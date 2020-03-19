@@ -165,11 +165,16 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #endif
 
 /* Protocol selection for 'initialize_link_protocol()'. */
-#define CAHUTE_LINK_PROTOCOL_CAS40     0x00000001
-#define CAHUTE_LINK_PROTOCOL_CAS50     0x00000002
-#define CAHUTE_LINK_PROTOCOL_CAS100    0x00000003
-#define CAHUTE_LINK_PROTOCOL_SEVEN     0x00000004
-#define CAHUTE_LINK_PROTOCOL_SEVEN_OHP 0x00000005
+#define CAHUTE_LINK_PROTOCOL_AUTO      0
+#define CAHUTE_LINK_PROTOCOL_CASIOLINK 1
+#define CAHUTE_LINK_PROTOCOL_SEVEN     2
+#define CAHUTE_LINK_PROTOCOL_SEVEN_OHP 3
+
+/* CASIOLINK variant selection for the same function. */
+#define CAHUTE_CASIOLINK_VARIANT_AUTO   0
+#define CAHUTE_CASIOLINK_VARIANT_CAS40  1
+#define CAHUTE_CASIOLINK_VARIANT_CAS50  2
+#define CAHUTE_CASIOLINK_VARIANT_CAS100 3
 
 /**
  * stdio stream state.

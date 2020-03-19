@@ -204,13 +204,66 @@ Function declarations
         In case of error, the value of ``*linkp`` mustn't be used nor freed.
 
     Since serial links do not offer any metadata, the protocol to use on the
-    serial link must be selected manually, amongst the following:
+    serial link is selected manually, amongst the following:
+
+    .. c:macro:: CAHUTE_SERIAL_PROTOCOL_AUTO
+
+        Use automatic protocol detection.
+
+        .. warning::
+
+            This cannot be used if :c:macro:`CAHUTE_SERIAL_RECEIVER` is not
+            set and :c:macro:`CAHUTE_SERIAL_NOCHECK` is set, as the
+            sender / active side tweaks the checking flow to determine the
+            protocol of the other side.
+
+    .. c:macro:: CAHUTE_SERIAL_PROTOCOL_CASIOLINK
+
+        Use CASIOLINK protocol.
+
+        See :ref:`protocol-casiolink` for more information.
 
     .. c:macro:: CAHUTE_SERIAL_PROTOCOL_SEVEN
 
         Use Protocol 7.00.
 
         See :ref:`protocol-seven` for more information.
+
+    .. c:macro:: CAHUTE_SERIAL_PROTOCOL_SEVEN_OHP
+
+        Use Protocol 7.00 Screenstreaming.
+
+        See :ref:`protocol-seven-ohp` for more information.
+
+    If the selected protocol is set or determined to be the CASIOLINK protocol,
+    the variant must be selected using one of the following macros:
+
+    .. c:macro:: CAHUTE_SERIAL_CASIOLINK_VARIANT_AUTO
+
+        Use automatic protocol variant detection.
+
+        .. warning::
+
+            This flag can only be used if :c:macro:`CAHUTE_SERIAL_RECEIVER`
+            is set.
+
+    .. c:macro:: CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS40
+
+        Use or expect CAS40 variant.
+
+        See :ref:`casiolink-cas40-header-format` for more information.
+
+    .. c:macro:: CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS50
+
+        Use or expect CAS50 variant.
+
+        See :ref:`casiolink-cas50-header-format` for more information.
+
+    .. c:macro:: CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS100
+
+        Use or expect CAS100 variant.
+
+        See :ref:`casiolink-cas100-header-format` for more information.
 
     Since the number of stop bits may be selectable on the calculator, it
     can also be selected manually, amongst the following:
@@ -293,22 +346,37 @@ Function declarations
 
     Protocol-specific behaviour can be tweaked using the following flags:
 
+    .. c:macro:: CAHUTE_SERIAL_RECEIVER
+
+        If this flag is provided, the link starts out as a passive / receiver
+        side rather than an active / sender side.
+
     .. c:macro:: CAHUTE_SERIAL_NOCHECK
 
-        If this flag is provided, the initial handshake will not be
-        done when the link is established on the underlying medium.
+        If this flag is provided:
+
+        * If :c:macro:`CAHUTE_SERIAL_RECEIVER` is provided, the initial
+          handshake is no longer required from the sender or active side,
+          albeit still accepted.
+        * Otherwise, the initial handshake will not be done when the
+          link is established on the underlying medium.
 
         This flag is mostly useful when resuming a connection initiated by
         another process, or when the passive process does not require or
         implement the initial handshake.
 
-        It is only effective when using protocol 7.00.
-        See :ref:`protocol-seven` for more information.
+        .. warning::
+
+            This cannot be used if :c:macro:`CAHUTE_SERIAL_RECEIVER` is not
+            set and :c:macro:`CAHUTE_SERIAL_PROTOCOL_AUTO` is used, as the
+            sender / active side tweaks the checking flow to determine the
+            protocol of the other side.
 
     .. c:macro:: CAHUTE_SERIAL_NODISC
 
-        If this flag is provided, command :ref:`seven-command-01` is
-        not issued once the link is established to get the device information.
+        If this flag is provided, and :c:macro:`CAHUTE_SERIAL_RECEIVER` is
+        **not** provided, command :ref:`seven-command-01` is not issued once
+        the link is established to get the device information.
 
         This flag is mostly useful when dealing with bootcode or custom
         link implementations that may not have implemented this command.
@@ -321,26 +389,15 @@ Function declarations
 
     .. c:macro:: CAHUTE_SERIAL_NOTERM
 
-        If this flag is provided, the terminate flow is not run when
-        the link is closed.
+        If this flag is provided, and :c:macro:`CAHUTE_SERIAL_RECEIVER` is
+        **not** provided, the terminate flow is not run when the link
+        is closed.
 
         This flag is mostly useful to let the connection still opened for
         other processes to run commands. Combined with
-        :c:macro:`CAHUTE_SERIAL_NOCHECK`, it allows running multiple shell
+        :c:macro:`CAHUTE_SERIAL_NOCHECK`, provided the protocol is set
+        explicitely, it allows running multiple shell
         commands on the same connection.
-
-        It is only effective when using protocol 7.00.
-        See :ref:`protocol-seven` for more information.
-
-    .. c:macro:: CAHUTE_SERIAL_OHP
-
-        If this flag is provided, the calculator is assumed to use the link
-        for screenstreaming purposes.
-
-        For example, with the fx-9860G and compatible, this prompts the link
-        to use Protocol 7.00 Screenstreaming instead of Protocol 7.00.
-
-        See :ref:`protocol-seven-ohp` for more information.
 
     :param linkp: The pointer to set the opened link to.
     :param flags: The flags to set to the serial link.

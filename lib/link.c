@@ -30,11 +30,12 @@
 #define DEFAULT_PROTOCOL_BUFFER_SIZE 524288 /* 512 KiB, max. for VRAM */
 
 /* Other protocol flags for 'initialize_link_protocol()'. */
-#define PROTOCOL_FLAG_SERIAL  0x00000001 /* Protocol is run over serial. */
-#define PROTOCOL_FLAG_SCSI    0x00000002 /* Protocol is over SCSI. */
-#define PROTOCOL_FLAG_NOCHECK 0x00000100 /* Should not send initial check. */
-#define PROTOCOL_FLAG_NOTERM  0x00000200 /* Should not send termination. */
-#define PROTOCOL_FLAG_NODISC  0x00000400 /* Should not run discovery. */
+#define PROTOCOL_FLAG_SERIAL   0x00000001 /* Protocol is run over serial. */
+#define PROTOCOL_FLAG_SCSI     0x00000002 /* Protocol is over SCSI. */
+#define PROTOCOL_FLAG_NOCHECK  0x00000100 /* Should not send initial check. */
+#define PROTOCOL_FLAG_NOTERM   0x00000200 /* Should not send termination. */
+#define PROTOCOL_FLAG_NODISC   0x00000400 /* Should not run discovery. */
+#define PROTOCOL_FLAG_RECEIVER 0x00000800 /* Act as a receiver. */
 
 
 /**
@@ -43,13 +44,16 @@
  * @param link Link to initialize.
  * @param flags Flags to initialize the link's protocol state with.
  * @param protocol Protocol to select.
+ * @param casiolink_variant CASIOLINK variant to use, if the protocol is either
+ *        automatic or CASIOLINK.
  * @return Cahute error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_LOCAL(int)
 initialize_link_protocol(
     cahute_link *link,
     unsigned long flags,
-    int protocol
+    int protocol,
+    int casiolink_variant
 ) {
     struct cahute_seven_state *seven_state;
     struct cahute_seven_ohp_state *seven_ohp_state;
@@ -149,39 +153,16 @@ cahute_open_serial_link(
     cahute_link *link = NULL;
     unsigned long protocol_flags = 0;
     unsigned long unsupported_flags;
-    int protocol, err = CAHUTE_OK;
-
-    switch (speed) {
-    case 0:
-        /* We use a default value of 9600 bauds. */
-        speed = 9600;
-        break;
-
-    case 300:
-    case 600:
-    case 1200:
-    case 2400:
-    case 4800:
-    case 9600:
-    case 19200:
-    case 38400:
-    case 57600:
-    case 115200:
-        /* Valid values! */
-        break;
-
-    default:
-        msg(ll_error, "Unsupported baud rate %lu for serial link.", speed);
-        return CAHUTE_ERROR_IMPL;
-    }
+    int protocol, casiolink_variant = 0, err = CAHUTE_OK;
 
     unsupported_flags =
         flags
-        & ~(CAHUTE_SERIAL_PROTOCOL_MASK | CAHUTE_SERIAL_STOP_MASK
-            | CAHUTE_SERIAL_PARITY_MASK | CAHUTE_SERIAL_XONXOFF_MASK
-            | CAHUTE_SERIAL_DTR_MASK | CAHUTE_SERIAL_RTS_MASK
+        & ~(CAHUTE_SERIAL_PROTOCOL_MASK | CAHUTE_SERIAL_CASIOLINK_VARIANT_MASK
+            | CAHUTE_SERIAL_STOP_MASK | CAHUTE_SERIAL_PARITY_MASK
+            | CAHUTE_SERIAL_XONXOFF_MASK | CAHUTE_SERIAL_DTR_MASK
+            | CAHUTE_SERIAL_RTS_MASK | CAHUTE_SERIAL_RECEIVER
             | CAHUTE_SERIAL_NOCHECK | CAHUTE_SERIAL_NODISC
-            | CAHUTE_SERIAL_NOTERM | CAHUTE_SERIAL_OHP);
+            | CAHUTE_SERIAL_NOTERM);
 
     if (unsupported_flags) {
         msg(ll_error,
@@ -190,10 +171,122 @@ cahute_open_serial_link(
         return CAHUTE_ERROR_IMPL;
     }
 
+    switch (flags & CAHUTE_SERIAL_PROTOCOL_MASK) {
+    case CAHUTE_SERIAL_PROTOCOL_AUTO:
+        /* If we are to be the sender or active side, and are not allowed
+         * to initiate the connection, we cannot test different things,
+         * therefore this cannot be used with ``CAHUTE_SERIAL_NOCHECK``. */
+        if ((~flags & CAHUTE_SERIAL_RECEIVER)
+            && (flags & CAHUTE_SERIAL_NOCHECK)) {
+            msg(ll_error,
+                "We need the check flow to try and determine the protocol.");
+            return CAHUTE_ERROR_IMPL;
+        }
+
+        protocol = CAHUTE_LINK_PROTOCOL_AUTO;
+
+        /* TODO */
+        msg(ll_error, "Automatic protocol detection is not yet implemented.");
+        return CAHUTE_ERROR_IMPL;
+
+    case CAHUTE_SERIAL_PROTOCOL_CASIOLINK:
+        protocol = CAHUTE_LINK_PROTOCOL_CASIOLINK;
+
+        /* TODO */
+        if (~flags & CAHUTE_SERIAL_RECEIVER) {
+            msg(ll_error,
+                "Sender mode is not yet implemented with CASIOLINK.");
+            return CAHUTE_ERROR_IMPL;
+        }
+
+        /* TODO */
+        msg(ll_error, "CASIOLINK protocol is not supported for now.");
+        return CAHUTE_ERROR_IMPL;
+
+    case CAHUTE_SERIAL_PROTOCOL_SEVEN:
+        if (flags & CAHUTE_SERIAL_RECEIVER) {
+            /* TODO */
+            msg(ll_error,
+                "Protocol 7.00 passive side is not supported for now.");
+            return CAHUTE_ERROR_IMPL;
+        }
+
+        protocol = CAHUTE_LINK_PROTOCOL_SEVEN;
+        break;
+
+    case CAHUTE_SERIAL_PROTOCOL_SEVEN_OHP:
+        if (~flags & CAHUTE_SERIAL_RECEIVER) {
+            /* TODO */
+            msg(ll_error, "Only receiver is supported for screenstreaming.");
+            return CAHUTE_ERROR_IMPL;
+        }
+
+        protocol = CAHUTE_LINK_PROTOCOL_SEVEN_OHP;
+        break;
+
+    default:
+        msg(ll_error,
+            "Invalid value for protocol: 0x%08lX!",
+            flags & CAHUTE_SERIAL_PROTOCOL_MASK);
+        return CAHUTE_ERROR_IMPL;
+    }
+
+    if (protocol == CAHUTE_LINK_PROTOCOL_AUTO
+        || protocol == CAHUTE_LINK_PROTOCOL_CASIOLINK) {
+        switch (flags & CAHUTE_SERIAL_CASIOLINK_VARIANT_MASK) {
+        case 0:
+            /* By default, if not provided, make the same choice as
+                 * the fx-9860G in compatibility mode, use CAS50 if sender
+                 * or detect if receiver. */
+            if (flags & CAHUTE_SERIAL_RECEIVER)
+                casiolink_variant = CAHUTE_CASIOLINK_VARIANT_AUTO;
+            else
+                casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS50;
+
+            break;
+
+        case CAHUTE_SERIAL_CASIOLINK_VARIANT_AUTO:
+            if (protocol == CAHUTE_LINK_PROTOCOL_AUTO
+                && (~flags & CAHUTE_SERIAL_RECEIVER)) {
+                msg(ll_error,
+                    "Automatic data payload format detection is impossible "
+                    "without receiver mode.");
+                return CAHUTE_ERROR_IMPL;
+            }
+            break;
+
+        case CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS40:
+            casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS40;
+            break;
+
+        case CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS50:
+            casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS50;
+            break;
+
+        case CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS100:
+            casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS100;
+            break;
+
+        default:
+            msg(ll_error,
+                "Invalid value for CASIOLINK variant: 0x%08lX!",
+                flags & CAHUTE_SERIAL_CASIOLINK_VARIANT_MASK);
+            return CAHUTE_ERROR_IMPL;
+        }
+    }
+
     switch (flags & CAHUTE_SERIAL_STOP_MASK) {
     case 0:
-        /* We use a default value of 2 stop bits. */
-        flags |= CAHUTE_SERIAL_STOP_TWO;
+        /* We use a default value depending on the protocol and variant. */
+        if (protocol == CAHUTE_LINK_PROTOCOL_SEVEN
+            || protocol == CAHUTE_LINK_PROTOCOL_SEVEN_OHP
+            || (protocol == CAHUTE_LINK_PROTOCOL_CASIOLINK
+                && casiolink_variant == CAHUTE_CASIOLINK_VARIANT_CAS100))
+            flags |= CAHUTE_SERIAL_STOP_TWO;
+        else
+            flags |= CAHUTE_SERIAL_STOP_ONE;
+
+        break;
 
     case CAHUTE_SERIAL_STOP_ONE:
     case CAHUTE_SERIAL_STOP_TWO:
@@ -241,16 +334,34 @@ cahute_open_serial_link(
         flags |= CAHUTE_SERIAL_RTS_DISABLE;
     }
 
-    if ((flags & CAHUTE_SERIAL_PROTOCOL_MASK)
-        != CAHUTE_SERIAL_PROTOCOL_SEVEN) {
-        msg(ll_error, "Only Protocol 7.00 is supported on serial.");
+    switch (speed) {
+    case 0:
+        /* We use a default value depending on the protocol. */
+        if (protocol == CAHUTE_LINK_PROTOCOL_CASIOLINK
+            && casiolink_variant == CAHUTE_CASIOLINK_VARIANT_CAS100)
+            speed = 38400;
+        else
+            speed = 9600;
+
+        break;
+
+    case 300:
+    case 600:
+    case 1200:
+    case 2400:
+    case 4800:
+    case 9600:
+    case 19200:
+    case 38400:
+    case 57600:
+    case 115200:
+        /* Valid values! */
+        break;
+
+    default:
+        msg(ll_error, "Unsupported baud rate %lu for serial link.", speed);
         return CAHUTE_ERROR_IMPL;
     }
-
-    if (flags & CAHUTE_SERIAL_OHP)
-        protocol = CAHUTE_LINK_PROTOCOL_SEVEN_OHP;
-    else
-        protocol = CAHUTE_LINK_PROTOCOL_SEVEN;
 
 #if defined(CAHUTE_LINK_STREAM_UNIX)
     int fd;
@@ -353,8 +464,16 @@ cahute_open_serial_link(
         protocol_flags |= PROTOCOL_FLAG_NODISC;
     if (flags & CAHUTE_SERIAL_NOTERM)
         protocol_flags |= PROTOCOL_FLAG_NOTERM;
+    if (flags & PROTOCOL_FLAG_RECEIVER)
+        protocol_flags |= PROTOCOL_FLAG_RECEIVER;
 
-    if ((err = initialize_link_protocol(link, protocol_flags, protocol))) {
+    err = initialize_link_protocol(
+        link,
+        protocol_flags,
+        protocol,
+        casiolink_variant
+    );
+    if (err) {
         cahute_close_link(link);
         return err;
     }
@@ -615,7 +734,7 @@ cahute_open_usb_link(
     if (flags & CAHUTE_USB_NOTERM)
         protocol_flags |= PROTOCOL_FLAG_NOTERM;
 
-    if ((err = initialize_link_protocol(link, protocol_flags, protocol))) {
+    if ((err = initialize_link_protocol(link, protocol_flags, protocol, 0))) {
         cahute_close_link(link);
         return err;
     }
