@@ -1,0 +1,391 @@
+.. _p7:
+
+``p7`` command line reference
+=============================
+
+p7 is a utility originally provided with libp7_ back in August of 2016 by
+`Thomas Touhey`_. It is used to interact with the calculator's storage
+devices from any calculator using Protocol 7.00.
+
+.. warning::
+
+    This interface is provided by compatibility with libp7 / libcasio, and
+    must not be changed to bring new features or change the syntax of
+    existing ones.
+
+For concrete steps in using p7, consult the following guides:
+
+* :ref:`guide-cli-send-file`;
+* :ref:`guide-cli-get-file`;
+* :ref:`guide-cli-get-info`.
+
+Available options for all subcommands are the following:
+
+``-l``, ``--log``
+    Logging level to set the library as, as any of ``info``, ``warning``,
+    ``error``, ``fatal``, ``none``.
+
+    This option may allow contributors to visualize the effects of their
+    contribution better, and allows users to produce a full output to join
+    to an issue.
+
+    See :ref:`logging` for more information.
+
+p7 is used through subcommands that work on a link, with the exception of
+the ``list-devices`` subcommand. Available options for such subcommands
+are the following:
+
+``--com <device>``
+    Path or name of the serial device with which to communicate,
+    e.g. ``/dev/ttyUSB0``.
+
+    If this option is not provided, p7 will look for a calculator connected
+    through USB.
+
+``--use <settings>``
+    Serial settings to instantiate the serial link with.
+
+    This parameter is of the following format:
+
+    .. code-block:: text
+
+        <Speed in bauds><Parity><Stop bits>
+
+    Where:
+
+    * The speed in bauds is expressed as an integer, e.g. ``19200``.
+    * The parity is either ``O`` for odd parity, ``E`` for even parity,
+      and ``N`` if parity checks are disabled altogether.
+    * The stop bits is either ``1`` or ``2``.
+
+    By default, the serial link is instanciated with a speed of 9600 bauds,
+    no parity and 2 stop bits (``9600N2``).
+
+    This option is ignored if the path or name of a serial device is not
+    provided using the ``--com`` option.
+
+``--set <settings>``
+    Serial settings to negotiate with the calculator.
+
+    The parameter is of the same format as the ``--use`` option described
+    above.
+
+    This option is ignored if the path or name of a serial device is not
+    provided using the ``--com`` option.
+
+``--reset``
+    Short hand form of ``--set 9600N2``.
+
+``--no-init``
+    Disable the initiation handshake when the link is opened.
+
+    This is mostly useful if combining multiple consecutive p7 subcommands,
+    if the previous one was passed ``--no-exit``.
+
+``--no-exit``
+    Disable the termination handshake when the link is closed.
+
+    This is mostly useful if combining multiple consecutive p7 subcommands,
+    provided the next one is passed ``--no-init``.
+
+Invalid options are ignored by p7. If an option is provided several time,
+only the latest occurrence will be taken into account.
+
+See the following sections for subcommand specification.
+
+.. _p7-list-devices:
+
+``list-devices`` subcommand reference
+-------------------------------------
+
+This subcommand is used to list serial devices available to be used by p7.
+
+This subcommand does not provide additional options.
+
+An example execution is the following:
+
+.. code-block:: text
+
+    $ p7 list-devices
+    Available devices:
+
+    - /dev/ttyUSB1
+    - /dev/ttyUSB2
+
+.. _p7-info:
+
+``info`` subcommand reference
+-----------------------------
+
+This subcommand is used to get information regarding a calculator.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 info
+
+.. _p7-idle:
+
+``idle`` subcommand reference
+-----------------------------
+
+This subcommand does not run any use case, and is used to only initiate,
+terminate, and/or update serial parameters on a link, when chaining multiple
+commands.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 idle
+
+.. _p7-send:
+
+``send`` subcommand reference
+-----------------------------
+
+This subcommand is used for sending a file to a storage device on the
+calculator.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 send [options...] <local file path>
+
+Where the local file path is the path to the local file to send, relative
+to the working directory; for example, ``myaddin.g1a``.
+
+Available options are the following:
+
+``-#``
+    Flag to enable displaying of a loading bar to show transfer progress.
+
+``-f``, ``--force``
+    If the file already exists in the calculator's device storage, force
+    overwriting it or not.
+
+    By default, if the case occurs, the subcommand requests an interactive
+    overwrite confirmation or rejection.
+
+``-o``, ``--output``
+    File name the file should be stored as on the storage device,
+    e.g. ``-o MYADDIN.G1A``.
+
+    By default, the output file name is determined using the base name
+    of the local path.
+
+``-d``, ``--directory``
+    Directory name in which the file should be sent to.
+
+    By default, the file is sent to the storage device's root.
+
+``--storage``
+    Name of the storage device on which the file should be stored.
+
+    By default, this is set to ``fls0`` (flash memory filesystem).
+    However, this can be set to other storage device names, such as
+    ``crd0`` (SD card) for calculators with an SD card slot.
+
+.. _p7-get:
+
+``get`` subcommand reference
+----------------------------
+
+This command is used to request a file from a storage device on the
+calculator.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 get [options...] <distant file name>
+
+Where the distant file name is the name of the file on the calculator.
+
+.. warning::
+
+    Note that the parameter is **NOT** the path of the file, but the name
+    of the file. If you wish to request a file from a directory, you must
+    use the ``-d`` or ``--directory`` option.
+
+Available options are the following:
+
+``-#``
+    Flag to enable displaying of a loading bar to show transfer progress.
+
+``-o``, ``--output``
+    Local path of the file to which to write the result, absolute or relative
+    to the working directory.
+
+    If the file already exists, it will be overwritten automatically.
+
+    By default, this is set to the distant file name in the current working
+    directory.
+
+``-d``, ``--directory``
+    Name of the distant directory in which the requested file is present.
+
+    By default, the file is requested from the storage device's root.
+
+``--storage``
+    Name of the storage device from which the file should be requested.
+
+    By default, this is set to ``fls0`` (flash memory filesystem).
+    However, this can be set to other storage device names, such as
+    ``crd0`` (SD card) for calculators with an SD card slot.
+
+.. _p7-copy:
+
+``copy`` subcommand reference
+-----------------------------
+
+This subcommand is used to copy a distant file to another on a storage device
+on the calculator.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 copy [options...] <source file name> <target file name>
+
+.. warning::
+
+    Both parameters are **NOT** the file paths, but the file names.
+
+    If you wish to set a directory for the source file, use the ``-d``
+    or ``--directory`` option.
+
+    If you wish to set a directory for the target file, use the ``-t``
+    or ``--to`` option.
+
+Available options are the following:
+
+``-d``, ``--directory``
+    Directory in which the source file should be retrieved from.
+
+    By default, the source file is retrieved from the storage device's root.
+
+``-t``, ``--to``
+    Directory in which the target file should be created in.
+
+    By default, the target file is created in the storage device's root.
+
+``--storage``
+    Name of the storage device on which the copy should occur.
+
+    By default, this is set to ``fls0`` (flash memory filesystem).
+    However, this can be set to other storage device names, such as
+    ``crd0`` (SD card) for calculators with an SD card slot.
+
+.. _p7-delete:
+
+``delete`` subcommand reference
+-------------------------------
+
+This subcommand is used to delete a distant file on a storage device on
+the calculator.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 delete [options...] <distant file name>
+
+.. warning::
+
+    Note that the parameter is **NOT** the path of the file, but the name
+    of the file. If you wish to request a file from a directory, you must
+    use the ``-d`` or ``--directory`` option.
+
+Available options are the following:
+
+``-d``, ``--directory``
+    Directory in which the file should be deleted from.
+
+    By default, the file is deleted from the storage device's root.
+
+``--storage``
+    Name of the storage device on which the deletion should occur.
+
+    By default, this is set to ``fls0`` (flash memory filesystem).
+    However, this can be set to other storage device names, such as
+    ``crd0`` (SD card) for calculators with an SD card slot.
+
+.. _p7-list:
+
+``list`` subcommand reference
+-----------------------------
+
+This subcommand is used to list files present on a storage device on
+the calculator.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 list [options...]
+
+Available options are the following:
+
+``-d``, ``--directory``
+    Directory in which the file should be listed in.
+
+    By default, this subcommand lists files from all directories, including
+    the storage device's root.
+
+``--storage``
+    Name of the storage device on which to list files.
+
+    By default, this is set to ``fls0`` (flash memory filesystem).
+    However, this can be set to other storage device names, such as
+    ``crd0`` (SD card) for calculators with an SD card slot.
+
+.. _p7-reset:
+
+``reset`` subcommand reference
+------------------------------
+
+This subcommand is used to reset a storage device on the calculator.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 reset [options...]
+
+Available options are the following:
+
+``--storage``
+    Name of the storage device to reset.
+
+    By default, this is set to ``fls0`` (flash memory filesystem).
+    However, this can be set to other storage device names, such as
+    ``crd0`` (SD card) for calculators with an SD card slot.
+
+.. _p7-optimize:
+
+``optimize`` subcommand reference
+---------------------------------
+
+This subcommand is used to optimize a storage device on the calculator,
+i.e. defragment in order to save space.
+
+The syntax is the following:
+
+.. code-block:: text
+
+    p7 optimize [options...]
+
+Available options are the following:
+
+``--storage``
+    Name of the storage device to optimize.
+
+    By default, this is set to ``fls0`` (flash memory filesystem).
+    However, this can be set to other storage device names, such as
+    ``crd0`` (SD card) for calculators with an SD card slot.
+
+.. _libp7: https://p7.planet-casio.com/
+.. _Thomas Touhey: https://thomas.touhey.fr/

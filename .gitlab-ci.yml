@@ -1,0 +1,73 @@
+stages:
+  - lint
+  - build
+  - publish
+
+pre-commit:
+    stage: lint
+    image: python:3.11
+    before_script:
+        - pip install pre-commit==3.6.0
+    script:
+        - pre-commit run -v --all-files
+
+build (linux):
+    stage: build
+    image: debian:bookworm-slim
+    before_script:
+        - apt-get update -y
+        - apt-get install -y cmake pkg-config gcc libusb-1.0-0-dev libsdl2-dev
+    script:
+        - cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr
+        - cmake --build build
+
+build docs:
+    stage: build
+    image: python:3.11
+    before_script:
+        - pip install -r docs/requirements.txt
+    script:
+        - sphinx-build -M html docs docs/_build
+    artifacts:
+        paths:
+            - docs/_build/html
+
+publish docs:
+    stage: publish
+    rules:
+      - if: $CI_COMMIT_TAG
+        when: always
+    image: debian:bookworm-slim
+    before_script:
+        - apt-get update -y
+        - apt-get install -y rsync openssh-client
+        - eval $(ssh-agent -s)
+        - mkdir ~/.ssh && chmod 700 ~/.ssh
+        - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" >~/.ssh/config
+        - chmod 400 "$SSH_PRIVATE_KEY"
+        - ssh-add "$SSH_PRIVATE_KEY"
+    script:
+        - rsync -Prlt --delete docs/_build/html/ gitlab-cahute@cahuteproject.org:/var/www/cahuteproject/www
+    dependencies:
+        - build docs
+
+publish tarball:
+    stage: publish
+    rules:
+        - if: $CI_COMMIT_TAG
+          when: always
+    image: debian:bookworm-slim
+    before_script:
+        - apt-get update -y
+        - apt-get install -y cmake pkg-config gcc libusb-1.0-0-dev libsdl2-dev openssh-client
+        - eval $(ssh-agent -s)
+        - mkdir ~/.ssh && chmod 700 ~/.ssh
+        - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" >~/.ssh/config
+        - chmod 400 "$SSH_PRIVATE_KEY"
+        - ssh-add "$SSH_PRIVATE_KEY"
+    script:
+        - cmake -B build -S .
+        - cpack --config build/CPackSourceConfig.cmake
+        - export RELEASE_FILE=$(ls cahute-*.tar.gz)
+        - sha256sum $RELEASE_FILE >$RELEASE_FILE.sha256
+        - scp $RELEASE_FILE $RELEASE_FILE.sha256 gitlab-cahute@cahuteproject.org:/var/www/cahuteproject/ftp/releases

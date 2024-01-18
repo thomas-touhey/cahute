@@ -1,0 +1,21 @@
+repos:
+    - repo: https://github.com/commitizen-tools/commitizen
+      rev: v2.38.0
+      hooks:
+          - id: commitizen
+            stages: [commit-msg]
+
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v2.3.0
+      hooks:
+          - id: trailing-whitespace
+          - id: check-merge-conflict
+          - id: check-ast
+          - id: check-json
+          - id: mixed-line-ending
+          - id: end-of-file-fixer
+
+    - repo: https://github.com/pre-commit/mirrors-clang-format
+      rev: v17.0.6
+      hooks:
+          - id: clang-format

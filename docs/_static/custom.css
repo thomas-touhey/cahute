@@ -1,0 +1,19 @@
+h1 img, h2 img, p img {
+    vertical-align: middle;
+    width: 1em;
+}
+
+.sidebar-logo {
+    width: 80%;
+}
+
+.mermaid {
+    text-align: center;
+}
+
+.bottom-of-page .icons svg,
+.bottom-of-page .icons img {
+    width: auto;
+    height: 2em;
+    vertical-align: middle;
+}

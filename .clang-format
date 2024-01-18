@@ -1,0 +1,97 @@
+---
+AlignAfterOpenBracket: BlockIndent
+AlignArrayOfStructures: None
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: Consecutive
+AlignEscapedNewlines: DontAlign
+AlignOperands: Align
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakBeforeMultilineStrings: true
+AttributeMacros: ['CAHUTE_WUR', 'CAHUTE_DEPRECATED', 'CAHUTE_EXTERN']
+BinPackArguments: false
+BinPackParameters: false
+BitFieldColonSpacing: After
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeElse: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+BracedInitializerIndentWidth: 4
+BreakAfterAttributes: Never
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBraces: Custom
+BreakBeforeTernaryOperators: true
+BreakStringLiterals: true
+ColumnLimit: 79
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+DisableFormat: false
+IncludeBlocks: Preserve
+IndentCaseBlocks: false
+IndentCaseLabels: false
+IndentExternBlock: NoIndent
+IndentGotoLabels: false
+IndentPPDirectives: AfterHash
+IndentWidth: 4
+IndentWrappedFunctionNames: false
+InsertBraces: false
+InsertNewlineAtEOF: true
+InsertTrailingCommas: None
+KeepEmptyLinesAtEOF: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+LambdaBodyIndentation: Signature
+Language: Cpp
+LineEnding: LF
+MaxEmptyLinesToKeep: 2
+NamespaceIndentation: None
+PPIndentWidth: 1
+PointerAlignment: Right
+QualifierAlignment: Custom
+QualifierOrder: ['constexpr', 'static', 'inline', 'type', 'volatile', 'const', 'restrict']
+ReferenceAlignment: Right
+ReflowComments: false
+RemoveParentheses: Leave
+RemoveSemicolon: true
+SortIncludes: Never
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAroundPointerQualifiers: Both
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeParens: ControlStatements
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 2
+SpacesInAngles: false
+SpacesInContainerLiterals: false
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1
+SpacesInParens: Never
+SpacesInSquareBrackets: false
+Standard: Latest
+TabWidth: 4
+UseTab: Never

@@ -1,0 +1,47 @@
+.. _xfer9860:
+
+``xfer9860`` command line reference
+===================================
+
+`xfer9860 <xfer9860 project page_>`_ is a tool originally released back in
+June 2007 by Andreas Bertheussen for their fx-9860G SD. It is used to interact
+with the calculator's storage memory from any calculator supporting
+Protocol 7.00.
+
+.. warning::
+
+    This interface is provided by compatibility with Andres Bertheussen's
+    work, and must not be changed to bring new features or change the syntax of
+    existing ones.
+
+The utility operates differently depending on the provided option:
+
+``xfer9860 -u <local file path> <file name>``
+    **U**\ pload the file as ``<file name>`` on the calculator's main
+    storage device.
+
+``xfer9860 -d <file name> <local file path>``
+    **D**\ ownload the file named ``<file name>`` on the calculator's main
+    storage device.
+
+``xfer9860 -i``
+    Gather **i**\ nformation regarding the calculator.
+
+``xfer9860 -o``
+    **O**\ ptimize the calculator's main storage device.
+
+Available options for all operations are the following:
+
+``-h``, ``-a``
+    Display the help message and exit.
+
+    ``-a`` actually stands for "**a**\ bout", and only displayed licensing
+    information while ``-h`` stands for "**h**\ elp" and only displayed
+    usage help.
+
+    Cahute's implementation shows the same message for both options.
+
+``-t``
+    **T**\ hrottle in seconds, i.e. delay in milliseconds between packets.
+
+.. _xfer9860 project page: https://sourceforge.net/projects/xfer9860/

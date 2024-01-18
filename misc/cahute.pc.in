@@ -1,0 +1,9 @@
+includedir=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_INCLUDEDIR@/@PROJECT_NAME@-@PROJECT_VERSION_MAJOR@.@PROJECT_VERSION_MINOR@
+libdir=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@
+
+Name: cahute
+Description: Communication and file format handling tools for CASIO calculators
+Version: @PROJECT_VERSION_MAJOR@.@PROJECT_VERSION_MINOR@
+Requires: libusb-1.0
+Libs: -L${libdir} -lcahute
+Cflags: -I${includedir}

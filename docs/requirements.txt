@@ -1,0 +1,4 @@
+Sphinx~=7.2
+sphinx-autobuild
+sphinxcontrib-mermaid
+furo
