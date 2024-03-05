@@ -7,6 +7,7 @@ syntaxes support by Cahute's command-line utilities.
 .. toctree::
     :maxdepth: 1
 
+    cli/cas
     cli/p7
     cli/p7os
     cli/p7screen

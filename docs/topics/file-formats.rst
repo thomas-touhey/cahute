@@ -9,6 +9,7 @@ The file formats described by topic are the following:
     :maxdepth: 2
 
     file-formats/casiolink
+    file-formats/casrc
     file-formats/graphcard
 
 The file formats described by extension are the following:
@@ -21,5 +22,7 @@ The file formats described by extension are the following:
       - Description
     * - ``.CAS``
       - :ref:`file-format-casiolink`
+    * - ``.CASRC``
+      - :ref:`file-format-casrc`
     * - ``.GRC``
       - :ref:`file-format-graphcard`
