@@ -94,6 +94,7 @@ static struct long_option const long_options[] = {
  */
 int parse_args(int argc, char **argv, struct args *args) {
     struct option_parser_state state;
+    char const *command = argv[0];
     int help = 0, zoom, option, optopt;
     char *optarg;
 
@@ -157,7 +158,7 @@ int parse_args(int argc, char **argv, struct args *args) {
 
     /* If we want to display the help message, do it here! */
     if (help) {
-        printf(help_message, argv[0], get_current_log_level(), DEFAULT_ZOOM);
+        printf(help_message, command, get_current_log_level(), DEFAULT_ZOOM);
         return 0;
     }
 
