@@ -28,7 +28,9 @@
 
 #include "common.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 /**
  * Get the current logging level as a string.
@@ -70,4 +72,74 @@ extern void set_log_level(char const *loglevel) {
         value = CAHUTE_LOGLEVEL_FATAL;
 
     cahute_set_log_level(value);
+}
+
+/**
+ * Get a line and allocate it.
+ *
+ * Source: https://github.com/ivanrad/getline
+ *
+ * @param sp Pointer to the string to allocate.
+ * @param np Pointer to the gathered size.
+ * @param delim Delimiter.
+ * @param filep File pointer.
+ * @return Size of the obtained line.
+ */
+ssize_t portable_getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
+    char *cur_pos, *new_lineptr;
+    size_t new_lineptr_len;
+    int c;
+
+    if (lineptr == NULL || n == NULL || stream == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (*lineptr == NULL) {
+        *n = 128; /* Initial length. */
+        if ((*lineptr = (char *)malloc(*n)) == NULL) {
+            errno = ENOMEM;
+            return -1;
+        }
+    }
+
+    cur_pos = *lineptr;
+    for (;;) {
+        c = getc(stream);
+
+        if (ferror(stream) || (c == EOF && cur_pos == *lineptr))
+            return -1;
+
+        if (c == EOF)
+            break;
+
+        if ((*lineptr + *n - cur_pos) < 2) {
+            if (SSIZE_MAX / 2 < *n) {
+#ifdef EOVERFLOW
+                errno = EOVERFLOW;
+#else
+                errno = ERANGE; /* no EOVERFLOW defined */
+#endif
+                return -1;
+            }
+            new_lineptr_len = *n * 2;
+
+            if ((new_lineptr = (char *)realloc(*lineptr, new_lineptr_len))
+                == NULL) {
+                errno = ENOMEM;
+                return -1;
+            }
+            cur_pos = new_lineptr + (cur_pos - *lineptr);
+            *lineptr = new_lineptr;
+            *n = new_lineptr_len;
+        }
+
+        *cur_pos++ = (char)c;
+
+        if (c == delim)
+            break;
+    }
+
+    *cur_pos = '\0';
+    return (ssize_t)(cur_pos - *lineptr);
 }

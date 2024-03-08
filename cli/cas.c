@@ -26,15 +26,22 @@
  * knowledge of the CeCILL 2.1 license and that you accept its terms.
  * ************************************************************************* */
 
-#ifndef COMMON_H
-#define COMMON_H 1
-#include <cahute.h>
+#include "cas.h"
 
-extern char const *get_current_log_level(void);
-extern void set_log_level(char const *loglevel);
+/**
+ * Main function
+ *
+ * @param ac Argument count.
+ * @param av Argument values.
+ */
+int main(int ac, char **av) {
+    struct args args;
 
-/* Portable getdelim() implementation. */
-extern ssize_t
-portable_getdelim(char **sp, size_t *np, int delim, FILE *filep);
+    if (!parse_args(ac, av, &args))
+        return 0;
 
-#endif /* COMMON_H */
+    fprintf(stderr, "Not implemented.\n");
+
+    free_args(&args);
+    return 0;
+}

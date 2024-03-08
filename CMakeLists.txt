@@ -115,6 +115,14 @@ add_executable(xfer9860
     cli/options.c
 )
 
+add_executable(CaS
+    cli/cas.c
+    cli/cas_args.c
+    cli/casrc.c
+    cli/common.c
+    cli/options.c
+)
+
 include_directories(
     "${CMAKE_CURRENT_BINARY_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -122,6 +130,7 @@ include_directories(
 )
 target_include_directories(p7screen PRIVATE ${SDL2_INCLUDE_DIRS})
 
+target_link_libraries(CaS PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
 target_link_libraries(p7 PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
 target_link_libraries(p7os PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
 target_link_libraries(p7screen PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${SDL2_LIBRARIES} ${PLATFORM_LIBS})
@@ -136,6 +145,7 @@ install(TARGETS p7 RUNTIME)
 install(TARGETS p7os RUNTIME)
 install(TARGETS p7screen RUNTIME)
 install(TARGETS xfer9860 RUNTIME)
+install(TARGETS CaS RUNTIME)
 install(
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/" "${CMAKE_CURRENT_BINARY_DIR}/include/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
