@@ -1,7 +1,7 @@
 .. _guide-developer-detect-serial:
 
-As a developer, I want to list available serial ports
-=====================================================
+Listing available serial ports
+==============================
 
 In order to list calculators connected by USB, you must use
 :c:func:`cahute_detect_serial`, while providing it with a callback to either

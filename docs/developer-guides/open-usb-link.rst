@@ -1,5 +1,5 @@
-As a developer, I want to open a link to a calculator connected by USB
-======================================================================
+Opening a link to a calculator connected by USB
+===============================================
 
 In order to open the link to the calculator, the steps are the following:
 

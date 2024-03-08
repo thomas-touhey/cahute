@@ -20,6 +20,8 @@ This documentation is organized using `Diátaxis`_' structure.
 
     acknowledgements
     guides
+    cli-guides
+    developer-guides
     topics
     project
     cli

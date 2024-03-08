@@ -1,7 +1,7 @@
-.. _guide-cli-send-file:
+.. _guide-cli-get-info:
 
-As a CLI user, I want to send a file to the calculator's storage memory
-=======================================================================
+Getting information regarding a calculator
+==========================================
 
 .. warning::
 
@@ -9,13 +9,10 @@ As a CLI user, I want to send a file to the calculator's storage memory
     calculators, excluding the fx-CG line of calculators, which need to
     be used as a normal storage device ("USB Key" mode).
 
-In this guide, we will assume you want to transfer the ``MYADDIN.G1A`` file
-from your PC to your calculator.
-
 The instructions vary depending on the way your calculator is connected,
 see the correct section for your case.
 
-For more options, see :ref:`p7` and :ref:`p7-send`.
+For more options, see :ref:`p7` and :ref:`p7-info`.
 
 If you are using USB
 --------------------
@@ -24,19 +21,13 @@ The steps are the following:
 
 1. Connect the calculator to the PC using a mini USB cable.
 2. Select the ``DataTrans`` (``TransfDon`` in French) mode when prompted.
-3. Run the transfer from the PC using ``p7 send``.
+3. Run the command from the PC using ``p7 info``.
 
 Once steps 1 and 2 are done, run the following command::
 
-    p7 send MYADDIN.G1A
+    p7 info
 
-If the file already exists, you will be prompted on whether you want to
-overwrite the file on the calculator. In this case, you can either:
-
-* Enter ``y`` and press enter, to confirm the overwrite.
-* Enter ``n`` and press enter, to reject the overwrite.
-
-Your file has successfully been transferred to the calculator!
+Your calculator's information should have been gathered and displayed!
 
 If you are using serial
 -----------------------
@@ -47,7 +38,7 @@ The steps are the following:
 2. Configure the calculator to use serial and data transfer, and place
    the calculator in standby mode.
 3. Find out which serial port your calculator is connected on.
-4. Run the transfer from the PC using ``p7 send``.
+4. Run the command from the PC using ``p7 info``.
 
 For step 2, go to your link application, and do the following:
 
@@ -73,12 +64,6 @@ For step 4, you can run the transfer by using the following command:
 
 .. code-block:: bash
 
-    p7 --com <your-serial-device> send MYADDIN.G1A
+    p7 --com <your-serial-device> info
 
-If the file already exists, you will be prompted on whether you want to
-overwrite the file on the calculator. In this case, you can either:
-
-* Enter ``y`` and press enter, to confirm the overwrite.
-* Enter ``n`` and press enter, to reject the overwrite.
-
-Your file has successfully been transferred to the calculator!
+Your calculator's information should have been gathered and displayed!

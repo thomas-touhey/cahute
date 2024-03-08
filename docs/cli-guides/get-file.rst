@@ -1,7 +1,7 @@
-.. _guide-cli-get-info:
+.. _guide-cli-get-file:
 
-As a CLI user, I want to get information regarding my calculator
-================================================================
+Getting a file from the calculator's storage memory
+===================================================
 
 .. warning::
 
@@ -9,10 +9,13 @@ As a CLI user, I want to get information regarding my calculator
     calculators, excluding the fx-CG line of calculators, which need to
     be used as a normal storage device ("USB Key" mode).
 
+In this guide, we will assume you want to transfer the ``MYADDIN.G1A`` file
+from your calculator.
+
 The instructions vary depending on the way your calculator is connected,
 see the correct section for your case.
 
-For more options, see :ref:`p7` and :ref:`p7-info`.
+For more options, see :ref:`p7` and :ref:`p7-get`.
 
 If you are using USB
 --------------------
@@ -21,13 +24,13 @@ The steps are the following:
 
 1. Connect the calculator to the PC using a mini USB cable.
 2. Select the ``DataTrans`` (``TransfDon`` in French) mode when prompted.
-3. Run the command from the PC using ``p7 info``.
+3. Run the transfer from the PC using ``p7 get``.
 
 Once steps 1 and 2 are done, run the following command::
 
-    p7 info
+    p7 get MYADDIN.G1A
 
-Your calculator's information should have been gathered and displayed!
+The file should have been successfully transferred from the calculator!
 
 If you are using serial
 -----------------------
@@ -38,7 +41,7 @@ The steps are the following:
 2. Configure the calculator to use serial and data transfer, and place
    the calculator in standby mode.
 3. Find out which serial port your calculator is connected on.
-4. Run the command from the PC using ``p7 info``.
+4. Run the transfer from the PC using ``p7 get``.
 
 For step 2, go to your link application, and do the following:
 
@@ -64,6 +67,6 @@ For step 4, you can run the transfer by using the following command:
 
 .. code-block:: bash
 
-    p7 --com <your-serial-device> info
+    p7 --com <your-serial-device> get MYADDIN.G1A
 
-Your calculator's information should have been gathered and displayed!
+The file should have been successfully transferred from the calculator!

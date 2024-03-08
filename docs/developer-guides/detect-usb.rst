@@ -1,7 +1,7 @@
 .. _guide-developer-detect-usb:
 
-As a developer, I want to list calculators connected by USB
-===========================================================
+Listing calculators connected by USB
+====================================
 
 In order to list calculators connected by USB, you must use
 :c:func:`cahute_detect_usb`, while providing it with a callback to either

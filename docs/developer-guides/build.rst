@@ -1,5 +1,5 @@
-As a developer, I want to use the Cahute library in my project
-==============================================================
+Building with the Cahute library
+================================
 
 .. warning::
 

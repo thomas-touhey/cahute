@@ -1,7 +1,7 @@
 .. _guide-cli-display-screen:
 
-As a CLI user, I want to display the screen from my calculator
-==============================================================
+Displaying the screen from a calculator
+=======================================
 
 .. warning::
 
