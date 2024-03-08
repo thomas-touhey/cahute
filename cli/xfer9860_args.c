@@ -29,7 +29,7 @@
 #include "xfer9860.h"
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "options.h"
 
 static char const about_message[] =
     "xfer9860 - from Cahute v" CAHUTE_VERSION
@@ -75,9 +75,24 @@ static char const help_message[] =
     "    " CAHUTE_ISSUES_URL "\n";
 
 /**
- * Short options for getopt().
+ * Short options definitions.
  */
-static char const *short_options = "hat:u:d:io";
+static struct short_option const short_options[] = {
+    {'h', 0},
+    {'a', 0},
+    {'t', OPTION_FLAG_PARAMETER_REQUIRED},
+    {'u', OPTION_FLAG_PARAMETER_REQUIRED},
+    {'d', OPTION_FLAG_PARAMETER_REQUIRED},
+    {'i', 0},
+    {'o', 0},
+
+    SHORT_OPTION_SENTINEL
+};
+
+/**
+ * Long options definitions.
+ */
+static struct long_option const long_options[] = {LONG_OPTION_SENTINEL};
 
 /**
  * Parse the command-line parameters into a parsed arguments structure.
@@ -88,8 +103,10 @@ static char const *short_options = "hat:u:d:io";
  * @return 1 if the parameters have been parsed successfully, 0 otherwise.
  */
 int parse_args(int argc, char **argv, struct args *args) {
+    struct option_parser_state state;
     char const *command_path = argv[0];
-    int about = 0, help = 0, multiple_operations = 0;
+    char *optarg;
+    int option, optopt, about = 0, help = 0, multiple_operations = 0;
 
     args->operation = 0;
     args->throttle = 0;
@@ -100,12 +117,15 @@ int parse_args(int argc, char **argv, struct args *args) {
     args->local_source_fp = NULL;
     args->local_target_fp = NULL;
 
-    opterr = 0;
-    while (1) {
-        int option = getopt(argc, argv, short_options);
-        if (option < 0)
-            break;
-
+    init_option_parser(
+        &state,
+        GETOPT_STYLE_POSIX,
+        short_options,
+        long_options,
+        argc,
+        argv
+    );
+    while (parse_next_option(&state, &option, &optopt, NULL, &optarg)) {
         switch (option) {
         case 't':
             /* Original command used 'atoi()' here. */
@@ -163,8 +183,7 @@ int parse_args(int argc, char **argv, struct args *args) {
     }
 
 process_params:
-    argc -= optind;
-    argv += optind;
+    update_positional_parameters(&state, &argc, &argv);
 
     if (about) {
         fprintf(stderr, about_message);

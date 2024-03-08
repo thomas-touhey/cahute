@@ -29,7 +29,7 @@
 #include "p7screen.h"
 #include <stdlib.h>
 #include <ctype.h>
-#include <getopt.h>
+#include "options.h"
 
 static char const version_message[] =
     "p7screen - from Cahute v" CAHUTE_VERSION
@@ -61,27 +61,31 @@ static char const help_message[] =
     "    " CAHUTE_ISSUES_URL "\n";
 
 /**
- * Short options for getopt_long().
+ * Short options definitions.
  */
-char const *short_options = "hvz:l:";
+static struct short_option const short_options[] = {
+    {'h', 0},
+    {'v', 0},
+    {'z', OPTION_FLAG_PARAMETER_REQUIRED},
+    {'l', OPTION_FLAG_PARAMETER_REQUIRED},
+
+    SHORT_OPTION_SENTINEL
+};
 
 /**
- * Long options for getopt_long().
+ * Long options definitions.
  */
-struct option const long_options[] = {
-    {"help", no_argument, NULL, 'h'},
-    {"version", no_argument, NULL, 'v'},
-    {"zoom", required_argument, NULL, 'z'},
-    {"log", required_argument, NULL, 'l'},
-    {NULL, 0, NULL, 0}
+static struct long_option const long_options[] = {
+    {"help", 0, 'h'},
+    {"version", 0, 'v'},
+    {"zoom", OPTION_FLAG_PARAMETER_REQUIRED, 'z'},
+    {"log", OPTION_FLAG_PARAMETER_REQUIRED, 'l'},
+
+    LONG_OPTION_SENTINEL
 };
 
 /**
  * Parse command-line parameters, and handle help and version messages.
- *
- * Note that since we use getopt_long(), the argv array is actually
- * reorganized to move positional parameters at the end of the array, hence
- * why argv is of "char **" type, and not "char const * const *".
  *
  * @param argc Argument count, as provided to main().
  * @param argv Argument values, as provided to main().
@@ -89,18 +93,22 @@ struct option const long_options[] = {
  * @return Whether parameters were successfully parsed (1), or not (0).
  */
 int parse_args(int argc, char **argv, struct args *args) {
-    int help = 0, zoom, option;
+    struct option_parser_state state;
+    int help = 0, zoom, option, optopt;
+    char *optarg;
 
     /* Default parsed arguments. */
     args->zoom = DEFAULT_ZOOM;
 
-    opterr = 0;
-
-    while (1) {
-        option = getopt_long(argc, argv, short_options, long_options, NULL);
-        if (option < 0)
-            break;
-
+    init_option_parser(
+        &state,
+        GETOPT_STYLE_POSIX,
+        short_options,
+        long_options,
+        argc,
+        argv
+    );
+    while (parse_next_option(&state, &option, &optopt, NULL, &optarg)) {
         switch (option) {
         case 'h':
             /* -h, --help: display the help message and quit. */
@@ -128,7 +136,7 @@ int parse_args(int argc, char **argv, struct args *args) {
             set_log_level(optarg);
             break;
 
-        case '?':
+        case GETOPT_FAIL:
             /* Erroneous option usage. */
             if (optopt == 'z')
                 fprintf(stderr, "-z, --zoom: expected an argument\n");
@@ -140,9 +148,11 @@ int parse_args(int argc, char **argv, struct args *args) {
         }
     }
 
+    update_positional_parameters(&state, &argc, &argv);
+
     /* p7screen is used without parameters.
-        * If there is any, we want to print the help and quit. */
-    if (argc - optind)
+     * If there is any, we want to print the help and quit. */
+    if (argc)
         help = 1;
 
     /* If we want to display the help message, do it here! */

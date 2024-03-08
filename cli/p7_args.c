@@ -29,9 +29,9 @@
 #include "p7.h"
 #include <ctype.h>
 #include <errno.h>
-#include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
+#include "options.h"
 
 static char const version_message[] =
     "p7 - from Cahute v" CAHUTE_VERSION
@@ -209,33 +209,43 @@ static char const help_optimize[] =
     "'" DEFAULT_STORAGE "'.\n" SUBCOMMAND_FOOTER;
 
 /**
- * Short options for getopt_long().
+ * Short options definitions.
  */
-static char const *short_options = "hvfo:d:t:l:#";
+static struct short_option const short_options[] = {
+    {'h', 0},
+    {'v', 0},
+    {'f', 0},
+    {'o', OPTION_FLAG_PARAMETER_REQUIRED},
+    {'d', OPTION_FLAG_PARAMETER_REQUIRED},
+    {'t', OPTION_FLAG_PARAMETER_REQUIRED},
+    {'l', OPTION_FLAG_PARAMETER_REQUIRED},
+    {'#', 0},
+
+    SHORT_OPTION_SENTINEL
+};
 
 /**
- * Long options for getopt_long().
+ * Long options definitions.
  */
-static struct option const long_options[] = {
-    {"help", no_argument, NULL, 'h'},
-    {"version", no_argument, NULL, 'v'},
-    {"com", required_argument, NULL, 'c'},
-    {"storage", required_argument, NULL, 's'},
-    {"force", no_argument, NULL, 'f'},
-    {"output", required_argument, NULL, 'o'},
-    {"directory", required_argument, NULL, 'd'},
-    {"to", required_argument, NULL, 't'},
-    {"no-init", no_argument, NULL, 'i'},
-    {"no-start", no_argument, NULL, 'i'},
-    {"no-exit", no_argument, NULL, 'e'},
-    {"no-term", no_argument, NULL, 'e'},
-    {"set", required_argument, NULL, 'S'},
-    {"reset", no_argument, NULL, 'R'},
-    {"use", required_argument, NULL, 'U'},
-    {"log", required_argument, NULL, 'l'},
+static struct long_option const long_options[] = {
+    {"help", 0, 'h'},
+    {"version", 0, 'v'},
+    {"com", OPTION_FLAG_PARAMETER_REQUIRED, 'c'},
+    {"storage", OPTION_FLAG_PARAMETER_REQUIRED, 's'},
+    {"force", 0, 'f'},
+    {"output", OPTION_FLAG_PARAMETER_REQUIRED, 'o'},
+    {"directory", OPTION_FLAG_PARAMETER_REQUIRED, 'd'},
+    {"to", OPTION_FLAG_PARAMETER_REQUIRED, 't'},
+    {"no-init", 0, 'i'},
+    {"no-start", 0, 'i'},
+    {"no-exit", 0, 'e'},
+    {"no-term", 0, 'e'},
+    {"set", OPTION_FLAG_PARAMETER_REQUIRED, 'S'},
+    {"reset", 0, 'R'},
+    {"use", OPTION_FLAG_PARAMETER_REQUIRED, 'U'},
+    {"log", OPTION_FLAG_PARAMETER_REQUIRED, 'l'},
 
-    /* sentinel */
-    {NULL, 0, NULL, 0}
+    LONG_OPTION_SENTINEL
 };
 
 /**
@@ -366,9 +376,9 @@ static inline int check_file_name(char const *name) {
 /**
  * Parse command-line parameters, and handle help and version messages.
  *
- * Note that since we use getopt_long(), the argv array is actually reorganized
- * to move positional parameters at the end of the array, hence why argv
- * is of "char **" type, and not "char const * const *".
+ * Note that since we use option parsing, the argv array is actually
+ * reorganized to move positional parameters at the end of the array,
+ * hence why argv is of "char **" type, and not "char const * const *".
  *
  * @param argc Argument count, as provided to main().
  * @param argv Argument values, as provided to main().
@@ -376,13 +386,15 @@ static inline int check_file_name(char const *name) {
  * @return Whether parameters were successfully parsed (1), or not (0).
  */
 int parse_args(int argc, char **argv, struct args *args) {
+    struct option_parser_state state;
     char const *command = argv[0], *subcommand;
     char **params;
     char const *o_directory = NULL;
     char const *o_target_directory = NULL;
     char const *o_output = NULL;
     char const *o_storage = DEFAULT_STORAGE;
-    int option, help = 0, param_count;
+    char *optarg;
+    int option, optopt, help = 0, err, param_count;
 
     /* Default parsed arguments.
      * By default, the serial speed is defined as 9600N2. */
@@ -410,13 +422,15 @@ int parse_args(int argc, char **argv, struct args *args) {
     args->local_source_fp = NULL;
     args->local_target_fp = NULL;
 
-    opterr = 0;
-
-    while (1) {
-        option = getopt_long(argc, argv, short_options, long_options, NULL);
-        if (option < 0)
-            break;
-
+    init_option_parser(
+        &state,
+        GETOPT_STYLE_POSIX,
+        short_options,
+        long_options,
+        argc,
+        argv
+    );
+    while (parse_next_option(&state, &option, &optopt, NULL, &optarg)) {
         switch (option) {
         case 'h':
             /* -h, --help: display the help message and quit.
@@ -494,11 +508,12 @@ int parse_args(int argc, char **argv, struct args *args) {
 
         case 'U':
             /* --use: use initial serial settings. */
-            if (parse_serial_attributes(
-                    optarg,
-                    &args->serial_flags,
-                    &args->serial_speed
-                )) {
+            err = parse_serial_attributes(
+                optarg,
+                &args->serial_flags,
+                &args->serial_speed
+            );
+            if (err) {
                 fprintf(stderr, "-u, --use: invalid format!\n");
                 return 0;
             }
@@ -507,11 +522,12 @@ int parse_args(int argc, char **argv, struct args *args) {
 
         case 'S':
             /* --set: set serial settings to negotiate with the calculator. */
-            if (parse_serial_attributes(
-                    optarg,
-                    &args->new_serial_flags,
-                    &args->new_serial_speed
-                )) {
+            err = parse_serial_attributes(
+                optarg,
+                &args->new_serial_flags,
+                &args->new_serial_speed
+            );
+            if (err) {
                 fprintf(stderr, "-s, --set: invalid format!\n");
                 return 0;
             }
@@ -527,7 +543,7 @@ int parse_args(int argc, char **argv, struct args *args) {
             args->change_serial = 1;
             break;
 
-        case '?':
+        case GETOPT_FAIL:
             /* Erroneous option usage. */
             if (optopt == 'o')
                 fprintf(stderr, "-o, --output: expected an argument\n");
@@ -547,9 +563,7 @@ int parse_args(int argc, char **argv, struct args *args) {
         }
     }
 
-    param_count = argc - optind;
-    params = &argv[optind];
-
+    update_positional_parameters(&state, &param_count, &params);
     if (!param_count || !strcmp(params[0], "help")) {
         printf(help_main, command, get_current_log_level(), command);
         return 0;

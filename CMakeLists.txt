@@ -80,18 +80,21 @@ add_executable(p7
     cli/p7.c
     cli/p7_args.c
     cli/common.c
+    cli/options.c
 )
 
 add_executable(p7screen
     cli/p7screen.c
     cli/p7screen_args.c
     cli/common.c
+    cli/options.c
 )
 
 add_executable(xfer9860
     cli/xfer9860.c
     cli/xfer9860_args.c
     cli/common.c
+    cli/options.c
 )
 
 include_directories(
