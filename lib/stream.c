@@ -636,14 +636,26 @@ cahute_set_serial_params_to_link(
             status = 0;
 
         original_status = status;
-        switch (flags & CAHUTE_SERIAL_DTRRTS_MASK) {
-        case CAHUTE_SERIAL_DTRRTS_ENABLE:
-        case CAHUTE_SERIAL_DTRRTS_HANDSHAKE:
-            status |= TIOCM_DTR | TIOCM_RTS;
+
+        switch (flags & CAHUTE_SERIAL_DTR_MASK) {
+        case CAHUTE_SERIAL_DTR_ENABLE:
+        case CAHUTE_SERIAL_DTR_HANDSHAKE:
+            status |= TIOCM_DTR;
             break;
 
         default:
-            status &= ~(TIOCM_DTR | TIOCM_RTS);
+            status &= ~TIOCM_DTR;
+            break;
+        }
+
+        switch (flags & CAHUTE_SERIAL_RTS_MASK) {
+        case CAHUTE_SERIAL_RTS_ENABLE:
+        case CAHUTE_SERIAL_RTS_HANDSHAKE:
+            status |= TIOCM_RTS;
+            break;
+
+        default:
+            status &= ~TIOCM_RTS;
             break;
         }
 
@@ -748,21 +760,30 @@ cahute_set_serial_params_to_link(
             dcb.fOutX = 0;
         }
 
-        switch (flags & CAHUTE_SERIAL_DTRRTS_MASK) {
-        case CAHUTE_SERIAL_DTRRTS_ENABLE:
+        switch (flags & CAHUTE_SERIAL_DTR_MASK) {
+        case CAHUTE_SERIAL_DTR_ENABLE:
             dcb.fDtrControl = DTR_CONTROL_ENABLE;
-            dcb.fRtsControl = RTS_CONTROL_ENABLE;
             break;
 
-        case CAHUTE_SERIAL_DTRRTS_HANDSHAKE:
+        case CAHUTE_SERIAL_DTR_HANDSHAKE:
             dcb.fDtrControl = DTR_CONTROL_HANDSHAKE;
-            dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
             break;
 
         default:
             dcb.fDtrControl = DTR_CONTROL_DISABLE;
-            dcb.fRtsControl = RTS_CONTROL_DISABLE;
+        }
+
+        switch (flags & CAHUTE_SERIAL_RTS_MASK) {
+        case CAHUTE_SERIAL_RTS_ENABLE:
+            dcb.fRtsControl = RTS_CONTROL_ENABLE;
             break;
+
+        case CAHUTE_SERIAL_RTS_HANDSHAKE:
+            dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
+            break;
+
+        default:
+            dcb.fRtsControl = RTS_CONTROL_DISABLE;
         }
 
         if (!SetCommState(link->stream_state.windows.handle, &dcb)) {

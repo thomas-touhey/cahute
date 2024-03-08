@@ -178,8 +178,9 @@ cahute_open_serial_link(
         flags
         & ~(CAHUTE_SERIAL_PROTOCOL_MASK | CAHUTE_SERIAL_STOP_MASK
             | CAHUTE_SERIAL_PARITY_MASK | CAHUTE_SERIAL_XONXOFF_MASK
-            | CAHUTE_SERIAL_DTRRTS_MASK | CAHUTE_SERIAL_NOCHECK
-            | CAHUTE_SERIAL_NODISC | CAHUTE_SERIAL_NOTERM | CAHUTE_SERIAL_OHP);
+            | CAHUTE_SERIAL_DTR_MASK | CAHUTE_SERIAL_RTS_MASK
+            | CAHUTE_SERIAL_NOCHECK | CAHUTE_SERIAL_NODISC
+            | CAHUTE_SERIAL_NOTERM | CAHUTE_SERIAL_OHP);
 
     if (unsupported_flags) {
         msg(ll_error,
@@ -229,9 +230,14 @@ cahute_open_serial_link(
         return CAHUTE_ERROR_IMPL;
     }
 
-    if ((flags & CAHUTE_SERIAL_DTRRTS_MASK) == 0) {
-        /* We disable DTR/RTS hardware control by default. */
-        flags |= CAHUTE_SERIAL_DTRRTS_DISABLE;
+    if ((flags & CAHUTE_SERIAL_DTR_MASK) == 0) {
+        /* We disable DTR hardware control by default. */
+        flags |= CAHUTE_SERIAL_DTR_DISABLE;
+    }
+
+    if ((flags & CAHUTE_SERIAL_RTS_MASK) == 0) {
+        /* We disable RTS hardware control by default. */
+        flags |= CAHUTE_SERIAL_RTS_DISABLE;
     }
 
     if ((flags & CAHUTE_SERIAL_PROTOCOL_MASK)

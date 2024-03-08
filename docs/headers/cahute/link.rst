@@ -261,20 +261,35 @@ Function declarations
 
         Enable XON/XOFF software control.
 
-    If the device uses DTR/RTS and the cable may support it, it can also be
+    If the device uses DTR and the cable supports it, it can be selected
+    manually as well, amongst the following:
+
+    .. c:macro:: CAHUTE_SERIAL_DTR_DISABLE
+
+        Disable DTR (*by default*).
+
+    .. c:macro:: CAHUTE_SERIAL_DTR_ENABLE
+
+        Enable DTR.
+
+    .. c:macro:: CAHUTE_SERIAL_DTR_HANDSHAKE
+
+        Enable DTR, and require a handshake to be done.
+
+    If the device uses RTS and the cable supports it, it can also be
     selected manually, amongst the following:
 
-    .. c:macro:: CAHUTE_SERIAL_DTRRTS_DISABLE
+    .. c:macro:: CAHUTE_SERIAL_RTS_DISABLE
 
-        Disable DTR/RTS (*by default*).
+        Disable RTS (*by default*).
 
-    .. c:macro:: CAHUTE_SERIAL_DTRRTS_ENABLE
+    .. c:macro:: CAHUTE_SERIAL_RTS_ENABLE
 
-        Enable DTR/RTS.
+        Enable RTS.
 
-    .. c:macro:: CAHUTE_SERIAL_DTRRTS_HANDSHAKE
+    .. c:macro:: CAHUTE_SERIAL_RTS_HANDSHAKE
 
-        Enable DTR/RTS, and require a DTR/RTS handshake to be done.
+        Enable RTS, and require a handshake to be done.
 
     Protocol-specific behaviour can be tweaked using the following flags:
 
