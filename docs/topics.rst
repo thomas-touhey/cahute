@@ -9,6 +9,7 @@ happening in this project, and why it is happening.
     :maxdepth: 2
 
     topics/picture-formats
+    topics/file-formats
     topics/protocols
     topics/usb-detection
     topics/logging

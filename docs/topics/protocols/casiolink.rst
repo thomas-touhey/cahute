@@ -1,0 +1,24 @@
+.. _protocol-casiolink:
+
+CASIOLINK protocol -- Serial protocols used by pre fx-9860G calculators
+=======================================================================
+
+The CASIOLINK protocol is used on graphing calculators from the early 1990s to
+the AFX / Graph 100, before the fx-9860G came out in 2004. It is used on serial
+links exclusively.
+
+It has three variants with slight variations:
+
+* One for pre-1996 calculators, named "CAS40".
+* One for calculators from 1996 to 2004, excluding the AFX, named "CAS50".
+* One for the AFX / Graph 100, named "CAS100".
+
+Variations include header format, types of some packets and available flows.
+They however share the same rationale in handling communication and basic
+packet format.
+
+.. toctree::
+    :maxdepth: 1
+
+    casiolink/packet-format
+    casiolink/flows

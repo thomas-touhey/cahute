@@ -274,7 +274,7 @@ The flow becomes the following:
 
     In order to mitigate such risks while still employing the technique,
     Cahute disables packet shifting on serial links, i.e. only enables it
-    on USB and UAS (SCSI) links.
+    on USB and UMS (SCSI) links.
 
 .. _seven-request-transfer:
 

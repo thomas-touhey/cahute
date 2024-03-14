@@ -29,6 +29,32 @@ of rows.
 In Cahute, this format is represented by
 :c:macro:`CAHUTE_PICTURE_FORMAT_1BIT_MONO`.
 
+.. _picture-format-1bit-cas50:
+
+1bpp monochrome picture format with CAS50 order
+-----------------------------------------------
+
+This format is the basic frame format for pre-fx-9860G calculators using
+the CAS50 variant of CASIOLINK.
+
+In this format, every pixel is represented as a bit, i.e. one byte contains
+8 consecutive horizontal pixels. An off bit (``0b0``) represents a white pixel,
+and an on bit (``0b1``) represents a black pixel.
+
+The picture is organized by descending column first, descending row
+second, 8 pixels by 8 pixels.
+
+.. figure:: picture-format-1bit-cas50.svg
+
+    Pixel order in the 1bpp monochrome picture format with CAS50 order.
+
+For computing the size of such pictures, one must compute the number of bytes
+a row occupies (usually ``ceil(width / 8)``), then multiply it by the number
+of rows.
+
+In Cahute, this format is represented by
+:c:macro:`CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50`.
+
 .. _picture-format-2bit-dual:
 
 Dual 1bpp gray picture format

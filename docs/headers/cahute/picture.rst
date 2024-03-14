@@ -13,6 +13,10 @@ picture's data is encoded.
 
     Constant representing the :ref:`picture-format-1bit`.
 
+.. c:macro:: CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50
+
+    Constant representing the :ref:`picture-format-1bit-cas50`.
+
 .. c:macro:: CAHUTE_PICTURE_FORMAT_1BIT_DUAL
 
     Constant representing the :ref:`picture-format-2bit-dual`.

@@ -59,7 +59,7 @@ Type definitions
 
         .. c:macro:: CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI
 
-            The device is a UAS (USB-Attached SCSI) device with proprietary
+            The device is a USB Mass Storage device with proprietary
             extensions to communicate using Protocol 7.00.
 
             See :ref:`protocol-ums` for more details.
