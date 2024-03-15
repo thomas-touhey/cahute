@@ -31,6 +31,8 @@ Bootcodes do **not** support restart-related commands :ref:`seven-command-00`
 and :ref:`seven-command-06`.
 Bootcodes with ``Link`` support command :ref:`seven-command-02`.
 
+.. _seven-devices:
+
 Devices
 -------
 

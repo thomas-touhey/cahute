@@ -234,6 +234,46 @@ For more information, consult the following sections:
 This flow is used by ``p7 optimize``; see the :ref:`p7-optimize` for more
 information.
 
+.. _seven-backup-rom:
+
+Back up the system
+------------------
+
+In order to back up the flash, the flow is the following:
+
+.. mermaid::
+
+    sequenceDiagram
+        Participant active as Original Active Side<br />(PC, ...)
+        Participant passive as Original Passive Side<br />(calculator)
+
+        active->>passive: Command '4F'
+
+        alt Error has occurred
+            passive->>active: Error
+        else
+            passive->>active: Acknowledge
+            active->>passive: Roleswap
+            passive->>active: Command '50'
+            active->>passive: Acknowledge
+
+            Note over active,passive: Data flow from calculator to PC
+
+            passive->>active: Roleswap
+        end
+
+This flow is only available in older models, and has been removed since;
+see :ref:`seven-devices` for more information.
+
+For more information, consult the following sections:
+
+* Command :ref:`seven-command-4F`;
+* Command :ref:`seven-command-50`;
+* :ref:`seven-request-transfer`.
+
+This flow is used by ``p7os get``; see the :ref:`p7os-get` for more
+information.
+
 .. _seven-upload-and-run:
 
 Upload and run an executable program
@@ -242,7 +282,7 @@ Upload and run an executable program
 .. warning::
 
     This is a dangerous flow, and is only documented here for completeness.
-    Programs suitable for this command, nicknamed "Update.exe", are crafted
+    Programs suitable for this command, nicknamed "Update.EXE", are crafted
     in a very specific way, and you should not attempt to make your own.
 
 In order to upload and run an executable program, the flow is the following:
@@ -276,5 +316,72 @@ For more information, consult the following sections:
 
 * Command :ref:`seven-command-56`;
 * :ref:`seven-transmit-data`.
+
+.. _seven-fxremote-flash:
+
+Flash the calculator using fxRemote
+-----------------------------------
+
+.. warning::
+
+    This is a **very** dangerous flow, and is only documented here for
+    completeness. It also is specific to the fxRemote's Update.EXE,
+    and is unofficial.
+
+In order to flash a new OS on an fx-9860G or compatible, the flow is
+the following:
+
+.. mermaid::
+
+    sequenceDiagram
+        Participant active as Active Side
+        Participant passive as Passive Side
+
+        Note over active,passive: Passive side is the bootloader.
+
+        active->>passive: Command '56'
+        passive->>active: Ack
+        Note over active,passive: Data flow from active to passive (Update.EXE)
+
+        Note over active,passive: Passive side becomes fxRemote's Update.EXE.
+
+        active->>passive: Initialize connection
+        passive->>active: Acknowledge
+
+        active->>passive: Check hardware configuration (command '76')
+        passive->>active: Acknowledge
+        passive->>active: Identification data
+
+        loop From 0xA0010000 to 0xA0280000 excluded, by increments of 0x10000
+            active->>passive: Clear data (command '72')
+            passive->>active: Acknowledge
+        end
+
+        loop From 0xA0020000 to 0xA0280000 excluded, then 0xA0010000, by increments of 0x10000
+            loop Data left to send for sector
+                active->>passive: Send sector data in buffer (command '70')
+                passive->>active: Acknowledge
+            end
+
+            active->>passive: Request sector copy to flash (command '71')
+            passive->>active: Acknowledge
+        end
+
+        active->>passive: Request for termination (command '78')
+        passive->>active: Acknowledge
+
+For serial links between the active side and fxRemote as the passive
+side, the link should use 115200 bauds, no parity, 2 stop bits,
+XON/XOFF software control and, if supported by the cable, DTR/RTS hardware
+control.
+
+For more information, consult the following sections:
+
+* :ref:`seven-upload-and-run`
+* :ref:`seven-fxremote-command-70`
+* :ref:`seven-fxremote-command-71`
+* :ref:`seven-fxremote-command-72`
+* :ref:`seven-fxremote-command-76`
+* :ref:`seven-fxremote-command-78`
 
 .. _fxRemote: https://tiplanet.org/forum/archives_voir.php?id=4484

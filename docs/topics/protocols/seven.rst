@@ -19,5 +19,6 @@ in 2004, up to the current day.
     seven/packet-format
     seven/flows
     seven/casio-commands
+    seven/fxremote-commands
     seven/use-cases
     seven/hardware-identifiers

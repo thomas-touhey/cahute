@@ -65,6 +65,8 @@ complement.
 The interpretation of the packet depends on the value of *T*.
 See the following sections for more information.
 
+.. _seven-command-packet:
+
 ``0x01`` -- Command packet
 --------------------------
 
