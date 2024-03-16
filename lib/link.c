@@ -1100,3 +1100,45 @@ cahute_optimize_storage(cahute_link *link, char const *storage) {
         return CAHUTE_ERROR_IMPL;
     }
 }
+
+/**
+ * Upload and run a program on the calculator.
+ *
+ * @param link Link to the calculator.
+ * @param program Program to upload and run.
+ * @param program_size Size to the program to upload and run.
+ * @param load_address Address at which to load the program.
+ * @param start_address Address at which to start the program.
+ * @param progress_func Function to call to signify progress.
+ * @param progress_cookie Cookie to pass to the progress function.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_EXTERN(int)
+cahute_upload_and_run_program(
+    cahute_link *link,
+    cahute_u8 const *program,
+    size_t program_size,
+    unsigned long load_address,
+    unsigned long start_address,
+    cahute_progress_func *progress_func,
+    void *progress_cookie
+) {
+    switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_SEVEN:
+        if (link->flags & CAHUTE_LINK_FLAG_SCSI)
+            return CAHUTE_ERROR_IMPL;
+
+        return cahute_seven_upload_and_run_program(
+            link,
+            program,
+            program_size,
+            load_address,
+            start_address,
+            progress_func,
+            progress_cookie
+        );
+
+    default:
+        return CAHUTE_ERROR_IMPL;
+    }
+}

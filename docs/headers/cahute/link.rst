@@ -627,3 +627,22 @@ Function declarations
     :param link: Link to the device.
     :param storage: Name of the storage device.
     :return: Error, or 0 if the operation was successful.
+
+.. c:function:: int cahute_upload_and_run_program(cahute_link *link, \
+    cahute_u8 const *program, size_t program_size, \
+    unsigned long load_address, unsigned long start_address, \
+    cahute_progress_func *progress_func, void *progress_cookie)
+
+    Upload and run a program on the calculator.
+
+    See :ref:`seven-upload-and-run` for the use case with Protocol 7.00.
+
+    :param link: Link to the device.
+    :param program: Pointer to the program to upload and run.
+    :param program_size: Size of the program to upload and run.
+    :param load_address: Remote address at which to load the program.
+    :param start_address: Remote address at which to start the program.
+    :param progress_func: Pointer to the optional progress function to call
+        once for every step in the transfer process.
+    :param progress_cookie: Cookie to pass to the progress function.
+    :return: Error, or 0 if the operation was successful.

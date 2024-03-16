@@ -452,7 +452,7 @@ cahute_seven_send_file_to_storage(
     cahute_confirm_overwrite_func *overwrite_func,
     void *overwrite_cookie,
     cahute_progress_func *progress_func,
-    void *cookie_func
+    void *progress_cookie
 );
 
 CAHUTE_EXTERN(int)
@@ -497,6 +497,17 @@ cahute_seven_reset_storage(cahute_link *link, char const *storage);
 
 CAHUTE_EXTERN(int)
 cahute_seven_optimize_storage(cahute_link *link, char const *storage);
+
+CAHUTE_EXTERN(int)
+cahute_seven_upload_and_run_program(
+    cahute_link *link,
+    cahute_u8 const *program,
+    size_t program_size,
+    unsigned long load_address,
+    unsigned long start_address,
+    cahute_progress_func *progress_func,
+    void *progress_cookie
+);
 
 /* ---
  * Protocol 7.00 Screenstreaming functions, defined in seven_ohp.c

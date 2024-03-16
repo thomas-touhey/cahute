@@ -266,6 +266,16 @@ CAHUTE_EXTERN(int)
 cahute_optimize_storage
     OF((cahute_link * cahute__link, char const *cahute__storage));
 
+CAHUTE_EXTERN(int)
+cahute_upload_and_run_program
+    OF((cahute_link * cahute__link,
+        cahute_u8 const *cahute__program,
+        size_t cahute__program_size,
+        unsigned long cahute__load_address,
+        unsigned long cahute__start_address,
+        cahute_progress_func *cahute__progress_func,
+        void *cahute__progress_cookie));
+
 CAHUTE_END_DECLS
 
 CAHUTE_END_NAMESPACE

@@ -1071,6 +1071,171 @@ cahute_seven_send_data(
 }
 
 /**
+ * Send data from a buffer.
+ *
+ * Note that packet shifting is enabled only when not disabled explicitely
+ * (e.g. for sensitive payloads, such as with command 0x56 "Upload and run"),
+ * or when not on a reliable enough medium (i.e. not serial).
+ *
+ * Also note that the command code to use as data packet subtypes has already
+ * been set as `link->protocol_state.seven.last_command` by
+ * :c:func:`cahute_seven_send_command`, so we use that instead of requiring
+ * it in the parameters.
+ *
+ * @param link Link with which to send the data.
+ * @param flags OR'd `SEND_DATA_FLAG_*` constants.
+ * @param data Buffer to read data from.
+ * @param size Size of the data to send.
+ * @param progress_func Function to display progress.
+ * @param progress_cookie Cookie to pass to the progress function.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_LOCAL(int)
+cahute_seven_send_data_from_buf(
+    cahute_link *link,
+    unsigned long flags,
+    cahute_u8 const *data,
+    size_t size,
+    cahute_progress_func *progress_func,
+    void *progress_cookie
+) {
+    cahute_u8 buf[264];
+    size_t last_packet_size = size & 255;
+    unsigned long packet_count = (size >> 8) + !!last_packet_size;
+    unsigned long i, loop_send_flags = 0;
+    int err, shifted = 0;
+
+    last_packet_size = last_packet_size ? last_packet_size : 256;
+    cahute_seven_set_ascii_hex(buf, (packet_count >> 8) & 255);
+    cahute_seven_set_ascii_hex(&buf[2], packet_count & 255);
+
+    if (packet_count >= 3 && (~link->flags & CAHUTE_LINK_FLAG_SERIAL)
+        && (~flags & SEND_DATA_FLAG_DISABLE_SHIFTING)) {
+        /* We are about to start packet shifting.
+         * For more information, please consult the following:
+         * https://cahuteproject.org/topics/protocols/seven/flows.html
+         * #packet-shifting */
+        buf[4] = '0';
+        buf[5] = '0';
+        buf[6] = '0';
+        buf[7] = '1';
+
+        memcpy(&buf[8], data, 256);
+        data += 256;
+
+        err = cahute_seven_send_extended(
+            link,
+            SEND_FLAG_DISABLE_RECEIVE,
+            PACKET_TYPE_DATA,
+            link->protocol_state.seven.last_command,
+            buf,
+            264
+        );
+        if (err)
+            return err;
+
+        shifted = 1;
+        loop_send_flags |= SEND_FLAG_DISABLE_CHECKSUM;
+
+        if (progress_func)
+            (*progress_func)(progress_cookie, 1, packet_count);
+    }
+
+    /* General loop for all packets except the last one. */
+    for (i = 1 + shifted; i < packet_count; i++) {
+        cahute_seven_set_ascii_hex(&buf[4], (i >> 8) & 255);
+        cahute_seven_set_ascii_hex(&buf[6], i & 255);
+        memcpy(&buf[8], data, 256);
+        data += 256;
+
+        msg(ll_info, "Sending data packet %lu/%lu.", i, packet_count);
+        err = cahute_seven_send_extended(
+            link,
+            loop_send_flags,
+            PACKET_TYPE_DATA,
+            link->protocol_state.seven.last_command,
+            buf,
+            264
+        );
+        if (err) {
+            if (shifted) {
+                msg(ll_error,
+                    "An error has occurred while we were using packet "
+                    "shifting; the link is now irrecoverable.");
+                link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+            }
+
+            return err;
+        }
+
+        EXPECT_BASIC_ACK;
+
+        if (progress_func)
+            (*progress_func)(progress_cookie, i, packet_count);
+    }
+
+    /* If we have been using packet shifting, we want to normalize the
+     * exchange before the last packet. */
+    if (shifted) {
+        if ((err = cahute_seven_receive(link)))
+            return err;
+
+        EXPECT_BASIC_ACK;
+    }
+
+    /* Send the last packet. */
+    cahute_seven_set_ascii_hex(&buf[4], (packet_count >> 8) & 255);
+    cahute_seven_set_ascii_hex(&buf[6], packet_count & 255);
+    memcpy(&buf[8], data, last_packet_size);
+
+    msg(ll_info,
+        "Sending data packet %lu/%lu (last).",
+        packet_count,
+        packet_count);
+    err = cahute_seven_send_extended(
+        link,
+        0,
+        PACKET_TYPE_DATA,
+        link->protocol_state.seven.last_command,
+        buf,
+        8 + last_packet_size
+    );
+    if (err)
+        return err;
+
+    if (link->protocol_state.seven.last_packet_type != PACKET_TYPE_ACK) {
+        msg(ll_error, "Calculator did not answer with an ACK.");
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    switch (link->protocol_state.seven.last_packet_subtype) {
+    case PACKET_SUBTYPE_ACK_BASIC:
+        /* Basic (most common) case, where the link can resume. */
+        break;
+
+    case PACKET_SUBTYPE_ACK_TERM:
+        /* The link is terminated at the end of the data exchange flow.
+         * Apart from that, the packet flow went great! */
+        msg(ll_info,
+            "Calculator terminated the link following the data transfer.");
+
+        link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
+        break;
+
+    default:
+        msg(ll_error,
+            "Unhandled ACK subtype %02X at the end of data transfer.",
+            link->protocol_state.seven.last_packet_subtype);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    if (progress_func)
+        (*progress_func)(progress_cookie, packet_count, packet_count);
+
+    return CAHUTE_OK;
+}
+
+/**
  * Accept and receive data to a FILE stream.
  *
  * This command starts by sending ACK in order to accept the command that
@@ -2026,4 +2191,86 @@ cahute_seven_reset_storage(cahute_link *link, char const *storage) {
 
     EXPECT_BASIC_ACK;
     return CAHUTE_OK;
+}
+
+/**
+ * Upload and run a program on the calculator.
+ *
+ * @param link Link to the device.
+ * @param program Program to upload and run.
+ * @param program_size Size of the program to upload and run.
+ * @param load_address Address at which to load the program.
+ * @param start_address Address at which to start the program.
+ * @param progress_func Function to display progress.
+ * @param progress_cookie Cookie to pass to the progress function.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_EXTERN(int)
+cahute_seven_upload_and_run_program(
+    cahute_link *link,
+    cahute_u8 const *program,
+    size_t program_size,
+    unsigned long load_address,
+    unsigned long start_address,
+    cahute_progress_func *progress_func,
+    void *progress_cookie
+) {
+    cahute_u8 command_payload[24];
+    int err;
+
+    if (program_size > 0xFFFFFFFF || load_address > 0xFFFFFFFF
+        || start_address > 0xFFFFFFFF)
+        return CAHUTE_ERROR_IMPL;
+
+    /* Prepare the command payload. */
+    cahute_seven_set_ascii_hex(&command_payload[0], program_size >> 24);
+    cahute_seven_set_ascii_hex(
+        &command_payload[2],
+        (program_size >> 16) & 255
+    );
+    cahute_seven_set_ascii_hex(&command_payload[4], (program_size >> 8) & 255);
+    cahute_seven_set_ascii_hex(&command_payload[6], program_size & 255);
+    cahute_seven_set_ascii_hex(&command_payload[8], load_address >> 24);
+    cahute_seven_set_ascii_hex(
+        &command_payload[10],
+        (load_address >> 16) & 255
+    );
+    cahute_seven_set_ascii_hex(
+        &command_payload[12],
+        (load_address >> 8) & 255
+    );
+    cahute_seven_set_ascii_hex(&command_payload[14], load_address & 255);
+    cahute_seven_set_ascii_hex(&command_payload[16], start_address >> 24);
+    cahute_seven_set_ascii_hex(
+        &command_payload[18],
+        (start_address >> 16) & 255
+    );
+    cahute_seven_set_ascii_hex(
+        &command_payload[20],
+        (start_address >> 8) & 255
+    );
+    cahute_seven_set_ascii_hex(&command_payload[22], start_address & 255);
+
+    err = cahute_seven_send_extended(
+        link,
+        0,
+        PACKET_TYPE_COMMAND,
+        0x56,
+        command_payload,
+        24
+    );
+    if (err)
+        return err;
+
+    EXPECT_BASIC_ACK;
+
+    link->protocol_state.seven.last_command = 0x56;
+    return cahute_seven_send_data_from_buf(
+        link,
+        0,
+        program,
+        program_size,
+        progress_func,
+        progress_cookie
+    );
 }
