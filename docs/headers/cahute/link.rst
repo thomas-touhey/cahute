@@ -646,3 +646,20 @@ Function declarations
         once for every step in the transfer process.
     :param progress_cookie: Cookie to pass to the progress function.
     :return: Error, or 0 if the operation was successful.
+
+.. c:function:: int cahute_flash_system_using_fxremote_method( \
+    cahute_link *link, cahute_u8 const *system, size_t system_size)
+
+    Flash a new system on the calculator, assuming the passive side
+    is running fxRemote's Update.EXE program.
+
+    The following flags are available:
+
+    .. c:macro:: CAHUTE_FLASH_FLAG_RESET_SMEM
+
+        Whether to also reset the storage memory on flash, or not.
+
+    :param link: Link to the device.
+    :param system: System to flash onto the calculator.
+    :param system_size: Size of the system to flash.
+    :return: Error, or 0 if the operation was successful.

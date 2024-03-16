@@ -1142,3 +1142,34 @@ cahute_upload_and_run_program(
         return CAHUTE_ERROR_IMPL;
     }
 }
+
+/**
+ * Flash using the fxRemote method.
+ *
+ * @param link Link to the calculator.
+ * @param flags Flags.
+ * @param system System image to flash.
+ * @param system_size Size of the system image to flash.
+ */
+CAHUTE_EXTERN(int)
+cahute_flash_system_using_fxremote_method(
+    cahute_link *link,
+    unsigned long flags,
+    cahute_u8 const *system,
+    size_t system_size
+) {
+    if (link->protocol != CAHUTE_LINK_PROTOCOL_SEVEN
+        || (link->flags & CAHUTE_LINK_FLAG_SCSI)) {
+        msg(ll_error,
+            "fxRemote method for flashing requires bulk "
+            "Protocol 7.00 link.");
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    return cahute_seven_flash_system_using_fxremote_method(
+        link,
+        flags,
+        system,
+        system_size
+    );
+}

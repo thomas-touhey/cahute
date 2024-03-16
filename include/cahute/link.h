@@ -276,6 +276,15 @@ cahute_upload_and_run_program
         cahute_progress_func *cahute__progress_func,
         void *cahute__progress_cookie));
 
+#define CAHUTE_FLASH_FLAG_RESET_SMEM 0x00000001 /* Also erase the SMEM. */
+
+CAHUTE_EXTERN(int)
+cahute_flash_system_using_fxremote_method
+    OF((cahute_link * cahute__link,
+        unsigned long cahute__flags,
+        cahute_u8 const *cahute__system,
+        size_t cahute__system_size));
+
 CAHUTE_END_DECLS
 
 CAHUTE_END_NAMESPACE

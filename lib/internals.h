@@ -509,6 +509,14 @@ cahute_seven_upload_and_run_program(
     void *progress_cookie
 );
 
+CAHUTE_EXTERN(int)
+cahute_seven_flash_system_using_fxremote_method(
+    cahute_link *link,
+    unsigned long flags,
+    cahute_u8 const *system,
+    size_t system_size
+);
+
 /* ---
  * Protocol 7.00 Screenstreaming functions, defined in seven_ohp.c
  * --- */
