@@ -36,6 +36,7 @@
 #ifndef CAHUTE_CDEFS_H
 # define CAHUTE_CDEFS_H 1
 # include <cahute/config.h>
+# include <stddef.h>
 
 /* C++ declaration and namespace management. */
 # ifdef __cplusplus

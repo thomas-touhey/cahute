@@ -83,6 +83,14 @@ add_executable(p7
     cli/options.c
 )
 
+add_executable(p7os
+    cli/p7os.c
+    cli/p7os_args.c
+    cli/common.c
+    cli/options.c
+    cli/fxremote-update.exe.bin.c
+)
+
 add_executable(p7screen
     cli/p7screen.c
     cli/p7screen_args.c
@@ -105,6 +113,7 @@ include_directories(
 target_include_directories(p7screen PRIVATE ${SDL2_INCLUDE_DIR})
 
 target_link_libraries(p7 PRIVATE ${PROJECT_NAME} PkgConfig::libusb)
+target_link_libraries(p7os PRIVATE ${PROJECT_NAME} PkgConfig::libusb)
 target_link_libraries(p7screen PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${SDL2_LIBRARIES})
 target_link_libraries(xfer9860 PRIVATE ${PROJECT_NAME} PkgConfig::libusb)
 

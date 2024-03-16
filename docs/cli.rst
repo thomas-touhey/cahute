@@ -8,5 +8,6 @@ syntaxes support by Cahute's command-line utilities.
     :maxdepth: 1
 
     cli/p7
+    cli/p7os
     cli/p7screen
     cli/xfer9860
