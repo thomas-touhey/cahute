@@ -1339,7 +1339,7 @@ cahute_seven_make_device_info(cahute_link *link, cahute_device_info **infop) {
     info->cahute_device_info_bootcode_offset =
         cahute_get_long_hex(&raw_info[80]);
     info->cahute_device_info_bootcode_size =
-        cahute_get_long_hex(&raw_info[88]) * 1000;
+        cahute_get_long_dec(&raw_info[88]) * 1024;
 
     info->cahute_device_info_os_version.cahute_version_major =
         cahute_get_byte_dec(&raw_info[96]);
@@ -1356,7 +1356,7 @@ cahute_seven_make_device_info(cahute_link *link, cahute_device_info **infop) {
 
     info->cahute_device_info_os_offset = cahute_get_long_hex(&raw_info[112]);
     info->cahute_device_info_os_size =
-        cahute_get_long_hex(&raw_info[120]) * 1000;
+        cahute_get_long_dec(&raw_info[120]) * 1024;
     info->cahute_device_info_product_id =
         cahute_seven_store_string(&buf, &raw_info[132], 16);
 

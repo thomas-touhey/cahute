@@ -293,8 +293,8 @@ static int print_device_info(cahute_link *link) {
             info->cahute_device_info_bootcode_offset
         );
         printf(
-            "Bootcode size: %luB\n",
-            info->cahute_device_info_bootcode_size
+            "Bootcode size: %luKiB\n",
+            info->cahute_device_info_bootcode_size / 1024
         );
     }
 
@@ -310,7 +310,7 @@ static int print_device_info(cahute_link *link) {
             info->cahute_device_info_os_version.cahute_version_platform
         );
         printf("\nOS offset: 0x%08lX\n", info->cahute_device_info_os_offset);
-        printf("OS size: %luB\n", info->cahute_device_info_os_size);
+        printf("OS size: %luKiB\n", info->cahute_device_info_os_size / 1024);
     }
 
     /* Miscallenous information */
