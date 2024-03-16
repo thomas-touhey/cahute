@@ -116,8 +116,8 @@ initialize_link_protocol(
  * @return Cahute error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_LOCAL(int) deinitialize_link_protocol(cahute_link *link) {
-    if (~link->flags
-        & (CAHUTE_LINK_FLAG_IRRECOVERABLE | CAHUTE_LINK_FLAG_TERMINATED))
+    if (!(link->flags
+          & (CAHUTE_LINK_FLAG_IRRECOVERABLE | CAHUTE_LINK_FLAG_TERMINATED))) {
         switch (link->protocol) {
         case CAHUTE_LINK_PROTOCOL_SEVEN:
             if (link->flags & CAHUTE_LINK_FLAG_TERMINATE)
@@ -125,6 +125,7 @@ CAHUTE_LOCAL(int) deinitialize_link_protocol(cahute_link *link) {
 
             break;
         }
+    }
 
     return CAHUTE_OK;
 }
