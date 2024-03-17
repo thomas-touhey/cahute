@@ -33,7 +33,7 @@ Type definitions
         Only available if the :c:macro:`CAHUTE_DEVICE_INFO_FLAG_PREPROG`
         flag is set.
 
-    .. c:member:: cahute_os_version cahute_device_info_rom_version
+    .. c:member:: char const *cahute_device_info_rom_version
 
         Preprogrammed ROM version.
 
@@ -48,7 +48,7 @@ Type definitions
 
         RAM capacity, in KiB.
 
-    .. c:member:: cahute_version cahute_device_info_bootcode_version
+    .. c:member:: char const *cahute_device_info_bootcode_version
 
         Bootcode version.
 
@@ -69,7 +69,7 @@ Type definitions
         Only available if the :c:macro:`CAHUTE_DEVICE_INFO_FLAG_BOOTCODE`
         flag is set.
 
-    .. c:member:: cahute_version cahute_device_info_os_version
+    .. c:member:: char const *cahute_device_info_os_version
 
         OS version.
 

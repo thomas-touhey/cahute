@@ -1861,50 +1861,18 @@ cahute_seven_make_device_info(cahute_link *link, cahute_device_info **infop) {
     info->cahute_device_info_ram_capacity =
         cahute_get_long_dec(&raw_info[40]) * 1024;
 
-    info->cahute_device_info_rom_version.cahute_version_major =
-        cahute_get_byte_dec(&raw_info[48]);
-    info->cahute_device_info_rom_version.cahute_version_minor =
-        cahute_get_byte_dec(&raw_info[51]);
-    info->cahute_device_info_rom_version.cahute_version_zone =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[54]);
-    info->cahute_device_info_rom_version.cahute_version_math =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[55]);
-    info->cahute_device_info_rom_version.cahute_version_status =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[56]);
-    info->cahute_device_info_rom_version.cahute_version_platform =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[57]);
+    info->cahute_device_info_rom_version =
+        cahute_seven_store_string(&buf, &raw_info[48], 16);
 
-    info->cahute_device_info_bootcode_version.cahute_version_major =
-        cahute_get_byte_dec(&raw_info[64]);
-    info->cahute_device_info_bootcode_version.cahute_version_minor =
-        cahute_get_byte_dec(&raw_info[67]);
-    info->cahute_device_info_bootcode_version.cahute_version_zone =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[70]);
-    info->cahute_device_info_bootcode_version.cahute_version_math =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[71]);
-    info->cahute_device_info_bootcode_version.cahute_version_status =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[72]);
-    info->cahute_device_info_bootcode_version.cahute_version_platform =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[73]);
-
+    info->cahute_device_info_bootcode_version =
+        cahute_seven_store_string(&buf, &raw_info[64], 16);
     info->cahute_device_info_bootcode_offset =
         cahute_get_long_hex(&raw_info[80]);
     info->cahute_device_info_bootcode_size =
         cahute_get_long_dec(&raw_info[88]) * 1024;
 
-    info->cahute_device_info_os_version.cahute_version_major =
-        cahute_get_byte_dec(&raw_info[96]);
-    info->cahute_device_info_os_version.cahute_version_minor =
-        cahute_get_byte_dec(&raw_info[99]);
-    info->cahute_device_info_os_version.cahute_version_zone =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[102]);
-    info->cahute_device_info_os_version.cahute_version_math =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[103]);
-    info->cahute_device_info_os_version.cahute_version_status =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[104]);
-    info->cahute_device_info_os_version.cahute_version_platform =
-        CONDITIONAL_ASCII_DEC_DIGIT(raw_info[105]);
-
+    info->cahute_device_info_os_version =
+        cahute_seven_store_string(&buf, &raw_info[96], 16);
     info->cahute_device_info_os_offset = cahute_get_long_hex(&raw_info[112]);
     info->cahute_device_info_os_size =
         cahute_get_long_dec(&raw_info[120]) * 1024;

@@ -261,9 +261,8 @@ static int print_device_info(cahute_link *link) {
     /* Preprogrammed ROM */
     if (info->cahute_device_info_flags & CAHUTE_DEVICE_INFO_FLAG_PREPROG) {
         printf(
-            "Preprogrammed ROM version: %02u.%02u",
-            info->cahute_device_info_rom_version.cahute_version_major,
-            info->cahute_device_info_rom_version.cahute_version_minor
+            "Preprogrammed ROM version: %s",
+            info->cahute_device_info_rom_version
         );
         printf(
             "\nPreprogrammed ROM capacity: %luKiB\n",
@@ -284,9 +283,8 @@ static int print_device_info(cahute_link *link) {
     /* Bootcode */
     if (info->cahute_device_info_flags & CAHUTE_DEVICE_INFO_FLAG_BOOTCODE) {
         printf(
-            "Bootcode version: %02u.%02u",
-            info->cahute_device_info_bootcode_version.cahute_version_major,
-            info->cahute_device_info_bootcode_version.cahute_version_minor
+            "Bootcode version: %s",
+            info->cahute_device_info_bootcode_version
         );
         printf(
             "\nBootcode offset: 0x%08lX\n",
@@ -300,15 +298,7 @@ static int print_device_info(cahute_link *link) {
 
     /* OS */
     if (info->cahute_device_info_flags & CAHUTE_DEVICE_INFO_FLAG_OS) {
-        printf(
-            "OS version: %02d.%02d.%d%d%d%d",
-            info->cahute_device_info_os_version.cahute_version_major,
-            info->cahute_device_info_os_version.cahute_version_minor,
-            info->cahute_device_info_os_version.cahute_version_zone,
-            info->cahute_device_info_os_version.cahute_version_math,
-            info->cahute_device_info_os_version.cahute_version_status,
-            info->cahute_device_info_os_version.cahute_version_platform
-        );
+        printf("OS version: %s", info->cahute_device_info_os_version);
         printf("\nOS offset: 0x%08lX\n", info->cahute_device_info_os_offset);
         printf("OS size: %luKiB\n", info->cahute_device_info_os_size / 1024);
     }

@@ -9,5 +9,4 @@
     cahute/error
     cahute/link
     cahute/logging
-    cahute/osversion
     cahute/picture

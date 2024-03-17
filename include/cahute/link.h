@@ -29,7 +29,6 @@
 #ifndef CAHUTE_LINK_H
 #define CAHUTE_LINK_H 1
 #include "cdefs.h"
-#include "osversion.h"
 #include <stdio.h>
 
 CAHUTE_BEGIN_NAMESPACE
@@ -50,19 +49,19 @@ struct cahute_device_info {
 
     /* Preprogrammed ROM information. */
     unsigned long cahute_device_info_rom_capacity;
-    cahute_os_version cahute_device_info_rom_version;
+    char const *cahute_device_info_rom_version;
 
     /* Flash ROM and RAM information. */
     unsigned long cahute_device_info_flash_rom_capacity;
     unsigned long cahute_device_info_ram_capacity;
 
     /* Bootcode information. */
-    cahute_os_version cahute_device_info_bootcode_version;
+    char const *cahute_device_info_bootcode_version;
     unsigned long cahute_device_info_bootcode_offset;
     unsigned long cahute_device_info_bootcode_size;
 
     /* OS information. */
-    cahute_os_version cahute_device_info_os_version;
+    char const *cahute_device_info_os_version;
     unsigned long cahute_device_info_os_offset;
     unsigned long cahute_device_info_os_size;
 
