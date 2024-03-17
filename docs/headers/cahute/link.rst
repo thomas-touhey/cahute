@@ -628,6 +628,21 @@ Function declarations
     :param storage: Name of the storage device.
     :return: Error, or 0 if the operation was successful.
 
+.. c:function:: int cahute_backup_rom(cahute_link *link, \
+    cahute_u8 **romp, size_t *sizep)
+
+    Request the flash ROM contents from the calculator.
+
+    ``*romp`` is allocated dynamically, and must be free'd once no longer used.
+    In case of error, ``*romp`` **must not** be read, used or free'd.
+
+    See :ref:`seven-backup-rom` for the use case with Protocol 7.00.
+
+    :param link: Link to the device.
+    :param romp: Pointer to the flash ROM contents to allocate.
+    :param sizep: Pointer to the size to define.
+    :return: Error, or 0 if the operation was successful.
+
 .. c:function:: int cahute_upload_and_run_program(cahute_link *link, \
     cahute_u8 const *program, size_t program_size, \
     unsigned long load_address, unsigned long start_address, \

@@ -267,6 +267,14 @@ cahute_optimize_storage
     OF((cahute_link * cahute__link, char const *cahute__storage));
 
 CAHUTE_EXTERN(int)
+cahute_backup_rom
+    OF((cahute_link * cahute__link,
+        cahute_u8 **cahute__romp,
+        size_t *cahute__sizep,
+        cahute_progress_func *cahute__progress_func,
+        void *cahute__progress_cookie));
+
+CAHUTE_EXTERN(int)
 cahute_upload_and_run_program
     OF((cahute_link * cahute__link,
         cahute_u8 const *cahute__program,

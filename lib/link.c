@@ -1102,6 +1102,42 @@ cahute_optimize_storage(cahute_link *link, char const *storage) {
 }
 
 /**
+ * Backup the ROM from the calculator.
+ *
+ * @param link Link to the calculator.
+ * @param romp Pointer to the ROM to allocate.
+ * @param sizep Pointer to the ROM size to define.
+ * @param progress_func Function to call to signify progress.
+ * @param progress_cookie Cookie to pass to the progress function.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_EXTERN(int)
+cahute_backup_rom(
+    cahute_link *link,
+    cahute_u8 **romp,
+    size_t *sizep,
+    cahute_progress_func *progress_func,
+    void *progress_cookie
+) {
+    switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_SEVEN:
+        if (link->flags & CAHUTE_LINK_FLAG_SCSI)
+            return CAHUTE_ERROR_IMPL;
+
+        return cahute_seven_backup_rom(
+            link,
+            romp,
+            sizep,
+            progress_func,
+            progress_cookie
+        );
+
+    default:
+        return CAHUTE_ERROR_IMPL;
+    }
+}
+
+/**
  * Upload and run a program on the calculator.
  *
  * @param link Link to the calculator.

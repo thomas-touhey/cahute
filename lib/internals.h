@@ -499,6 +499,15 @@ CAHUTE_EXTERN(int)
 cahute_seven_optimize_storage(cahute_link *link, char const *storage);
 
 CAHUTE_EXTERN(int)
+cahute_seven_backup_rom(
+    cahute_link *link,
+    cahute_u8 **romp,
+    size_t *sizep,
+    cahute_progress_func *progress_func,
+    void *progress_cookie
+);
+
+CAHUTE_EXTERN(int)
 cahute_seven_upload_and_run_program(
     cahute_link *link,
     cahute_u8 const *program,

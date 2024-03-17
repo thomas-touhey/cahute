@@ -69,8 +69,24 @@
         return CAHUTE_ERROR_UNKNOWN; \
     }
 
+#define EXPECT_PACKET_OR_FAIL(TYPE, SUBTYPE) \
+    if (link->protocol_state.seven.last_packet_type != (TYPE) \
+        || link->protocol_state.seven.last_packet_subtype != (SUBTYPE)) { \
+        msg(ll_info, \
+            "Expected a packet of type %02X and subtype %02X, " \
+            "got a packet of type %02X and subtype %02X.", \
+            (TYPE), \
+            (SUBTYPE), \
+            link->protocol_state.seven.last_packet_type, \
+            link->protocol_state.seven.last_packet_subtype); \
+        err = CAHUTE_ERROR_UNKNOWN; \
+        goto fail; \
+    }
+
 #define EXPECT_BASIC_ACK \
     EXPECT_PACKET(PACKET_TYPE_ACK, PACKET_SUBTYPE_ACK_BASIC)
+#define EXPECT_BASIC_ACK_OR_FAIL \
+    EXPECT_PACKET_OR_FAIL(PACKET_TYPE_ACK, PACKET_SUBTYPE_ACK_BASIC)
 
 /**
  * Copy a string from a payload to a buffer, while null-terminating it
@@ -307,7 +323,7 @@ cahute_seven_checksum(cahute_u8 const *data, size_t size) {
  */
 CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
     struct cahute_seven_state *state = &link->protocol_state.seven;
-    cahute_u8 buf[520], *state_data = link->protocol_buffer;
+    cahute_u8 buf[540], *state_data = link->protocol_buffer;
     size_t packet_size, data_size = 0;
     int err;
 
@@ -1373,6 +1389,138 @@ cahute_seven_receive_data(
 }
 
 /**
+ * Accept and receive data to a buffer.
+ *
+ * This command starts by sending ACK in order to accept the command that
+ * is accompanied with data, then receives and acknowledges all data packets
+ * with the exception of the last one. This way, the caller can send a
+ * different acknowledgement (e.g. with subtype '03'), or check that it
+ * receives a roleswap or another command.
+ *
+ * @param link Link with which to receive the data.
+ * @param buf Buffer into which to write the received data.
+ * @param size Expected and buffer size.
+ * @param command_code Command code of the corresponding flow.
+ * @param progress_func Function to display progress.
+ * @param progress_cookie Cookie to pass to the progress function.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_LOCAL(int)
+cahute_seven_receive_data_into_buf(
+    cahute_link *link,
+    cahute_u8 *buf,
+    size_t size,
+    int command_code,
+    cahute_progress_func *progress_func,
+    void *progress_cookie
+) {
+    cahute_u8 const *p_buf = link->protocol_buffer;
+    unsigned long packet_count = 0;
+    unsigned int i;
+    int err;
+
+    for (i = 1; size; i++) {
+        unsigned int read_packet_count, read_packet_i;
+
+        msg(ll_info, "Requesting packet %u/%u.", i, packet_count);
+
+        err = cahute_seven_send_basic(
+            link,
+            0,
+            PACKET_TYPE_ACK,
+            PACKET_SUBTYPE_ACK_BASIC
+        );
+        if (err)
+            return err;
+
+        EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
+        if (link->protocol_buffer_size < 9) {
+            msg(ll_error,
+                "Data packet doesn't contain metadata and at least one byte.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        if (!IS_ASCII_HEX_DIGIT(p_buf[0]) || !IS_ASCII_HEX_DIGIT(p_buf[1])
+            || !IS_ASCII_HEX_DIGIT(p_buf[2]) || !IS_ASCII_HEX_DIGIT(p_buf[3])
+            || !IS_ASCII_HEX_DIGIT(p_buf[4]) || !IS_ASCII_HEX_DIGIT(p_buf[5])
+            || !IS_ASCII_HEX_DIGIT(p_buf[6])
+            || !IS_ASCII_HEX_DIGIT(p_buf[7])) {
+            msg(ll_error, "Data packet has invalid format.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_packet_i =
+            ((ASCII_HEX_TO_NIBBLE(p_buf[4]) << 12)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[5]) << 8)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[6]) << 4)
+             | ASCII_HEX_TO_NIBBLE(p_buf[7]));
+        if (read_packet_i != i) {
+            msg(ll_error,
+                "Unexpected sequence number (expected %u, got %u)",
+                i,
+                read_packet_i);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_packet_count =
+            ((ASCII_HEX_TO_NIBBLE(p_buf[0]) << 12)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[1]) << 8)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[2]) << 4)
+             | ASCII_HEX_TO_NIBBLE(p_buf[3]));
+        if (i == 1)
+            packet_count = read_packet_count;
+        else if (read_packet_count != packet_count) {
+            msg(ll_error,
+                "Packet count was not consistent between packets "
+                "(initial: 1/%u, current: %u/%u)",
+                packet_count,
+                i,
+                read_packet_count);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        size_t current_size = link->protocol_buffer_size - 8;
+        if (i < read_packet_count) {
+            if (current_size >= size) {
+                msg(ll_error,
+                    "Packet too much data for the expected total size of "
+                    "the data flow (expected: %" CAHUTE_PRIuSIZE
+                    ", got: %" CAHUTE_PRIuSIZE ")",
+                    size,
+                    current_size);
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+        } else if (current_size < size) {
+            msg(ll_error,
+                "Last packet did not contain enough bytes to finish the "
+                "data flow (expected: %" CAHUTE_PRIuSIZE
+                ", got: %" CAHUTE_PRIuSIZE ").",
+                size,
+                current_size);
+            return CAHUTE_ERROR_UNKNOWN;
+        } else if (current_size > size) {
+            msg(ll_error,
+                "Last packet contained too many bytes to finish the data "
+                "flow (expected: %" CAHUTE_PRIuSIZE ", got: %" CAHUTE_PRIuSIZE
+                " )",
+                size,
+                current_size);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        /* Write what is in the current packet. */
+        memcpy(buf, &p_buf[8], current_size);
+        buf += current_size;
+        size -= current_size;
+
+        if (progress_func)
+            (*progress_func)(progress_cookie, i, packet_count);
+    }
+
+    return CAHUTE_OK;
+}
+
+/**
  * Request device information using Protocol 7.00.
  *
  * This stores the raw information in ``raw_device_info`` from the link's
@@ -2191,6 +2339,122 @@ cahute_seven_reset_storage(cahute_link *link, char const *storage) {
 
     EXPECT_BASIC_ACK;
     return CAHUTE_OK;
+}
+
+/**
+ * Backup the ROM from the calculator using Protocol 7.00.
+ *
+ * @param link Link to the calculator.
+ * @param romp Pointer to the ROM to allocate.
+ * @param sizep Pointer to the ROM size to define.
+ * @param progress_func Function to display progress.
+ * @param progress_cookie Cookie to pass to the progress function.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_EXTERN(int)
+cahute_seven_backup_rom(
+    cahute_link *link,
+    cahute_u8 **romp,
+    size_t *sizep,
+    cahute_progress_func *progress_func,
+    void *progress_cookie
+) {
+    unsigned long filesize;
+    cahute_u8 *rom = NULL;
+    size_t rom_size;
+    int err = CAHUTE_OK;
+
+    *romp = NULL;
+    *sizep = 0;
+
+    err = cahute_seven_send_command(
+        link,
+        0x4F,
+        0,
+        0,
+        0,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+    );
+    if (err)
+        return err;
+
+    EXPECT_BASIC_ACK;
+
+    err = cahute_seven_send_basic(link, 0, PACKET_TYPE_ROLESWAP, 0);
+    if (err)
+        return err;
+
+    EXPECT_PACKET(PACKET_TYPE_COMMAND, 0x50);
+
+    err = cahute_seven_decode_command(
+        link,
+        NULL,
+        NULL,
+        &filesize,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+    );
+    if (err)
+        return err;
+
+    rom_size = (size_t)filesize;
+    if (rom_size) {
+        rom = malloc(rom_size);
+        if (!rom) {
+            link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+            return CAHUTE_ERROR_ALLOC;
+        }
+
+        err = cahute_seven_receive_data_into_buf(
+            link,
+            rom,
+            rom_size,
+            0x50,
+            progress_func,
+            progress_cookie
+        );
+        if (err)
+            goto fail;
+    }
+
+    /* Active sends ACK for last data packet.
+     * Passive sends ROLESWAP.
+     * We are back to initial situation. */
+    err = cahute_seven_send_basic(
+        link,
+        0,
+        PACKET_TYPE_ACK,
+        PACKET_SUBTYPE_ACK_BASIC
+    );
+    if (err)
+        goto fail;
+
+    EXPECT_PACKET_OR_FAIL(PACKET_TYPE_ROLESWAP, 0);
+
+    *romp = rom;
+    *sizep = rom_size;
+    return CAHUTE_OK;
+
+fail:
+    if (rom)
+        free(rom);
+
+    return err;
 }
 
 /**
