@@ -1251,6 +1251,8 @@ cahute_seven_send_data_from_buf(
     return CAHUTE_OK;
 }
 
+#define RECEIVE_DATA_FLAG_DISABLE_SHIFTING 0x00000001 /* Disable shifting. */
+
 /**
  * Accept and receive data to a FILE stream.
  *
@@ -1261,6 +1263,7 @@ cahute_seven_send_data_from_buf(
  * receives a roleswap or another command.
  *
  * @param link Link with which to receive the data.
+ * @param flags Flags.
  * @param filep FILE object to write data to.
  * @param size Size of the data to receive.
  * @param code Command code of the corresponding flow.
@@ -1271,6 +1274,7 @@ cahute_seven_send_data_from_buf(
 CAHUTE_LOCAL(int)
 cahute_seven_receive_data(
     cahute_link *link,
+    unsigned long flags,
     FILE *filep,
     size_t size,
     int command_code,
@@ -1398,6 +1402,7 @@ cahute_seven_receive_data(
  * receives a roleswap or another command.
  *
  * @param link Link with which to receive the data.
+ * @param flags Flags.
  * @param buf Buffer into which to write the received data.
  * @param size Expected and buffer size.
  * @param command_code Command code of the corresponding flow.
@@ -1408,6 +1413,7 @@ cahute_seven_receive_data(
 CAHUTE_LOCAL(int)
 cahute_seven_receive_data_into_buf(
     cahute_link *link,
+    unsigned long flags,
     cahute_u8 *buf,
     size_t size,
     int command_code,
@@ -1416,17 +1422,113 @@ cahute_seven_receive_data_into_buf(
 ) {
     cahute_u8 const *p_buf = link->protocol_buffer;
     unsigned long packet_count = 0;
-    unsigned int i;
-    int err;
+    unsigned long read_packet_count, read_packet_i;
+    unsigned long i, loop_send_flags = 0;
+    size_t current_size;
+    int err, shifted = 0;
 
-    for (i = 1; size; i++) {
-        unsigned int read_packet_count, read_packet_i;
+    if (!size)
+        return CAHUTE_OK;
 
+    /* Read the first data packet to determine the number of packets. */
+    {
+        msg(ll_info, "Requesting first packet.");
+        err = cahute_seven_send_basic(
+            link,
+            0,
+            PACKET_TYPE_ACK,
+            PACKET_SUBTYPE_ACK_BASIC
+        );
+        if (err)
+            return err;
+
+        EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
+        if (link->protocol_buffer_size < 9) {
+            msg(ll_error,
+                "Data packet doesn't contain metadata and at least one byte.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        if (!IS_ASCII_HEX_DIGIT(p_buf[0]) || !IS_ASCII_HEX_DIGIT(p_buf[1])
+            || !IS_ASCII_HEX_DIGIT(p_buf[2]) || !IS_ASCII_HEX_DIGIT(p_buf[3])
+            || !IS_ASCII_HEX_DIGIT(p_buf[4]) || !IS_ASCII_HEX_DIGIT(p_buf[5])
+            || !IS_ASCII_HEX_DIGIT(p_buf[6])
+            || !IS_ASCII_HEX_DIGIT(p_buf[7])) {
+            msg(ll_error, "Data packet has invalid format.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_packet_i = (ASCII_HEX_TO_NIBBLE(p_buf[4]) << 12)
+                        | (ASCII_HEX_TO_NIBBLE(p_buf[5]) << 8)
+                        | (ASCII_HEX_TO_NIBBLE(p_buf[6]) << 4)
+                        | ASCII_HEX_TO_NIBBLE(p_buf[7]);
+        if (read_packet_i != 1) {
+            msg(ll_error,
+                "Unexpected sequence number %u for first packet.",
+                read_packet_i);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_packet_count = (ASCII_HEX_TO_NIBBLE(p_buf[0]) << 12)
+                            | (ASCII_HEX_TO_NIBBLE(p_buf[1]) << 8)
+                            | (ASCII_HEX_TO_NIBBLE(p_buf[2]) << 4)
+                            | ASCII_HEX_TO_NIBBLE(p_buf[3]);
+        if (!read_packet_count) {
+            msg(ll_info,
+                "Unexpected packet count %u in first packet.",
+                read_packet_count);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        packet_count = read_packet_count;
+
+        current_size = link->protocol_buffer_size - 8;
+        if (current_size >= size) {
+            msg(ll_error,
+                "Packet too much data for the expected total size of "
+                "the data flow (expected: %" CAHUTE_PRIuSIZE
+                ", got: %" CAHUTE_PRIuSIZE ")",
+                size,
+                current_size);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        /* Write what is in the current packet. */
+        memcpy(buf, &p_buf[8], current_size);
+        buf += current_size;
+        size -= current_size;
+
+        if (progress_func)
+            (*progress_func)(progress_cookie, 1, packet_count);
+    }
+
+    /* If the conditions are met, start packet shifting! */
+    if (packet_count >= 3 && (~link->flags & CAHUTE_LINK_FLAG_SERIAL)
+        && (~flags & RECEIVE_DATA_FLAG_DISABLE_SHIFTING)) {
+        /* We are about to start packet shifting.
+         * For more information, please consult the following:
+         * https://cahuteproject.org/topics/protocols/seven/flows.html
+         * #packet-shifting */
+        err = cahute_seven_send_basic(
+            link,
+            SEND_FLAG_DISABLE_RECEIVE,
+            PACKET_TYPE_ACK,
+            PACKET_SUBTYPE_ACK_BASIC
+        );
+        if (err)
+            return err;
+
+        shifted = 1;
+        loop_send_flags |= SEND_FLAG_DISABLE_CHECKSUM;
+    }
+
+    /* Read all middle packets in the flow. */
+    for (i = 2; size && i < read_packet_count - shifted; i++) {
         msg(ll_info, "Requesting packet %u/%u.", i, packet_count);
 
         err = cahute_seven_send_basic(
             link,
-            0,
+            loop_send_flags,
             PACKET_TYPE_ACK,
             PACKET_SUBTYPE_ACK_BASIC
         );
@@ -1467,9 +1569,7 @@ cahute_seven_receive_data_into_buf(
              | (ASCII_HEX_TO_NIBBLE(p_buf[1]) << 8)
              | (ASCII_HEX_TO_NIBBLE(p_buf[2]) << 4)
              | ASCII_HEX_TO_NIBBLE(p_buf[3]));
-        if (i == 1)
-            packet_count = read_packet_count;
-        else if (read_packet_count != packet_count) {
+        if (read_packet_count != packet_count) {
             msg(ll_error,
                 "Packet count was not consistent between packets "
                 "(initial: 1/%u, current: %u/%u)",
@@ -1479,18 +1579,158 @@ cahute_seven_receive_data_into_buf(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        size_t current_size = link->protocol_buffer_size - 8;
-        if (i < read_packet_count) {
-            if (current_size >= size) {
-                msg(ll_error,
-                    "Packet too much data for the expected total size of "
-                    "the data flow (expected: %" CAHUTE_PRIuSIZE
-                    ", got: %" CAHUTE_PRIuSIZE ")",
-                    size,
-                    current_size);
-                return CAHUTE_ERROR_UNKNOWN;
-            }
-        } else if (current_size < size) {
+        current_size = link->protocol_buffer_size - 8;
+        if (current_size >= size) {
+            msg(ll_error,
+                "Packet too much data for the expected total size of "
+                "the data flow (expected: %" CAHUTE_PRIuSIZE
+                ", got: %" CAHUTE_PRIuSIZE ")",
+                size,
+                current_size);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        /* Write what is in the current packet. */
+        memcpy(buf, &p_buf[8], current_size);
+        buf += current_size;
+        size -= current_size;
+
+        if (progress_func)
+            (*progress_func)(progress_cookie, i, packet_count);
+    }
+
+    /* If we have been using packet shifting, we want to normalize the
+     * exchange before the last packet. */
+    if (shifted) {
+        msg(ll_info, "Requesting packet %u/%u.", packet_count - 1, packet_count
+        );
+
+        if ((err = cahute_seven_receive(link)))
+            return err;
+
+        EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
+        if (link->protocol_buffer_size < 9) {
+            msg(ll_error,
+                "Data packet doesn't contain metadata and at least one byte.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        if (!IS_ASCII_HEX_DIGIT(p_buf[0]) || !IS_ASCII_HEX_DIGIT(p_buf[1])
+            || !IS_ASCII_HEX_DIGIT(p_buf[2]) || !IS_ASCII_HEX_DIGIT(p_buf[3])
+            || !IS_ASCII_HEX_DIGIT(p_buf[4]) || !IS_ASCII_HEX_DIGIT(p_buf[5])
+            || !IS_ASCII_HEX_DIGIT(p_buf[6])
+            || !IS_ASCII_HEX_DIGIT(p_buf[7])) {
+            msg(ll_error, "Data packet has invalid format.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_packet_i =
+            ((ASCII_HEX_TO_NIBBLE(p_buf[4]) << 12)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[5]) << 8)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[6]) << 4)
+             | ASCII_HEX_TO_NIBBLE(p_buf[7]));
+        if (read_packet_i != packet_count - 1) {
+            msg(ll_error,
+                "Unexpected sequence number (expected %u, got %u)",
+                packet_count - 1,
+                read_packet_i);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_packet_count =
+            ((ASCII_HEX_TO_NIBBLE(p_buf[0]) << 12)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[1]) << 8)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[2]) << 4)
+             | ASCII_HEX_TO_NIBBLE(p_buf[3]));
+        if (read_packet_count != packet_count) {
+            msg(ll_error,
+                "Packet count was not consistent between packets "
+                "(initial: 1/%u, current: %u/%u)",
+                packet_count,
+                packet_count - 1,
+                read_packet_count);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        current_size = link->protocol_buffer_size - 8;
+        if (current_size >= size) {
+            msg(ll_error,
+                "Packet too much data for the expected total size of "
+                "the data flow (expected: %" CAHUTE_PRIuSIZE
+                ", got: %" CAHUTE_PRIuSIZE ")",
+                size,
+                current_size);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        /* Write what is in the current packet. */
+        memcpy(buf, &p_buf[8], current_size);
+        buf += current_size;
+        size -= current_size;
+
+        if (progress_func)
+            (*progress_func)(progress_cookie, packet_count - 1, packet_count);
+    }
+
+    /* Read the last data packet. */
+    if (packet_count > 1) {
+        msg(ll_info, "Requesting packet %u/%u.", packet_count, packet_count);
+
+        err = cahute_seven_send_basic(
+            link,
+            loop_send_flags,
+            PACKET_TYPE_ACK,
+            PACKET_SUBTYPE_ACK_BASIC
+        );
+        if (err)
+            return err;
+
+        EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
+        if (link->protocol_buffer_size < 9) {
+            msg(ll_error,
+                "Data packet doesn't contain metadata and at least one byte.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        if (!IS_ASCII_HEX_DIGIT(p_buf[0]) || !IS_ASCII_HEX_DIGIT(p_buf[1])
+            || !IS_ASCII_HEX_DIGIT(p_buf[2]) || !IS_ASCII_HEX_DIGIT(p_buf[3])
+            || !IS_ASCII_HEX_DIGIT(p_buf[4]) || !IS_ASCII_HEX_DIGIT(p_buf[5])
+            || !IS_ASCII_HEX_DIGIT(p_buf[6])
+            || !IS_ASCII_HEX_DIGIT(p_buf[7])) {
+            msg(ll_error, "Data packet has invalid format.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_packet_i =
+            ((ASCII_HEX_TO_NIBBLE(p_buf[4]) << 12)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[5]) << 8)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[6]) << 4)
+             | ASCII_HEX_TO_NIBBLE(p_buf[7]));
+        if (read_packet_i != packet_count) {
+            msg(ll_error,
+                "Unexpected sequence number (expected %u, got %u)",
+                i,
+                read_packet_i);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_packet_count =
+            ((ASCII_HEX_TO_NIBBLE(p_buf[0]) << 12)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[1]) << 8)
+             | (ASCII_HEX_TO_NIBBLE(p_buf[2]) << 4)
+             | ASCII_HEX_TO_NIBBLE(p_buf[3]));
+        if (read_packet_count != packet_count) {
+            msg(ll_error,
+                "Packet count was not consistent between packets "
+                "(initial: 1/%u, current: %u/%u)",
+                packet_count,
+                i,
+                read_packet_count);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        current_size = link->protocol_buffer_size - 8;
+        if (current_size < size) {
             msg(ll_error,
                 "Last packet did not contain enough bytes to finish the "
                 "data flow (expected: %" CAHUTE_PRIuSIZE
@@ -1510,8 +1750,6 @@ cahute_seven_receive_data_into_buf(
 
         /* Write what is in the current packet. */
         memcpy(buf, &p_buf[8], current_size);
-        buf += current_size;
-        size -= current_size;
 
         if (progress_func)
             (*progress_func)(progress_cookie, i, packet_count);
@@ -2058,6 +2296,7 @@ cahute_seven_request_file_from_storage(
      * Last ACK is not yet sent. */
     err = cahute_seven_receive_data(
         link,
+        0,
         filep,
         filesize,
         0x45,
@@ -2422,6 +2661,7 @@ cahute_seven_backup_rom(
 
         err = cahute_seven_receive_data_into_buf(
             link,
+            RECEIVE_DATA_FLAG_DISABLE_SHIFTING,
             rom,
             rom_size,
             0x50,
