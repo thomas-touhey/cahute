@@ -136,7 +136,7 @@ Type-specific data for such files are the following:
       -
       - 8-bit unsigned integer.
     * - 2 (0x02)
-      - 4 B
+      - 1 B
       - Screenshot format
       -
       - Screenshot format, among the following:
@@ -146,8 +146,23 @@ Type-specific data for such files are the following:
 
             * - Value
               - Description
-            * - ``\x11UWF``
+            * - ``\x11``
               - :ref:`picture-format-1bit-multiple-cas50`
+    * - 3 (0x03)
+      - 1 B
+      - Direction (*DR*)
+      -
+      - ``U`` (?)
+    * - 4 (0x04)
+      - 1 B
+      - Byte Direction
+      -
+      - ``W`` (?)
+    * - 5 (0x05)
+      - 1 B
+      - Bit Weight (*BW*)
+      -
+      - ``F`` (?)
     * - 6 (0x06)
       - 1 B
       - Sheet count
@@ -156,6 +171,8 @@ Type-specific data for such files are the following:
 
 This is followed by 3 data parts, each representing a monochrome picture with
 a one-byte prefix representing the color.
+
+.. todo:: Document the role of the different fields here!
 
 .. _casiolink-cas40-dd:
 
@@ -186,7 +203,7 @@ Type-specific data for such files are the following:
       -
       - 8-bit unsigned integer.
     * - 2 (0x02)
-      - 4 B
+      - 1 B
       - Screenshot format
       -
       - Screenshot format, among the following:
@@ -196,8 +213,23 @@ Type-specific data for such files are the following:
 
             * - Value
               - Description
-            * - ``\x10DWF``
+            * - ``\x10``
               - :ref:`picture-format-1bit-cas50`.
+    * - 3 (0x03)
+      - 1 B
+      - Direction (*DR*)
+      -
+      - ``D`` (?)
+    * - 4 (0x04)
+      - 1 B
+      - Byte Direction
+      -
+      - ``W`` (?)
+    * - 5 (0x05)
+      - 1 B
+      - Bit Weight (*BW*)
+      -
+      - ``F`` (?)
 
 This is followed by a single data part representing the monochrome picture.
 
@@ -470,60 +502,21 @@ The format of such headers is the following:
       - Values
     * - 0 (0x00)
       - 4 B
-      - Type (*T*)
-      - Basic purpose of the packet
-      - ``END\0``
+      - Format (*FMT*)
+      - Format of the following data packets.
+      -
     * - 4 (0x04)
-      - 2 B
-      - File Type (*FT*)
-      - File type, used by ``TXT`` packets.
-      - ``PG``
-    * - 6 (0x06)
-      - 4 B
-      - Size (*S*)
-      - Size of the data accompanying the header (big endian).
-
-        For most data, this is either set to 0 if there are no data part, or
-        the size of the data part plus 2 otherwise. However, some types
-        override this behaviour to use it elsewhere.
-      - ``\0\0\0\xFF``
-    * - 10 (0x0A)
-      - 8 B
-      - File Name (*FN*)
-      - Name of the file, with unset bytes being set to ``\xFF``.
-      - ``HELLO\xFF\xFF\xFF``
-    * - 18 (0x12)
-      - 8 B
-      - Alternative File Type (*AFT*)
-      - Alternative file type used for some packet types, notably variables.
-      - ``VariableR\x0A``
-    * - 26 (0x1A)
-      - 8 B
-      - File Password (*FP*)
-      - Password of the file, with unset bytes being set to ``\xFF``.
-      - ``WORLD\xFF\xFF\xFF``
-    * - 34 (0x22)
-      - 2 B
-      - Base, if the file is a program.
-      - ``BN`` for Base programs, ``NL`` otherwise.
-      - ``BN``
-    * - 36 (0x24)
-      - 6 B
-      - Backup Size (*BS*) *(?)*
-      - Size of the backup (big endian).
-      - ``\0\x10\0\0\0\0``
-    * - 42 (0x2A)
-      - 6 B
-      - (unknown)
-      - Unknown, filled with ``\xFF``.
-      - ``\xFF\xFF\xFF\xFF\xFF\xFF``
+      - 44 B
+      - Format-specific data
+      -
+      - See the type description for the format of this component.
+        If the type-specific data is less than 44 bytes, the rest is filled
+        with ``\xFF``.
     * - 48 (0x30)
-      - 2 B
+      - 1 B
       - Checksum (*CS*)
-      - Checksum (big endian).
-      - ``\x12\x34``
-
-Note that any field not used by the packet type should be set to ``\xFF``.
+      -
+      - ``\x12``
 
 .. _casiolink-cas50-end:
 
@@ -547,30 +540,47 @@ This is not followed by any data parts.
 ``IMG\0`` CAS50 Image
 ~~~~~~~~~~~~~~~~~~~~~
 
-Such packets carry over a main memory picture file.
-
-.. list-table::
-    :header-rows: 1
-
-    * - Subtype (*ST*) value
-      - Description
-    * - ``PC``
-      - Picture.
+.. todo:: Describe this more.
 
 .. _casiolink-cas50-mem:
 
-``MEM\0`` CAS50 Backup
-~~~~~~~~~~~~~~~~~~~~~~
+``MEM\0`` CAS50 Memory Dump
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Such packets carry over a backup.
+Such packets carry over a memory dump.
+
+Format-specific data for this format is the following:
 
 .. list-table::
     :header-rows: 1
 
-    * - Subtype (*ST*) value
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Data Type (*DT*)
+      - Data type, presenting the nature of the data depending on the format.
+      - ``PG``
+    * - 2 (0x02)
+      - 4 B
+      - Size (*S*)
+      - Size of the data accompanying the header.
+      - Big endian 16-bit unsigned integer.
+
+Known data types for this format are:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Data Type (*DT*)
       - Description
     * - ``BU``
       - Backup.
+
+.. todo:: Describe this more. Notably, there is more to the header!
 
 .. _casiolink-cas50-req:
 
@@ -586,10 +596,72 @@ Such packets carry over a backup.
 
 Such packets carry over a main memory textual file.
 
+Format-specific data for this format is the following:
+
 .. list-table::
     :header-rows: 1
 
-    * - Subtype (*ST*) value
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Data Type (*DT*)
+      - Data type, presenting the nature of the data depending on the format.
+      - ``PG``
+    * - 2 (0x02)
+      - 4 B
+      - Size (*S*)
+      - Size of the data accompanying the header (big endian).
+
+        For most data, this is either set to 0 if there are no data part, or
+        the size of the data part plus 2 otherwise. However, some types
+        override this behaviour to use it elsewhere.
+      - ``\0\0\0\xFF``
+    * - 6 (0x06)
+      - 8 B
+      - File Name (*FN*)
+      - Name of the file, with unset bytes being set to ``\xFF``.
+      - ``HELLO\xFF\xFF\xFF``
+    * - 14 (0x0E)
+      - 8 B
+      - Reserved
+      -
+      - Set to ``\xFF``
+    * - 22 (0x16)
+      - 8 B
+      - File Password (*FP*)
+      - Password of the file, with unset bytes being set to ``\xFF``.
+      - ``WORLD\xFF\xFF\xFF``
+    * - 30 (0x1E)
+      - 2 B
+      - Option 1.
+      - ``BN`` for Base programs, ``NL`` otherwise.
+      - ``BN``
+    * - 32 (0x20)
+      - 2 B
+      - Option 2
+      -
+      - Set to ``\xFF``
+    * - 34 (0x22)
+      - 2 B
+      - Option 3
+      -
+      - Set to ``\xFF``
+    * - 36 (0x24)
+      - 2 B
+      - Option 4
+      -
+      - Set to ``\xFF``
+
+Known data types for this format are the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Data Type (*DT*)
       - Description
     * - ``PG``
       - Program.
@@ -599,7 +671,81 @@ Such packets carry over a main memory textual file.
 ``VAL\0`` CAS50 Value
 ~~~~~~~~~~~~~~~~~~~~~
 
-Such packets carry over a variable. Particularities for this packet are:
+Such packets carry over one or more values.
 
-* *FN* should be set to the variable name (?).
-* *AFT* should be set to ``VariableR\x0A``.
+Format-specific data for this format is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Data Type (*DT*)
+      - Data type, presenting the nature of the data depending on the format.
+      - ``PG``
+    * - 2 (0x02)
+      - 2 B
+      - Height (*H*)
+      -
+      - Big endian 16-bit unsigned integer.
+    * - 4 (0x04)
+      - 2 B
+      - Width (*W*)
+      - Width of the array. Set to 0 for lists (i.e. only width is used).
+      - Big endian 16-bit unsigned integer.
+    * - 6 (0x06)
+      - 8 B
+      - Reserved
+      -
+      - Set to ``\xFF``.
+    * - 14 (0x0E)
+      - 8 B
+      - Unknown
+      -
+      - ``VariableR\x0A``
+
+Known data types for this format are the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Data Type (*DT*)
+      - Description
+    * - ``MT``
+      - Matrix
+    * - ``LT``
+      - List
+
+Every data payload represents a value in the collection, using a 14-byte
+format composed of the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Y coordinate (*Y*)
+      -
+      - Big endian 16-bit unsigned integer.
+    * - 2 (0x02)
+      - 2 B
+      - X coordinate (*X*)
+      -
+      - Big endian 16-bit unsigned integer.
+    * - 4 (0x04)
+      - 10 B
+      - Value (*V*)
+      -
+      - :ref:`number-format-casiolink-bcd`
+
+.. todo:: Check the format and its order!

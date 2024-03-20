@@ -1,3 +1,5 @@
+.. _protocol-seven-casio-commands:
+
 Known Protocol 7.00 commands by CASIO
 =====================================
 
