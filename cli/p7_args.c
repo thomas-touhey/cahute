@@ -338,7 +338,7 @@ static inline int check_directory_name(char const *name) {
         return 1;
 
     n = strnlen(name, 9);
-    if (n > 9)
+    if (n > 8)
         return 0;
 
     for (; n--; name++)
