@@ -481,6 +481,13 @@ cahute_open_usb_link(
         case LIBUSB_ERROR_NOT_FOUND:
             break;
 
+        case LIBUSB_ERROR_ACCESS:
+            /* On MacOS / OS X, we actually require an entitlement guaranteed
+             * by code signing, and that costs money, so we just don't
+             * detach the kernel driver and try to use the device directly. */
+            msg(ll_warn, "Kernel driver could not be detached due to access.");
+            break;
+
         case LIBUSB_ERROR_NO_DEVICE:
             err = CAHUTE_ERROR_NOT_FOUND;
             break;
@@ -503,6 +510,11 @@ cahute_open_usb_link(
             case LIBUSB_ERROR_NO_DEVICE:
             case LIBUSB_ERROR_NOT_FOUND:
                 err = CAHUTE_ERROR_NOT_FOUND;
+                break;
+
+            case LIBUSB_ERROR_ACCESS:
+                /* Same entitlement problems on MacOS / OS X. */
+                msg(ll_warn, "Interface could not be claimed due to access.");
                 break;
 
             case LIBUSB_ERROR_BUSY:
