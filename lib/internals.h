@@ -208,10 +208,14 @@ struct cahute_link_windows {
  *
  * @property context libusb context to close once the link is closed.
  * @property handle libusb device handle which to use to make USB requests.
+ * @property bulk_in Bulk IN endpoint address to use for reading.
+ * @property bulk_out Bulk OUT endpoint address to use for writing.
  */
 struct cahute_link_libusb {
     libusb_context *context;
     libusb_device_handle *handle;
+    int bulk_in;
+    int bulk_out;
 };
 #endif
 

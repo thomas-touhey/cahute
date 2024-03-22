@@ -391,7 +391,7 @@ cahute_open_usb_link(
     libusb_context *context = NULL;
     libusb_device **device_list = NULL;
     libusb_device_handle *device_handle = NULL;
-    int device_count, id, libusberr;
+    int device_count, id, libusberr, bulk_in = -1, bulk_out = -1;
 
     if (libusb_init(&context)) {
         msg(ll_fatal, "Could not create a libusb context.");
@@ -407,7 +407,9 @@ cahute_open_usb_link(
     for (id = 0; id < device_count; id++) {
         struct libusb_device_descriptor device_descriptor;
         struct libusb_config_descriptor *config_descriptor;
-        int interface_class = 0;
+        struct libusb_interface_descriptor const *interface_descriptor;
+        struct libusb_endpoint_descriptor const *endpoint_descriptor;
+        int interface_class = 0, i;
 
         if (libusb_get_bus_number(device_list[id]) != bus
             || libusb_get_device_address(device_list[id]) != address)
@@ -433,10 +435,12 @@ cahute_open_usb_link(
             ))
             break;
 
-        if (config_descriptor->bNumInterfaces == 1
-            && config_descriptor->interface[0].num_altsetting == 1)
-            interface_class =
-                config_descriptor->interface[0].altsetting[0].bInterfaceClass;
+        if (config_descriptor->bNumInterfaces != 1
+            || config_descriptor->interface[0].num_altsetting != 1)
+            break;
+
+        interface_descriptor = config_descriptor->interface[0].altsetting;
+        interface_class = interface_descriptor->bInterfaceClass;
 
         if (interface_class == 8 || interface_class == 255) {
             if (flags & CAHUTE_USB_OHP)
@@ -449,6 +453,36 @@ cahute_open_usb_link(
         } else
             break;
 
+        /* Find bulk in and out endpoints.
+         * This search is in case they vary between host platforms. */
+        for (endpoint_descriptor = interface_descriptor->endpoint,
+            i = interface_descriptor->bNumEndpoints;
+             i;
+             endpoint_descriptor++, i--) {
+            if ((endpoint_descriptor->bmAttributes & 3)
+                != LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK)
+                continue;
+
+            switch (endpoint_descriptor->bEndpointAddress & 128) {
+            case LIBUSB_ENDPOINT_OUT:
+                bulk_out = endpoint_descriptor->bEndpointAddress;
+                break;
+            case LIBUSB_ENDPOINT_IN:
+                bulk_in = endpoint_descriptor->bEndpointAddress;
+                break;
+            }
+        }
+
+        if (bulk_in < 0) {
+            msg(ll_error, "Bulk in endpoint could not be found.");
+            break;
+        }
+
+        if (bulk_out < 0) {
+            msg(ll_error, "Bulk out endpoint could not be found.");
+            break;
+        }
+
         libusberr = libusb_open(device_list[id], &device_handle);
         switch (libusberr) {
         case 0:
@@ -459,7 +493,7 @@ cahute_open_usb_link(
             break;
 
         default:
-            msg(ll_fatal,
+            msg(ll_error,
                 "libusb_open returned %d: %s",
                 libusberr,
                 libusb_error_name(libusberr));
@@ -556,6 +590,11 @@ cahute_open_usb_link(
     link->stream = CAHUTE_LINK_STREAM_LIBUSB;
     link->stream_state.libusb.context = context;
     link->stream_state.libusb.handle = device_handle;
+    link->stream_state.libusb.bulk_in = bulk_in;
+    link->stream_state.libusb.bulk_out = bulk_out;
+
+    msg(ll_info, "Bulk in endpoint address is: 0x%02X", bulk_in);
+    msg(ll_info, "Bulk out endpoint address is: 0x%02X", bulk_out);
 #else
     err = CAHUTE_ERROR_IMPL;
 #endif

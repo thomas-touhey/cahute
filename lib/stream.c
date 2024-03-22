@@ -274,7 +274,7 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
 
                 libusberr = libusb_bulk_transfer(
                     link->stream_state.libusb.handle,
-                    LIBUSB_ENDPOINT_IN | LIBUSB_TRANSFER_TYPE_BULK,
+                    link->stream_state.libusb.bulk_in,
                     dest,
                     target_size,
                     &received,
@@ -295,10 +295,10 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
                     return CAHUTE_ERROR_TIMEOUT;
 
                 default:
-                    msg(ll_fatal,
-                        "libusb error was %d: %s",
+                    msg(ll_error,
+                        "libusb_bulk_transfer returned %d: %s",
                         libusberr,
-                        libusb_strerror(libusberr));
+                        libusb_error_name(libusberr));
                     return CAHUTE_ERROR_UNKNOWN;
                 }
 
@@ -468,7 +468,7 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
 
                 libusberr = libusb_bulk_transfer(
                     link->stream_state.libusb.handle,
-                    LIBUSB_ENDPOINT_OUT | LIBUSB_TRANSFER_TYPE_ISOCHRONOUS,
+                    link->stream_state.libusb.bulk_out,
                     (cahute_u8 *)buf,
                     size,
                     &sent,
@@ -486,10 +486,10 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
                     return CAHUTE_ERROR_GONE;
 
                 default:
-                    msg(ll_fatal,
-                        "libusb error was %d: %s",
+                    msg(ll_error,
+                        "libusb_bulk_transfer returned %d: %s",
                         libusberr,
-                        libusb_strerror(libusberr));
+                        libusb_error_name(libusberr));
                     return CAHUTE_ERROR_UNKNOWN;
                 }
 
@@ -860,7 +860,7 @@ cahute_scsi_request(
 
         libusberr = libusb_bulk_transfer(
             link->stream_state.libusb.handle,
-            LIBUSB_ENDPOINT_OUT | LIBUSB_TRANSFER_TYPE_ISOCHRONOUS,
+            link->stream_state.libusb.bulk_out,
             (cahute_u8 *)cbw_buf,
             31,
             &sent,
@@ -878,10 +878,10 @@ cahute_scsi_request(
             return CAHUTE_ERROR_GONE;
 
         default:
-            msg(ll_fatal,
-                "libusb error was %d: %s",
+            msg(ll_error,
+                "libusb_bulk_transfer returned %d: %s",
                 libusberr,
-                libusb_strerror(libusberr));
+                libusb_error_name(libusberr));
             return CAHUTE_ERROR_UNKNOWN;
         }
     }
@@ -893,7 +893,7 @@ cahute_scsi_request(
 
             libusberr = libusb_bulk_transfer(
                 link->stream_state.libusb.handle,
-                LIBUSB_ENDPOINT_OUT | LIBUSB_TRANSFER_TYPE_ISOCHRONOUS,
+                link->stream_state.libusb.bulk_out,
                 buf,
                 (int)buf_size,
                 &sent,
@@ -911,10 +911,10 @@ cahute_scsi_request(
                 return CAHUTE_ERROR_GONE;
 
             default:
-                msg(ll_fatal,
-                    "libusb error was %d: %s",
+                msg(ll_error,
+                    "libusb_bulk_transfer returned %d: %s",
                     libusberr,
-                    libusb_strerror(libusberr));
+                    libusb_error_name(libusberr));
                 return CAHUTE_ERROR_UNKNOWN;
             }
         } else {
@@ -923,7 +923,7 @@ cahute_scsi_request(
 
                 libusberr = libusb_bulk_transfer(
                     link->stream_state.libusb.handle,
-                    LIBUSB_ENDPOINT_IN | LIBUSB_TRANSFER_TYPE_BULK,
+                    link->stream_state.libusb.bulk_in,
                     buf,
                     (int)buf_size,
                     &recv,
@@ -940,10 +940,10 @@ cahute_scsi_request(
                     return CAHUTE_ERROR_GONE;
 
                 default:
-                    msg(ll_fatal,
-                        "libusb error was %d: %s",
+                    msg(ll_error,
+                        "libusb_bulk_transfer returned %d: %s",
                         libusberr,
-                        libusb_strerror(libusberr));
+                        libusb_error_name(libusberr));
                     return CAHUTE_ERROR_UNKNOWN;
                 }
 
@@ -964,7 +964,7 @@ cahute_scsi_request(
             do {
                 libusberr = libusb_bulk_transfer(
                     link->stream_state.libusb.handle,
-                    LIBUSB_ENDPOINT_IN | LIBUSB_TRANSFER_TYPE_BULK,
+                    link->stream_state.libusb.bulk_in,
                     csw,
                     (int)csw_size,
                     &recv,
@@ -981,10 +981,10 @@ cahute_scsi_request(
                     return CAHUTE_ERROR_GONE;
 
                 default:
-                    msg(ll_fatal,
-                        "libusb error was %d: %s",
+                    msg(ll_error,
+                        "libusb_bulk_transfer returned %d: %s",
                         libusberr,
-                        libusb_strerror(libusberr));
+                        libusb_error_name(libusberr));
                     return CAHUTE_ERROR_UNKNOWN;
                 }
 
