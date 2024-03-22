@@ -311,6 +311,7 @@ update_texture_pixels(Uint32 *pixels, cahute_frame const *frame, int zoom) {
 static int
 display_frame(struct display_cookie *cookie, cahute_frame const *frame) {
     int width, height, format, zoom;
+    SDL_Event event;
 
     width = frame->cahute_frame_width;
     height = frame->cahute_frame_height;
@@ -357,6 +358,11 @@ display_frame(struct display_cookie *cookie, cahute_frame const *frame) {
             );
             return 1;
         }
+
+        /* Update and read the event queue, ignoring events for now.
+	    * This is needed for MacOS to show and update the window. */
+        SDL_PumpEvents();
+        while (SDL_PollEvent(&event) != 0) {}
 
         /* Finally, create the texture we're gonna use for drawing
             * the picture as a classic ARGB pixel matric (8 bits per
