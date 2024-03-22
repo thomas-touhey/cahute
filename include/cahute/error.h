@@ -31,13 +31,15 @@
 
 CAHUTE_BEGIN_NAMESPACE
 
-#define CAHUTE_OK              0x0000 /* No error has occurred. */
-#define CAHUTE_ERROR_UNKNOWN   0x0001 /* An unknown error has occurred. */
-#define CAHUTE_ERROR_IMPL      0x0002 /* A feature was unimplemented. */
-#define CAHUTE_ERROR_ALLOC     0x0003 /* A memory allocation has failed. */
-#define CAHUTE_ERROR_PRIV      0x0004 /* Insufficient privileges were found. */
-#define CAHUTE_ERROR_INT       0x0005 /* Interrupted by a callback. */
-#define CAHUTE_ERROR_SIZE      0x0006 /* Some received data was too big. */
+#define CAHUTE_OK 0x0000 /* No error has occurred. */
+
+#define CAHUTE_ERROR_UNKNOWN 0x0001 /* An unknown error has occurred. */
+#define CAHUTE_ERROR_IMPL    0x0002 /* A feature was unimplemented. */
+#define CAHUTE_ERROR_ALLOC   0x0003 /* A memory allocation has failed. */
+#define CAHUTE_ERROR_PRIV    0x0004 /* Insufficient privileges were found. */
+#define CAHUTE_ERROR_INT     0x0005 /* Interrupted by a callback. */
+#define CAHUTE_ERROR_SIZE    0x0006 /* Some received data was too big. */
+
 #define CAHUTE_ERROR_NOT_FOUND 0x0101 /* Device could not be found. */
 #define CAHUTE_ERROR_TOO_MANY  0x0102 /* Too Many Devices found. */
 #define CAHUTE_ERROR_INCOMPAT  0x0103 /* Found device is incompatible. */
@@ -45,7 +47,8 @@ CAHUTE_BEGIN_NAMESPACE
 #define CAHUTE_ERROR_TIMEOUT   0x0105 /* A timeout has occurred. */
 #define CAHUTE_ERROR_CORRUPT   0x0106 /* Corrupted packet (invalid checksum) */
 #define CAHUTE_ERROR_IRRECOV   0x0107 /* Irrecoverable link */
-#define CAHUTE_ERROR_NOOW      0x0201 /* File was not overwritten. */
+
+#define CAHUTE_ERROR_NOOW 0x0201 /* File was not overwritten. */
 
 CAHUTE_END_NAMESPACE
 

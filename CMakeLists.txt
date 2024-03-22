@@ -66,6 +66,7 @@ add_compile_options(
 )
 
 add_library(${PROJECT_NAME} STATIC
+    lib/casiolink.c
     lib/cdefs.c
     lib/detection.c
     lib/link.c

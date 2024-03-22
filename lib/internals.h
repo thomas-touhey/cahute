@@ -147,10 +147,13 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_LINK_FLAG_CLOSE_STREAM   0x00000001
 #define CAHUTE_LINK_FLAG_CLOSE_PROTOCOL 0x00000002
 #define CAHUTE_LINK_FLAG_TERMINATE      0x00000004 /* Should terminate. */
-#define CAHUTE_LINK_FLAG_TERMINATED     0x00000008 /* Was terminated! */
-#define CAHUTE_LINK_FLAG_SCSI           0x00000010 /* Using SCSI. */
-#define CAHUTE_LINK_FLAG_SERIAL         0x00000020 /* Using serial. */
-#define CAHUTE_LINK_FLAG_IRRECOVERABLE  0x00000040 /* Cannot recover. */
+#define CAHUTE_LINK_FLAG_RECEIVER       0x00000008 /* Act as a receiver. */
+
+#define CAHUTE_LINK_FLAG_SCSI   0x00000010 /* Using SCSI. */
+#define CAHUTE_LINK_FLAG_SERIAL 0x00000020 /* Using serial. */
+
+#define CAHUTE_LINK_FLAG_TERMINATED    0x00000100 /* Was terminated! */
+#define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000200 /* Cannot recover. */
 
 /* Stream types allowed. */
 #define CAHUTE_LINK_STREAM_STDIO 0x00000001
@@ -245,6 +248,9 @@ union cahute_link_stream_state {
 #endif
 };
 
+/* Absolute minimum buffer size for CASIOLINK. */
+#define CASIOLINK_MINIMUM_BUFFER_SIZE 50
+
 /* Absolute minimum buffer size for Protocol 7.00. */
 #define SEVEN_MINIMUM_BUFFER_SIZE 1024
 
@@ -255,6 +261,17 @@ union cahute_link_stream_state {
 
 /* Flag to describe whether device information has been requested. */
 #define SEVEN_FLAG_DEVICE_INFO_REQUESTED 0x00000001
+
+/**
+ * CASIOLINK peer state.
+ *
+ * @property variant Variant with which to force data frame interpretation.
+ * @property last_variant Variant for the last data frame.
+ */
+struct cahute_casiolink_state {
+    int variant;
+    int last_variant;
+};
 
 /**
  * Protocol 7.00 peer state.
@@ -319,10 +336,12 @@ struct cahute_seven_ohp_state {
  * Link protocol client state, to be used depending on the protocol selected
  * in the link flags.
  *
+ * @property casiolink CASIOLINK peer state.
  * @property seven Protocol 7.00 peer state.
  * @property seven_ohp Protocol 7.00 screenstreaming receiver state.
  */
 union cahute_link_protocol_state {
+    struct cahute_casiolink_state casiolink;
     struct cahute_seven_state seven;
     struct cahute_seven_ohp_state seven_ohp;
 };
@@ -420,6 +439,21 @@ cahute_scsi_request_from_link(
     cahute_u8 *buf,
     size_t buf_size,
     int *statusp
+);
+
+/* ---
+ * CASIOLINK protocol and file format functions, defined in casiolink.c
+ * --- */
+
+CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link);
+
+CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link);
+
+CAHUTE_EXTERN(int)
+cahute_casiolink_get_screen(
+    cahute_link *link,
+    cahute_process_frame_func *callback,
+    void *cookie
 );
 
 /* ---

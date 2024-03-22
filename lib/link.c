@@ -55,6 +55,7 @@ initialize_link_protocol(
     int protocol,
     int casiolink_variant
 ) {
+    struct cahute_casiolink_state *casiolink_state;
     struct cahute_seven_state *seven_state;
     struct cahute_seven_ohp_state *seven_ohp_state;
     int err;
@@ -64,8 +65,33 @@ initialize_link_protocol(
         link->flags |= CAHUTE_LINK_FLAG_TERMINATE;
     if (flags & PROTOCOL_FLAG_SCSI)
         link->flags |= CAHUTE_LINK_FLAG_SCSI;
+    if (flags & PROTOCOL_FLAG_RECEIVER)
+        link->flags |= CAHUTE_LINK_FLAG_RECEIVER;
 
     switch (protocol) {
+    case CAHUTE_LINK_PROTOCOL_CASIOLINK:
+        casiolink_state = &link->protocol_state.casiolink;
+
+        if (link->protocol_buffer_capacity < CASIOLINK_MINIMUM_BUFFER_SIZE) {
+            msg(ll_fatal,
+                "CASIOLINK implementation expected a minimum protocol "
+                "buffer capacity of %" CAHUTE_PRIuSIZE
+                ", got %" CAHUTE_PRIuSIZE ".",
+                CASIOLINK_MINIMUM_BUFFER_SIZE,
+                link->protocol_buffer_capacity);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        casiolink_state->variant = casiolink_variant;
+
+        if (~flags & PROTOCOL_FLAG_NOCHECK) {
+            err = cahute_casiolink_initiate(link);
+            if (err)
+                return err;
+        }
+
+        break;
+
     case CAHUTE_LINK_PROTOCOL_SEVEN:
         seven_state = &link->protocol_state.seven;
 
@@ -106,7 +132,7 @@ initialize_link_protocol(
         break;
 
     default:
-        msg(ll_fatal, "Can only initialize for Protocol 7.00 for now.");
+        msg(ll_fatal, "Missing initialization for protocol %d.", protocol);
         return CAHUTE_ERROR_IMPL;
     }
 
@@ -123,6 +149,12 @@ CAHUTE_LOCAL(int) deinitialize_link_protocol(cahute_link *link) {
     if (!(link->flags
           & (CAHUTE_LINK_FLAG_IRRECOVERABLE | CAHUTE_LINK_FLAG_TERMINATED))) {
         switch (link->protocol) {
+        case CAHUTE_LINK_PROTOCOL_CASIOLINK:
+            if (link->flags & CAHUTE_LINK_FLAG_TERMINATE)
+                cahute_casiolink_terminate(link);
+
+            break;
+
         case CAHUTE_LINK_PROTOCOL_SEVEN:
             if (link->flags & CAHUTE_LINK_FLAG_TERMINATE)
                 cahute_seven_terminate(link);
@@ -191,17 +223,7 @@ cahute_open_serial_link(
 
     case CAHUTE_SERIAL_PROTOCOL_CASIOLINK:
         protocol = CAHUTE_LINK_PROTOCOL_CASIOLINK;
-
-        /* TODO */
-        if (~flags & CAHUTE_SERIAL_RECEIVER) {
-            msg(ll_error,
-                "Sender mode is not yet implemented with CASIOLINK.");
-            return CAHUTE_ERROR_IMPL;
-        }
-
-        /* TODO */
-        msg(ll_error, "CASIOLINK protocol is not supported for now.");
-        return CAHUTE_ERROR_IMPL;
+        break;
 
     case CAHUTE_SERIAL_PROTOCOL_SEVEN:
         if (flags & CAHUTE_SERIAL_RECEIVER) {
@@ -464,7 +486,7 @@ cahute_open_serial_link(
         protocol_flags |= PROTOCOL_FLAG_NODISC;
     if (flags & CAHUTE_SERIAL_NOTERM)
         protocol_flags |= PROTOCOL_FLAG_NOTERM;
-    if (flags & PROTOCOL_FLAG_RECEIVER)
+    if (flags & CAHUTE_SERIAL_RECEIVER)
         protocol_flags |= PROTOCOL_FLAG_RECEIVER;
 
     err = initialize_link_protocol(
@@ -973,12 +995,17 @@ cahute_receive_screen(
         return CAHUTE_ERROR_GONE;
 
     switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_CASIOLINK:
+        if (link->flags & CAHUTE_LINK_FLAG_RECEIVER)
+            return cahute_casiolink_get_screen(link, callback, cookie);
+
+        break;
+
     case CAHUTE_LINK_PROTOCOL_SEVEN_OHP:
         return cahute_seven_ohp_get_screen(link, callback, cookie);
-
-    default:
-        return CAHUTE_ERROR_IMPL;
     }
+
+    return CAHUTE_ERROR_IMPL;
 }
 
 /**

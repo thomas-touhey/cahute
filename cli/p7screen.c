@@ -178,6 +178,24 @@ update_texture_pixels(Uint32 *pixels, cahute_frame const *frame, int zoom) {
         }
         break;
 
+    case CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50:
+        for (y = 0, oy = 0; y < height; y++, oy += zoom_line_size) {
+            for (x = 0, ox = 0; x < width; x++, ox += zoom) {
+                Uint32 pixel =
+                    data[((127 - x) >> 3) * 64 + y] & (128 >> (x & 7))
+                        ? 0
+                        : 0xFFFFFF;
+
+                for (dx = zoom - 1; dx >= 0; dx--)
+                    pixels[oy + ox + dx] = pixel;
+            }
+
+            for (py = oy + zoom_line_size - line_size; py > oy;
+                 py -= line_size)
+                memcpy(&pixels[py], &pixels[oy], line_size << 2);
+        }
+        break;
+
     case CAHUTE_PICTURE_FORMAT_1BIT_DUAL:
         data2 = data + height * ((width >> 8) + !!(width & 7));
 
@@ -319,6 +337,7 @@ display_frame(struct display_cookie *cookie, cahute_frame const *frame) {
     zoom = cookie->zoom;
 
     if (format != CAHUTE_PICTURE_FORMAT_1BIT_MONO
+        && format != CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50
         && format != CAHUTE_PICTURE_FORMAT_1BIT_DUAL
         && format != CAHUTE_PICTURE_FORMAT_4BIT_RGB_PACKED
         && format != CAHUTE_PICTURE_FORMAT_16BIT_R5G6B5) {
