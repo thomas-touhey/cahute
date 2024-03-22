@@ -299,6 +299,9 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
                         "libusb_bulk_transfer returned %d: %s",
                         libusberr,
                         libusb_error_name(libusberr));
+                    if (libusberr == LIBUSB_ERROR_OVERFLOW)
+                        msg(ll_error, "Required buffer size was %d.", received
+                        );
                     return CAHUTE_ERROR_UNKNOWN;
                 }
 
