@@ -141,7 +141,7 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
  * Link internals.
  * --- */
 
-#define CAHUTE_LINK_STREAM_BUFFER_SIZE 16384
+#define CAHUTE_LINK_STREAM_BUFFER_SIZE 32768
 
 /* Flags that can be present on a link at runtime. */
 #define CAHUTE_LINK_FLAG_CLOSE_STREAM   0x00000001

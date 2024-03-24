@@ -31,6 +31,7 @@
 #include "cdefs.h"
 
 CAHUTE_BEGIN_NAMESPACE
+CAHUTE_DECLARE_TYPE(cahute_frame)
 
 #define CAHUTE_PICTURE_FORMAT_1BIT_MONO         1
 #define CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50   2
@@ -38,7 +39,33 @@ CAHUTE_BEGIN_NAMESPACE
 #define CAHUTE_PICTURE_FORMAT_1BIT_TRIPLE_CAS50 4
 #define CAHUTE_PICTURE_FORMAT_4BIT_RGB_PACKED   5
 #define CAHUTE_PICTURE_FORMAT_16BIT_R5G6B5      6
+#define CAHUTE_PICTURE_FORMAT_32BIT_ARGB_HOST   7
 
+struct cahute_frame {
+    int cahute_frame_width;
+    int cahute_frame_height;
+    int cahute_frame_format;
+    cahute_u8 const *cahute_frame_data;
+};
+
+CAHUTE_BEGIN_DECLS
+
+CAHUTE_EXTERN(int)
+cahute_convert_picture
+    OF((void *cahute__dest,
+        int cahute__dest_format,
+        void const *cahute__src,
+        int cahute__src_format,
+        int cahute__width,
+        int cahute__height));
+
+CAHUTE_EXTERN(int)
+cahute_convert_picture_from_frame
+    OF((void *cahute__dest,
+        int cahute__dest_format,
+        cahute_frame const *cahute__frame));
+
+CAHUTE_END_DECLS
 CAHUTE_END_NAMESPACE
 
 #endif /* CAHUTE_PICTURE_H */

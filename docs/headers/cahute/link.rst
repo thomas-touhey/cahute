@@ -110,27 +110,6 @@ Type definitions
 
         Null-terminated hardware platform identifier, up to 16 characters.
 
-.. c:struct:: cahute_frame
-
-    Screenstreaming frame details for screenstreaming.
-
-    .. c:member:: int cahute_frame_width
-
-        Width of the frame, in pixels.
-
-    .. c:member:: int cahute_frame_height
-
-        Height of the frame, in pixels.
-
-    .. c:member:: int cahute_frame_format
-
-        Format of the frame, as a ``CAHUTE_PICTURE_FORMAT_*`` constant.
-        See :ref:`header-cahute-picture` for more information.
-
-    .. c:member:: cahute_u8 const *cahute_frame_data
-
-        Frame contents encoded with the format described above.
-
 .. c:struct:: cahute_storage_entry
 
     Entry when listing the contents of a storage device or directory.

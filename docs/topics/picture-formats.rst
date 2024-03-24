@@ -180,3 +180,14 @@ The size of such pictures is the number of pixels multiplied by 2.
 
 In Cahute, this format is represented by
 :c:macro:`CAHUTE_PICTURE_FORMAT_16BIT_R5G6B5`.
+
+.. _picture-format-32bit-argb-host:
+
+32bpp ARGB picture format using host endianness
+-----------------------------------------------
+
+This format uses one 32-bit integer using host endianness for every pixel,
+organized by ascending row then ascending column.
+
+This format is not used by CASIO, but declared as a possible picture format
+for conversion purposes.

@@ -29,12 +29,12 @@
 #ifndef CAHUTE_LINK_H
 #define CAHUTE_LINK_H 1
 #include "cdefs.h"
+#include "picture.h"
 #include <stdio.h>
 
 CAHUTE_BEGIN_NAMESPACE
 CAHUTE_DECLARE_TYPE(cahute_link)
 CAHUTE_DECLARE_TYPE(cahute_device_info)
-CAHUTE_DECLARE_TYPE(cahute_frame)
 CAHUTE_DECLARE_TYPE(cahute_storage_entry)
 
 /* Preprogrammed ROM information available. */
@@ -71,13 +71,6 @@ struct cahute_device_info {
     char const *cahute_device_info_organisation;
     char const *cahute_device_info_hwid;
     char const *cahute_device_info_cpuid;
-};
-
-struct cahute_frame {
-    int cahute_frame_width;
-    int cahute_frame_height;
-    int cahute_frame_format;
-    cahute_u8 const *cahute_frame_data;
 };
 
 typedef int(cahute_process_frame_func)(
