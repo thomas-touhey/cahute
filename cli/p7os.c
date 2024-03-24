@@ -147,6 +147,25 @@ int main(int ac, char **av) {
         if (err)
             goto end;
 
+        if (!args.uexe_allocated_data) {
+            cahute_device_info *info;
+
+            /* We are uploading the fxRemote Update.EXE.
+             * However, to be sure of what we're doing, we should actually
+             * check that we are sending it to a compatible calculator. */
+            err = cahute_get_device_info(link, &info);
+            if (err)
+                goto end;
+
+            if (memcmp(info->cahute_device_info_hwid, "Gy36200", 7)
+                && memcmp(info->cahute_device_info_hwid, "Gy36300", 7)) {
+                fprintf(stderr, "Incompatible calculator detected!\n");
+                fprintf(stderr, "This should only be used with Gy362 or\n");
+                fprintf(stderr, "Gy363 calculator models.\n");
+                goto end;
+            }
+        }
+
         err = cahute_upload_and_run_program(
             link,
             args.uexe_data,
