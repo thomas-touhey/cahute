@@ -125,6 +125,7 @@ target_link_libraries(xfer9860 PRIVATE ${PROJECT_NAME} PkgConfig::libusb)
 
 install(TARGETS ${PROJECT_NAME} ARCHIVE)
 install(TARGETS p7 RUNTIME)
+install(TARGETS p7os RUNTIME)
 install(TARGETS p7screen RUNTIME)
 install(TARGETS xfer9860 RUNTIME)
 install(
