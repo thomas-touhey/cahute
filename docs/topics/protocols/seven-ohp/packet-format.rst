@@ -160,7 +160,7 @@ The frame formats are the following:
       - :ref:`picture-format-4bit-rgb-packed`
       - ``ceil(width * height / 2)``
     * - ``1RM2``
-      - :ref:`picture-format-2bit-dual`
+      - :ref:`picture-format-1bit-dual`
       - ``2 * height * ceil(width / 8)``
 
 ``TYPZ2`` frame format

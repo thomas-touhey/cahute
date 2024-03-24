@@ -138,13 +138,11 @@ Type-specific data for such files are the following:
 
             * - Value
               - Description
-            * - ``\x10DWF``
-              - 9700 screenshot order.
-            * - ``\0RWF``
-              - 9800 screenshot order.
+            * - ``\x11UWF``
+              - :ref:`picture-format-1bit-multiple-cas50`
     * - 6 (0x06)
       - 1 B
-      - Channel count
+      - Sheet count
       -
       - Should be set to ``\x03``.
 
@@ -191,8 +189,6 @@ Type-specific data for such files are the following:
               - Description
             * - ``\x10DWF``
               - :ref:`picture-format-1bit-cas50`.
-            * - ``\0RWF``
-              - 9800 screenshot order.
 
 .. todo:: What is the format of the data?
 

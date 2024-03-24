@@ -98,8 +98,9 @@ CAHUTE_INLINE(int) cahute_casiolink_is_end(cahute_link *link) {
 CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
     cahute_u8 *buf = link->protocol_buffer;
     size_t buf_capacity = link->protocol_buffer_capacity;
-    size_t buf_size, data_size = 0;
-    int packet_type, err, type_found = 0, variant = 0, checksum;
+    size_t buf_size, part_count = 1, part_size = 0;
+    int packet_type, err, type_found = 0, variant = 0, checksum, checksum_alt;
+    int ignore_invalid_data_checksum = 0;
 
     do {
         err = cahute_read_from_link(link, buf, 1);
@@ -231,7 +232,16 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
             /* Monochrome Screenshot. */
             if (!memcmp(&buf[5], "\x10\x44WF", 4)) {
                 type_found = 1;
-                data_size = ((width >> 3) + !!(width & 7)) * height;
+                part_size = ((width >> 3) + !!(width & 7)) * height;
+            }
+        } else if (!memcmp(&buf[1], "DC", 2)) {
+            int width = buf[3], height = buf[4];
+
+            /* Color Screenshot. */
+            if (!memcmp(&buf[5], "\x11UWF\x03", 4)) {
+                type_found = 1;
+                part_count = 3;
+                part_size = 1 + ((width >> 3) + !!(width & 7)) * height;
             }
         }
 
@@ -273,11 +283,11 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
         return CAHUTE_ERROR_IMPL;
     }
 
-    if (data_size && data_size + buf_size > buf_capacity) {
+    if (part_size && buf_size + part_count * part_size > buf_capacity) {
         msg(ll_error,
             "Cannot get %" CAHUTE_PRIuSIZE "B into a %" CAHUTE_PRIuSIZE
             "B protocol buffer.",
-            data_size + buf_size,
+            buf_size + part_count * part_size,
             buf_capacity);
 
         link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
@@ -304,68 +314,93 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
             return err;
     }
 
-    if (data_size) {
+    if (part_size) {
         cahute_u8 tmp_buf[2];
+        size_t part_i;
 
         /* There is data to be read.
          * The method to transfer data here varies depending on the variant:
          *
-         * - For CAS40 and CAS50, the data is provided in one packet using
-         *   PACKET_TYPE_HEADER.
+         * - For CAS40 and CAS50, the data is provided in multiple packets
+         *   depending on the part count & size using PACKET_TYPE_HEADER.
          * - For CAS100, the data is provided in multiple packets containing
          *   1024 bytes of data each, using PACKET_TYPE_DATA. */
         switch (variant) {
         case CAHUTE_CASIOLINK_VARIANT_CAS40:
         case CAHUTE_CASIOLINK_VARIANT_CAS50:
-            err = cahute_read_from_link(link, tmp_buf, 1);
-            if (err)
-                return err;
+            buf = &buf[buf_size];
 
-            if (buf[0] != PACKET_TYPE_HEADER) {
-                msg(ll_error,
-                    "Expected 0x3A (':') packet type, got 0x%02X.",
-                    buf[0]);
-                return CAHUTE_ERROR_UNKNOWN;
-            }
-
-            err = cahute_read_from_link(link, &buf[buf_size], data_size);
-            if (err)
-                return err;
-
-            /* Read and check the checksum. */
-            err = cahute_read_from_link(link, tmp_buf + 1, 1);
-            if (err)
-                return err;
-
-            checksum = cahute_casiolink_checksum(&buf[buf_size], data_size);
-            if (checksum != tmp_buf[1]) {
-                cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA};
-
-                msg(ll_error,
-                    "Invalid checksum (expected: 0x%02X, computed: 0x%02X), "
-                    "transfer will abort.",
-                    buf[buf_size - 1],
-                    checksum);
-
-                link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
-
-                err = cahute_write_to_link(link, send_buf, 1);
+            for (part_i = 0; part_i < part_count; part_i++) {
+                err = cahute_read_from_link(link, tmp_buf, 1);
                 if (err)
                     return err;
 
-                return CAHUTE_ERROR_CORRUPT;
-            }
+                if (tmp_buf[0] != PACKET_TYPE_HEADER) {
+                    msg(ll_error,
+                        "Expected 0x3A (':') packet type, got 0x%02X.",
+                        buf[0]);
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
 
-            /* Acknowledge the data. */
-            {
-                cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
+                msg(ll_info,
+                    "Reading data part %d/%d (%" CAHUTE_PRIuSIZE "o).",
+                    1 + part_i,
+                    part_count,
+                    part_size);
 
-                err = cahute_write_to_link(link, send_buf, 1);
+                err = cahute_read_from_link(link, buf, part_size);
                 if (err)
                     return err;
-            }
 
-            buf_size += data_size;
+                /* Read and check the checksum. */
+                err = cahute_read_from_link(link, tmp_buf + 1, 1);
+                if (err)
+                    return err;
+
+                checksum = cahute_casiolink_checksum(buf, part_size);
+                checksum_alt =
+                    cahute_casiolink_checksum(buf + 1, part_size - 1);
+
+                if (checksum != tmp_buf[1] && checksum_alt != tmp_buf[1]) {
+                    cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA};
+
+                    msg(ll_warn,
+                        "Invalid checksum (expected: 0x%02X, computed: "
+                        "0x%02X).",
+                        tmp_buf[1],
+                        checksum);
+
+                    if (!ignore_invalid_data_checksum) {
+                        msg(ll_error, "Transfer will abort.");
+                        link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+
+                        err = cahute_write_to_link(link, send_buf, 1);
+                        if (err)
+                            return err;
+
+                        return CAHUTE_ERROR_CORRUPT;
+                    } else {
+                        msg(ll_warn, "This error will be ignored.");
+                    }
+                }
+
+                /* Acknowledge the data. */
+                {
+                    cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
+
+                    err = cahute_write_to_link(link, send_buf, 1);
+                    if (err)
+                        return err;
+                }
+
+                msg(ll_info,
+                    "Data part %d/%d received and acknowledged.",
+                    1 + part_i,
+                    part_count);
+
+                buf += part_size;
+                buf_size += part_size;
+            }
             break;
 
         default:
@@ -525,6 +560,7 @@ cahute_casiolink_get_screen(
 ) {
     cahute_frame frame;
     cahute_u8 *buf = link->protocol_buffer;
+    size_t sheet_size;
     int err;
 
     do {
@@ -534,18 +570,54 @@ cahute_casiolink_get_screen(
 
         switch (link->protocol_state.casiolink.last_variant) {
         case CAHUTE_CASIOLINK_VARIANT_CAS40:
-            if (memcmp(&buf[1], "DD", 2))
+            if (!memcmp(&buf[1], "DD", 2)) {
+                if (!memcmp(&buf[5], "\x10\x44WF", 4))
+                    frame.cahute_frame_format =
+                        CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50;
+                else
+                    continue;
+
+                frame.cahute_frame_height = buf[3];
+                frame.cahute_frame_width = buf[4];
+                frame.cahute_frame_data = &buf[40];
+            } else if (!memcmp(&buf[1], "DC", 2)) {
+                if (!memcmp(&buf[5], "\x11UWF\x03", 5)) {
+                    sheet_size = buf[3] * ((buf[4] >> 3) + !!(buf[4] & 7));
+
+                    /* Check that the color codes are all known, i.e. that
+                     * they all are between 1 and 4 included. */
+                    if (buf[40] < 1 || buf[40] > 4) {
+                        msg(ll_warn,
+                            "Unknown color code 0x%02X for sheet 1, skipping.",
+                            buf[40]);
+                        continue;
+                    }
+                    if (buf[40 + sheet_size + 1] < 1
+                        || buf[40 + sheet_size + 1] > 4) {
+                        msg(ll_warn,
+                            "Unknown color code 0x%02X for sheet 2, skipping.",
+                            buf[40 + sheet_size + 1]);
+                        continue;
+                    }
+                    if (buf[40 + sheet_size + sheet_size + 2] < 1
+                        || buf[40 + sheet_size + sheet_size + 2] > 4) {
+                        msg(ll_warn,
+                            "Unknown color code 0x%02X for sheet 3, skipping.",
+                            buf[40 + sheet_size + sheet_size + 1]);
+                        continue;
+                    }
+
+                    frame.cahute_frame_format =
+                        CAHUTE_PICTURE_FORMAT_1BIT_TRIPLE_CAS50;
+                } else
+                    continue;
+
+                frame.cahute_frame_height = buf[3];
+                frame.cahute_frame_width = buf[4];
+                frame.cahute_frame_data = &buf[40];
+            } else
                 continue;
 
-            if (!memcmp(&buf[5], "\x10\x44WF", 4))
-                frame.cahute_frame_format =
-                    CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50;
-            else
-                continue;
-
-            frame.cahute_frame_height = buf[3];
-            frame.cahute_frame_width = buf[4];
-            frame.cahute_frame_data = &buf[40];
             break;
 
         default:
@@ -553,9 +625,8 @@ cahute_casiolink_get_screen(
         }
 
         if ((*callback)(cookie, &frame))
-            break;
+            return CAHUTE_ERROR_INT;
     } while (1);
 
-    /* TODO */
-    return CAHUTE_ERROR_IMPL;
+    return CAHUTE_OK;
 }

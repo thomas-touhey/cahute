@@ -55,7 +55,7 @@ of rows.
 In Cahute, this format is represented by
 :c:macro:`CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50`.
 
-.. _picture-format-2bit-dual:
+.. _picture-format-1bit-dual:
 
 Dual 1bpp gray picture format
 -----------------------------
@@ -87,10 +87,47 @@ the following:
       - ``0x000000``
 
 For computing the size of such pictures, one must compute the number of bytes
-a picture occupies, and multiply it by two, i.e. ``2 * ceil(width / 8)``.
+a picture occupies, and multiply it by two, i.e.
+``2 * ceil(width / 8) * height``.
 
 In Cahute, this format is represented by
 :c:macro:`CAHUTE_PICTURE_FORMAT_1BIT_DUAL`.
+
+.. _picture-format-1bit-multiple-cas50:
+
+Multiple 1bpp picture format with CAS50 order and palette prefix
+----------------------------------------------------------------
+
+This format is basically three pictures, also named "sheets", using
+:ref:`picture-format-1bit-cas50` placed back-to-back, with the exception
+that **the picture is inverted vertically**, i.e. you should use
+``height - 1 - y`` instead of ``y``.
+
+Every sheet has **an additional 1-bit prefix** representing the palette color
+the picture represents:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Palette code
+      - Corresponding color
+    * - ``0x01``
+      - Blue (``0x000080``)
+    * - ``0x02``
+      - Green (``0x008000``)
+    * - ``0x03``
+      - White (``0xFFFFFF``)
+    * - ``0x04``
+      - Orange (``0xFF8000``)
+
+For computing the size of such pictures, one must compute the number of bytes
+a picture occupies, and multiply it by the number of sheets, i.e.
+``sheet_count * ceil(width / 8) * height``.
+
+In Cahute, this format is represented by a different constant depending on
+the number of sheets:
+
+* For 3 sheets, :c:macro:`CAHUTE_PICTURE_FORMAT_1BIT_TRIPLE_CAS50`.
 
 .. _picture-format-4bit-rgb-packed:
 

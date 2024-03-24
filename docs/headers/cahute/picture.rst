@@ -19,7 +19,11 @@ picture's data is encoded.
 
 .. c:macro:: CAHUTE_PICTURE_FORMAT_1BIT_DUAL
 
-    Constant representing the :ref:`picture-format-2bit-dual`.
+    Constant representing the :ref:`picture-format-1bit-dual`.
+
+.. c:macro:: CAHUTE_PICTURE_FORMAT_1BIT_TRIPLE_CAS50
+
+    Constant representing the :ref:`picture-format-1bit-multiple-cas50`.
 
 .. c:macro:: CAHUTE_PICTURE_FORMAT_4BIT_RGB_PACKED
 

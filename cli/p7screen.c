@@ -31,6 +31,13 @@
 #include <SDL.h>
 
 static Uint32 const dual_pixels[] = {0xFFFFFF, 0xAAAAAA, 0x777777, 0x000000};
+static Uint32 const multiple_cas50_colors[] = {
+    0x000000, /* Unused. */
+    0x000080,
+    0x008000,
+    0xFFFFFF,
+    0xFF8000
+};
 
 /**
  * Display cookie.
@@ -147,6 +154,8 @@ update_texture_pixels(Uint32 *pixels, cahute_frame const *frame, int zoom) {
     int y, oy, x, ox, dx, py, mask;
     cahute_u8 const *data = frame->cahute_frame_data;
     cahute_u8 const *data2;
+    cahute_u8 const *data3;
+    Uint32 color1, color2, color3;
 
     switch (frame->cahute_frame_format) {
     case CAHUTE_PICTURE_FORMAT_1BIT_MONO:
@@ -197,7 +206,7 @@ update_texture_pixels(Uint32 *pixels, cahute_frame const *frame, int zoom) {
         break;
 
     case CAHUTE_PICTURE_FORMAT_1BIT_DUAL:
-        data2 = data + height * ((width >> 8) + !!(width & 7));
+        data2 = data + height * ((width >> 3) + !!(width & 7));
 
         for (y = 0, oy = 0; y < height; y++, oy += zoom_line_size) {
             /* Same logic as for 1-bit monochrome encoding. */
@@ -251,6 +260,37 @@ update_texture_pixels(Uint32 *pixels, cahute_frame const *frame, int zoom) {
                 memcpy(&pixels[py], &pixels[oy], line_size << 2);
 
             data += (~mask & 128) >> 7;
+        }
+        break;
+
+    case CAHUTE_PICTURE_FORMAT_1BIT_TRIPLE_CAS50:
+        color1 = multiple_cas50_colors[*data++];
+        data2 = data + height * ((width >> 3) + !!(width & 7));
+        color2 = multiple_cas50_colors[*data2++];
+        data3 = data2 + height * ((width >> 3) + !!(width & 7));
+        color3 = multiple_cas50_colors[*data3++];
+
+        for (y = 0, oy = 0; y < height; y++, oy += zoom_line_size) {
+            for (x = 0, ox = 0; x < width; x++, ox += zoom) {
+                Uint32 pixel;
+
+                if (data3[((width - 1 - x) >> 3) * height + (height - 1 - y)]
+                    & (128 >> (x & 7)))
+                    pixel = color3;
+                else if (data2[((width - 1 - x) >> 3) * height + (height - 1 - y)] & (128 >> (x & 7)))
+                    pixel = color2;
+                else if (data[((width - 1 - x) >> 3) * height + (height - 1 - y)] & (128 >> (x & 7)))
+                    pixel = color1;
+                else
+                    pixel = 0xFFFFFF;
+
+                for (dx = zoom - 1; dx >= 0; dx--)
+                    pixels[oy + ox + dx] = pixel;
+            }
+
+            for (py = oy + zoom_line_size - line_size; py > oy;
+                 py -= line_size)
+                memcpy(&pixels[py], &pixels[oy], line_size << 2);
         }
         break;
 
@@ -339,6 +379,7 @@ display_frame(struct display_cookie *cookie, cahute_frame const *frame) {
     if (format != CAHUTE_PICTURE_FORMAT_1BIT_MONO
         && format != CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50
         && format != CAHUTE_PICTURE_FORMAT_1BIT_DUAL
+        && format != CAHUTE_PICTURE_FORMAT_1BIT_TRIPLE_CAS50
         && format != CAHUTE_PICTURE_FORMAT_4BIT_RGB_PACKED
         && format != CAHUTE_PICTURE_FORMAT_16BIT_R5G6B5) {
         fprintf(stderr, "Unsupported format %d.\n", format);
