@@ -68,7 +68,7 @@ static int print_device_info(cahute_link *link) {
 int main(int argc, char **argv) {
     struct args args;
     cahute_link *link = NULL;
-    int bus, address, err = 0;
+    int err = 0;
 
     /* Since xfer9860 has no logging level of any kind, we disable logging
      * entirely here. */
@@ -76,9 +76,7 @@ int main(int argc, char **argv) {
 
     if (!parse_args(argc, argv, &args))
         return 0;
-    if ((err = find_usb_calculator(0, &bus, &address)))
-        goto fail;
-    if ((err = cahute_open_usb_link(&link, 0, bus, address)))
+    if ((err = cahute_open_simple_usb_link(&link, 0)))
         goto fail;
 
     switch (args.operation) {

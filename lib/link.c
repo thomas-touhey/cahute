@@ -37,6 +37,22 @@
 #define PROTOCOL_FLAG_NODISC   0x00000400 /* Should not run discovery. */
 #define PROTOCOL_FLAG_RECEIVER 0x00000800 /* Act as a receiver. */
 
+/**
+ * Cookie for detection in the context of simple USB link opening.
+ *
+ * @param found_bus Bus of the found USB device; -1 if no device was found.
+ * @param found_address Address relative to the bus of the found USB device;
+ *        -1 if no device was found.
+ * @param found_type Type of the found address, -1 if not found.
+ * @param multiple Flag that, if set to 1, signifies that multiple devices have
+ *        already been found.
+ */
+struct simple_usb_detection_cookie {
+    int found_bus;
+    int found_address;
+    int found_type;
+    int multiple;
+};
 
 /**
  * Initialize a link's protocol state.
@@ -765,6 +781,115 @@ cahute_open_usb_link(
     *linkp = link;
 
     return err;
+}
+
+/**
+ * Get the name of a USB detection entry type.
+ *
+ * @param type Type identifier.
+ * @return Name of the type.
+ */
+CAHUTE_INLINE(char const *) get_usb_detection_type_name(int type) {
+    switch (type) {
+    case CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN:
+        return "fx-9860G compatible calculator (Protocol 7.00)";
+
+    case CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI:
+        return "fx-CG compatible calculator (SCSI)";
+
+    default:
+        return "unknown";
+    }
+}
+
+/**
+ * Simple USB detection callback.
+ *
+ * @param cookie Simple USB detection cookie.
+ * @param entry USB entry.
+ */
+CAHUTE_LOCAL(int)
+cahute_find_simple_usb_device(
+    struct simple_usb_detection_cookie *cookie,
+    cahute_usb_detection_entry const *entry
+) {
+    if (cookie->found_bus >= 0) {
+        /* A device was already found, which means there are at least two
+         * connected devices! */
+        if (!cookie->multiple) {
+            cookie->multiple = 1;
+            msg(ll_error, "Multiple devices were found:");
+            msg(ll_error,
+                "- %03d:%03d: %s",
+                cookie->found_bus,
+                cookie->found_address,
+                get_usb_detection_type_name(cookie->found_type));
+        }
+
+        msg(ll_error,
+            "- %03d:%03d: %s",
+            entry->cahute_usb_detection_entry_bus,
+            entry->cahute_usb_detection_entry_address,
+            get_usb_detection_type_name(entry->cahute_usb_detection_entry_type)
+        );
+
+        return 0;
+    }
+
+    cookie->found_bus = entry->cahute_usb_detection_entry_bus;
+    cookie->found_address = entry->cahute_usb_detection_entry_address;
+    cookie->found_type = entry->cahute_usb_detection_entry_type;
+    return 0;
+}
+
+/**
+ * Open a link over a detected USB medium.
+ *
+ * @param linkp Pointer to the link to set with the opened link.
+ * @param flags Flags to open the link and underlying medium with.
+ * @return Error, or CAHUTE_OK if no error has occurred.
+ */
+CAHUTE_EXTERN(int)
+cahute_open_simple_usb_link(cahute_link **linkp, unsigned long flags) {
+    struct simple_usb_detection_cookie cookie;
+    int attempts_left, err;
+
+    for (attempts_left = 5; attempts_left; attempts_left--) {
+        if (attempts_left < 5) {
+            msg(ll_warn, "Calculator not found, retrying in 1 second.");
+
+            err = cahute_sleep(1000);
+            if (err)
+                return err;
+        }
+
+        cookie.found_bus = -1;
+        cookie.found_address = -1;
+        cookie.found_type = -1;
+        cookie.multiple = 0;
+
+        err = cahute_detect_usb(
+            (cahute_detect_usb_entry_func *)&cahute_find_simple_usb_device,
+            &cookie
+        );
+        if (err)
+            return err;
+
+        if (cookie.multiple)
+            return CAHUTE_ERROR_TOO_MANY;
+
+        if (cookie.found_bus < 0)
+            continue;
+
+        return cahute_open_usb_link(
+            linkp,
+            flags,
+            cookie.found_bus,
+            cookie.found_address
+        );
+    }
+
+    return CAHUTE_ERROR_NOT_FOUND;
 }
 
 /**

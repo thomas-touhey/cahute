@@ -182,6 +182,9 @@ CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_usb_link
         int cahute__bus,
         int cahute__address));
 
+CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_simple_usb_link
+    OF((cahute_link * *cahute__linkp, unsigned long cahute__flags));
+
 CAHUTE_END_DECLS
 
 /* ---
@@ -191,6 +194,7 @@ CAHUTE_END_DECLS
 CAHUTE_BEGIN_DECLS
 
 CAHUTE_EXTERN(void) cahute_close_link OF((cahute_link * cahute__link));
+
 CAHUTE_EXTERN(int)
 cahute_get_device_info
     OF((cahute_link * cahute__link, cahute_device_info **cahute__infop));

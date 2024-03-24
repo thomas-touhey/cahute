@@ -30,34 +30,31 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The operation was not implemented (yet). */
 static char const error_notimplemented[] =
     "The requested operation was not implemented yet.\n";
 
-/* Couldn't initialize connexion with the calculator. */
 static char const error_notfound[] =
     "Could not connect to the calculator.\n"
     "- Is it plugged in and in receive mode?\n"
     "- Have you tried changing the cable?\n";
 
-/* Calculator was disconnected. */
+static char const error_toomany[] =
+    "Too many calculators connected by USB, please only have one connected.\n";
+
 static char const error_disconnected[] =
     "Lost connexion to the calculator!\n"
     "Please reconnect the calculator, rerun receive mode and try again.\n";
 
-/* Calculator was found but program wasn't allowed to communicate with it. */
 static char const error_noaccess[] =
     "Could not get access to the calculator.\n"
     "Install the appropriate udev rule, or run as root.\n";
 
-/* Command was unsupported. */
 static char const error_unsupported[] =
     "The command is unsupported by the calculator.\n"
     "- Does the calculator have mass storage?\n"
     "- Does its OS allow the use of it?\n"
     "- Is it in Receive Mode (and not in OS Update)?\n";
 
-/* The calculator acted in an unplanned way. */
 static char const error_unplanned[] =
     "The calculator didn't act as planned.\n"
     "Stop receive mode on calculator and start it again before "
@@ -171,7 +168,7 @@ static int confirm_overwrite(void *cookie) {
  */
 static int open_link(cahute_link **linkp, struct args const *args) {
     cahute_link *link = NULL;
-    int bus, address, err;
+    int err;
     unsigned long flags;
 
     if (args->serial_name) {
@@ -216,9 +213,7 @@ static int open_link(cahute_link **linkp, struct args const *args) {
     if (args->no_term)
         flags |= CAHUTE_USB_NOTERM;
 
-    if ((err = find_usb_calculator(1, &bus, &address)))
-        return err;
-    if ((err = cahute_open_usb_link(&link, flags, bus, address)))
+    if ((err = cahute_open_simple_usb_link(&link, flags)))
         return err;
 
     *linkp = link;
@@ -479,16 +474,16 @@ fail:
         fprintf(stderr, error_notfound);
         break;
 
+    case CAHUTE_ERROR_TOO_MANY:
+        fprintf(stderr, error_toomany);
+        break;
+
     case CAHUTE_ERROR_INCOMPAT:
         fprintf(stderr, error_unsupported);
         break;
 
     case CAHUTE_ERROR_GONE:
         fprintf(stderr, error_disconnected);
-        break;
-
-    case CAHUTE_ERROR_TOO_MANY:
-        /* The message should have already been displayed in this case. */
         break;
 
     default:

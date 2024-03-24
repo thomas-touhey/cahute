@@ -138,7 +138,8 @@ Type definitions
     calculator, or receive data such as screenstreaming data.
 
     This type is opaque, and such resources must be created using
-    :c:func:`cahute_open_usb_link` or :c:func:`cahute_open_serial_link`.
+    :c:func:`cahute_open_usb_link`, :c:func:`cahute_open_simple_usb_link`
+    or :c:func:`cahute_open_serial_link`.
 
 .. c:type:: int (cahute_process_frame_func)(void *cookie, \
     cahute_frame const *frame)
@@ -449,9 +450,39 @@ Function declarations
         See :ref:`protocol-seven-ohp` for more information.
 
     :param linkp: The pointer to set the opened link to.
-    :param flags: The flags to set to the serial link.
+    :param flags: The flags to set to the USB link.
     :param bus: The bus number of the USB calculator to open a link with.
     :param address: The device number of the calculator to open a link with.
+    :return: The error, or 0 if the operation was successful.
+
+.. c:function:: int cahute_open_simple_usb_link(cahute_link **linkp, \
+    unsigned long flags)
+
+    Open a link to a single USB device.
+
+    .. warning::
+
+        In case of error, the value of ``*linkp`` mustn't be used nor freed.
+
+    This function expects exactly one compatible device to be connected by
+    USB, leading to the following cases:
+
+    * If there are more than one, :c:macro:`CAHUTE_ERROR_TOO_MANY` will be
+      returned.
+    * If there are none, the function will retry a few times before giving
+      up and returning :c:macro:`CAHUTE_ERROR_NOT_FOUND`.
+
+    .. note::
+
+        Usage of this function is only useful for simple scripts that assume
+        only up to one calculator is connected at a time to the system.
+        If you plan on multiple being connected simultaneously, see
+        :c:func:`cahute_detect_usb` and :c:func:`cahute_open_usb_link`.
+
+    The flags are the same as for :c:func:`cahute_open_usb_link`.
+
+    :param linkp: The pointer to set to the opened link.
+    :param flags: The flags to set the USB link.
     :return: The error, or 0 if the operation was successful.
 
 .. c:function:: void cahute_close_link(cahute_link *link)

@@ -56,6 +56,9 @@ static char const error_notfound[] =
     "pop-up?\n"
     "- Have you tried changing the cable?\n";
 
+static char const error_toomany[] =
+    "Too many calculators connected by USB, please only have one connected.\n";
+
 static char const error_noaccess[] =
     "Could not get access to the calculator.\n"
     "Install the appropriate udev rule, or run as root.\n";
@@ -244,16 +247,19 @@ int main(int ac, char **av) {
     cahute_link *link = NULL;
     struct args args;
     struct display_cookie cookie;
-    int bus, address, err, ret = 0;
+    int err, ret = 0;
 
     if (!parse_args(ac, av, &args))
         return 0;
 
-    if ((err = find_usb_calculator(1, &bus, &address))
-        || (err = cahute_open_usb_link(&link, CAHUTE_USB_OHP, bus, address))) {
+    if ((err = cahute_open_simple_usb_link(&link, CAHUTE_USB_OHP))) {
         switch (err) {
         case CAHUTE_ERROR_NOT_FOUND:
             fprintf(stderr, error_notfound);
+            break;
+
+        case CAHUTE_ERROR_TOO_MANY:
+            fprintf(stderr, error_toomany);
             break;
 
         case CAHUTE_ERROR_PRIV:

@@ -91,13 +91,11 @@ display_progress(int *initp, unsigned long step, unsigned long total) {
  */
 static int open_link(cahute_link **linkp, struct args const *args) {
     cahute_link *link = NULL;
-    int bus, address, err;
     unsigned long flags;
+    int err;
 
     flags = 0;
-    if ((err = find_usb_calculator(1, &bus, &address)))
-        return err;
-    if ((err = cahute_open_usb_link(&link, flags, bus, address)))
+    if ((err = cahute_open_simple_usb_link(&link, flags)))
         return err;
 
     *linkp = link;
@@ -116,13 +114,11 @@ static int open_link(cahute_link **linkp, struct args const *args) {
  */
 static int open_fxremote_link(cahute_link **linkp, struct args const *args) {
     cahute_link *link = NULL;
-    int bus, address, err;
     unsigned long flags;
+    int err;
 
     flags = CAHUTE_USB_NOCHECK | CAHUTE_USB_NODISC | CAHUTE_USB_NOTERM;
-    if ((err = find_usb_calculator(1, &bus, &address)))
-        return err;
-    if ((err = cahute_open_usb_link(&link, flags, bus, address)))
+    if ((err = cahute_open_simple_usb_link(&link, flags)))
         return err;
 
     *linkp = link;

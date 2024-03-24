@@ -30,8 +30,6 @@
 #define COMMON_H 1
 #include <cahute.h>
 
-extern int find_usb_calculator(int should_display, int *busp, int *addressp);
-
 extern char const *get_current_log_level(void);
 extern void set_log_level(char const *loglevel);
 
