@@ -399,7 +399,7 @@ int parse_args(int argc, char **argv, struct args *args) {
     /* Default parsed arguments.
      * By default, the serial speed is defined as 9600N2. */
     args->command = COMMAND_IDLE;
-    args->nice_display = 1;
+    args->nice_display = 0;
 
     args->serial_flags = CAHUTE_SERIAL_PARITY_OFF | CAHUTE_SERIAL_STOP_TWO;
     args->serial_speed = 9600;
