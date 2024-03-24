@@ -44,6 +44,15 @@ case, and the CI, on detecting a new tag:
 * Builds the documentation and updates the main website using the newly
   generated files.
 
+Once this is done, the BDFL creates a new release on the Releases_ tab of
+the Gitlab repository, linked to the newly created tag, with a human-readable
+changelog.
+
+.. note::
+
+    Creating a new entry in Releases_ will notify package maintainers and
+    other manual users.
+
 Git repository structure
 ------------------------
 
@@ -77,3 +86,4 @@ see :ref:`project-commit-naming`.
     hotfix branches, and so on, to be introduced later.
 
 .. _Semantic Versioning: https://semver.org/
+.. _Releases: https://gitlab.com/cahuteproject/cahute/-/releases

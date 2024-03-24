@@ -117,6 +117,17 @@ That's it! You should be able to run the following command::
 
     p7 --version
 
+.. note::
+
+    Since you are not using a packaged version of Cahute, the project won't
+    be automatically updated when updating the rest of the system, which
+    means you need to do it manually, especially if a security update is
+    made.
+
+    You can subscribe to releases by creating a Gitlab.com account, and
+    following the steps in `Get notified when a release is created`_.
+    You can check your notification settings at any time in Notifications_.
+
 .. _Archlinux User Repository: https://aur.archlinux.org/
 .. _cahute on AUR: https://aur.archlinux.org/packages/cahute
 .. _p7 on AUR: https://aur.archlinux.org/packages/p7
@@ -129,6 +140,11 @@ That's it! You should be able to run the following command::
 .. _pkg-config: https://git.sr.ht/~kaniini/pkgconf
 .. _SDL: https://www.libsdl.org/
 .. _libusb: https://libusb.info/
+
+.. _Get notified when a release is created:
+    https://docs.gitlab.com/ee/user/project/releases/
+    #get-notified-when-a-release-is-created
+.. _Notifications: https://gitlab.com/-/profile/notifications
 
 .. |archlinux| image:: arch.svg
 .. |manjaro| image:: manjaro.svg
