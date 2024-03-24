@@ -1,6 +1,6 @@
 h1 img, h2 img, p img {
-    vertical-align: middle;
-    width: 1em;
+    vertical-align: baseline;
+    width: .8em;
 }
 
 .sidebar-logo {

@@ -21,6 +21,17 @@ instructions depends on the system you want to install it on.
     tweak the commands to point to the right executable in an absolute or
     relative fashion, e.g. ``/opt/cahute/bin/p7 info``.
 
+|apple| macOS, OS X
+-------------------
+
+Cahute and its command-line utilities can be installed using
+|homebrew| Homebrew_.
+
+Once Homebrew is installed, you can install the `cahute formula
+<cahute homebrew formula_>`_::
+
+    brew install cahute
+
 |archlinux| Archlinux, |manjaro| Manjaro Linux
 ----------------------------------------------
 
@@ -128,6 +139,8 @@ That's it! You should be able to run the following command::
     following the steps in `Get notified when a release is created`_.
     You can check your notification settings at any time in Notifications_.
 
+.. _Homebrew: https://brew.sh/
+.. _cahute homebrew formula: https://formulae.brew.sh/formula/cahute
 .. _Archlinux User Repository: https://aur.archlinux.org/
 .. _cahute on AUR: https://aur.archlinux.org/packages/cahute
 .. _p7 on AUR: https://aur.archlinux.org/packages/p7
@@ -146,6 +159,8 @@ That's it! You should be able to run the following command::
     #get-notified-when-a-release-is-created
 .. _Notifications: https://gitlab.com/-/profile/notifications
 
+.. |apple| image:: apple.svg
+.. |homebrew| image:: homebrew.svg
 .. |archlinux| image:: arch.svg
 .. |manjaro| image:: manjaro.svg
 .. |linux| image:: linux.svg
