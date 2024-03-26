@@ -61,8 +61,6 @@
 #include <libusb.h>
 #define LIBUSB_ENABLED 1
 
-CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms);
-
 /* ---
  * Logging internals.
  * --- */
@@ -391,13 +389,32 @@ struct cahute_link {
 };
 
 /* ---
+ * Miscellaneous functions, defined in misc.c
+ * --- */
+
+CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms);
+CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp);
+
+/* ---
  * Link stream functions, defined in stream.c
  * --- */
 
 CAHUTE_EXTERN(int)
-cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size);
+cahute_read_from_link(
+    cahute_link *link,
+    cahute_u8 *buf,
+    size_t size,
+    unsigned long first_timeout,
+    unsigned long next_timeout
+);
 
-CAHUTE_EXTERN(int) cahute_skip_from_link(cahute_link *link, size_t size);
+CAHUTE_EXTERN(int)
+cahute_skip_from_link(
+    cahute_link *link,
+    size_t size,
+    unsigned long first_timeout,
+    unsigned long next_timeout
+);
 
 CAHUTE_EXTERN(int)
 cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size);

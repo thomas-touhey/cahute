@@ -29,6 +29,12 @@
 #include <string.h>
 #include "internals.h"
 
+/* TIMEOUT_PACKET_TYPE is the timeout before reading the packet type, i.e.
+ * the first byte, while TIMEOUT_PACKET_CONTENTS is the timeout before
+ * reading any of the following bytes. */
+#define TIMEOUT_PACKET_TYPE     0
+#define TIMEOUT_PACKET_CONTENTS 1000
+
 #define PACKET_TYPE_ACK          0x06
 #define PACKET_TYPE_ESTABLISHED  0x13
 #define PACKET_TYPE_START        0x16
@@ -103,7 +109,13 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
     int ignore_invalid_data_checksum = 0;
 
     do {
-        err = cahute_read_from_link(link, buf, 1);
+        err = cahute_read_from_link(
+            link,
+            buf,
+            1,
+            TIMEOUT_PACKET_TYPE,
+            TIMEOUT_PACKET_CONTENTS
+        );
         if (err)
             return err;
 
@@ -139,7 +151,13 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
     else
         buf_size = 40;
 
-    err = cahute_read_from_link(link, &buf[1], buf_size - 1);
+    err = cahute_read_from_link(
+        link,
+        &buf[1],
+        buf_size - 1,
+        TIMEOUT_PACKET_CONTENTS,
+        TIMEOUT_PACKET_CONTENTS
+    );
     if (err)
         return err;
 
@@ -172,7 +190,13 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
              * the CAS50 header type. */
             msg(ll_info, "Variant is determined to be CAS50.");
 
-            err = cahute_read_from_link(link, &buf[40], 10);
+            err = cahute_read_from_link(
+                link,
+                &buf[40],
+                10,
+                TIMEOUT_PACKET_CONTENTS,
+                TIMEOUT_PACKET_CONTENTS
+            );
             if (err) {
                 msg(ll_info, "Reading failed. The header base was:");
                 mem(ll_info, buf, 40);
@@ -331,7 +355,13 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
             buf = &buf[buf_size];
 
             for (part_i = 0; part_i < part_count; part_i++) {
-                err = cahute_read_from_link(link, tmp_buf, 1);
+                err = cahute_read_from_link(
+                    link,
+                    tmp_buf,
+                    1,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
                 if (err)
                     return err;
 
@@ -348,12 +378,24 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
                     part_count,
                     part_size);
 
-                err = cahute_read_from_link(link, buf, part_size);
+                err = cahute_read_from_link(
+                    link,
+                    buf,
+                    part_size,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
                 if (err)
                     return err;
 
                 /* Read and check the checksum. */
-                err = cahute_read_from_link(link, tmp_buf + 1, 1);
+                err = cahute_read_from_link(
+                    link,
+                    tmp_buf + 1,
+                    1,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
                 if (err)
                     return err;
 
@@ -432,7 +474,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 
     if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
         /* Expect an initiation flow. */
-        err = cahute_read_from_link(link, buf, 1);
+        err = cahute_read_from_link(link, buf, 1, TIMEOUT_PACKET_TYPE, 0);
         if (err)
             return err;
 
@@ -456,7 +498,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
         if (err)
             return err;
 
-        err = cahute_read_from_link(link, buf, 1);
+        err = cahute_read_from_link(link, buf, 1, TIMEOUT_PACKET_TYPE, 0);
         if (err)
             return err;
 

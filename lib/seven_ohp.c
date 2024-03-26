@@ -27,6 +27,9 @@
  * ************************************************************************* */
 
 #include "internals.h"
+#define TIMEOUT_PACKET_START    0    /* Timeout for the packet start. */
+#define TIMEOUT_PACKET_CONTENTS 2000 /* Timeout for the rest of the packet. */
+
 #define IS_ASCII_HEX_DIGIT(C) \
     (((C) >= '0' && (C) <= '9') || ((C) >= 'A' && (C) <= 'F'))
 #define ASCII_HEX_TO_NIBBLE(C) ((C) >= 'A' ? (C) - 'A' + 10 : (C) - '0')
@@ -117,7 +120,9 @@ cahute_seven_ohp_receive(cahute_link *link, int align) {
             err = cahute_read_from_link(
                 link,
                 &buf[6 - to_complete],
-                to_complete
+                to_complete,
+                TIMEOUT_PACKET_START,
+                TIMEOUT_PACKET_CONTENTS
             );
             if (err)
                 return err;
@@ -145,7 +150,14 @@ sequence_found:
         }
     } else {
         /* We just need to fill the initial 6 bytes in the buffer. */
-        if ((err = cahute_read_from_link(link, buf, 6)))
+        err = cahute_read_from_link(
+            link,
+            buf,
+            6,
+            TIMEOUT_PACKET_CONTENTS,
+            TIMEOUT_PACKET_CONTENTS
+        );
+        if (err)
             return err;
     }
 
@@ -170,7 +182,14 @@ sequence_found:
         } else if (!memcmp(&buf[1], "TYPZ1", 5) || !memcmp(&buf[1], "TYPZ2", 5)) {
             if (buf[5] == '1') {
                 /* The Frame Length (FL) field is 6 bytes long. */
-                if ((err = cahute_read_from_link(link, &buf[6], 18)))
+                err = cahute_read_from_link(
+                    link,
+                    &buf[6],
+                    18,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
+                if (err)
                     return err;
 
                 if (!IS_ASCII_HEX_DIGIT(buf[6]) || !IS_ASCII_HEX_DIGIT(buf[7])
@@ -190,7 +209,14 @@ sequence_found:
                      | ASCII_HEX_TO_NIBBLE(buf[11]));
             } else {
                 /* The Frame Length (FL) field is 8 bytes long. */
-                if ((err = cahute_read_from_link(link, &buf[6], 20)))
+                err = cahute_read_from_link(
+                    link,
+                    &buf[6],
+                    20,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
+                if (err)
                     return err;
 
                 if (!IS_ASCII_HEX_DIGIT(buf[6]) || !IS_ASCII_HEX_DIGIT(buf[7])
@@ -223,10 +249,16 @@ sequence_found:
                 || !IS_ASCII_HEX_DIGIT(buf[packet_size - 6])
                 || !IS_ASCII_HEX_DIGIT(buf[packet_size - 5])) {
                 /* The header is corrupted.
-                    * We however still want to skip the frame length and the
-                    * checksum in order to fall back on our feet on next
-                    * packet reception. */
-                if ((err = cahute_skip_from_link(link, frame_length + 2)))
+                 * We however still want to skip the frame length and the
+                 * checksum in order to fall back on our feet on next
+                 * packet reception. */
+                err = cahute_skip_from_link(
+                    link,
+                    frame_length + 2,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
+                if (err)
                     return err;
 
                 return CAHUTE_ERROR_CORRUPT;
@@ -290,7 +322,13 @@ sequence_found:
         if (!frame_length) {
             /* The message has likely already been displayed here, we don't
              * need to print another one. */
-            if ((err = cahute_skip_from_link(link, 2)))
+            err = cahute_skip_from_link(
+                link,
+                2,
+                TIMEOUT_PACKET_CONTENTS,
+                TIMEOUT_PACKET_CONTENTS
+            );
+            if (err)
                 return err;
 
             return CAHUTE_ERROR_UNKNOWN;
@@ -298,7 +336,13 @@ sequence_found:
 
         if (format < 0) {
             /* Same as above, the message has likely already been displayed. */
-            if ((err = cahute_skip_from_link(link, frame_length + 2)))
+            err = cahute_skip_from_link(
+                link,
+                frame_length + 2,
+                TIMEOUT_PACKET_CONTENTS,
+                TIMEOUT_PACKET_CONTENTS
+            );
+            if (err)
                 return err;
 
             return CAHUTE_ERROR_UNKNOWN;
@@ -332,7 +376,13 @@ sequence_found:
                 height,
                 format);
 
-            if ((err = cahute_skip_from_link(link, frame_length + 2)))
+            err = cahute_skip_from_link(
+                link,
+                frame_length + 2,
+                TIMEOUT_PACKET_CONTENTS,
+                TIMEOUT_PACKET_CONTENTS
+            );
+            if (err)
                 return err;
 
             return CAHUTE_ERROR_UNKNOWN;
@@ -346,9 +396,15 @@ sequence_found:
                 link->protocol_buffer_capacity);
 
             /* We still want to skip the frame length and the
-                * checksum in order to fall back on our feet on next
-                * packet reception. */
-            if ((err = cahute_skip_from_link(link, frame_length + 2)))
+             * checksum in order to fall back on our feet on next
+             * packet reception. */
+            err = cahute_skip_from_link(
+                link,
+                frame_length + 2,
+                TIMEOUT_PACKET_CONTENTS,
+                TIMEOUT_PACKET_CONTENTS
+            );
+            if (err)
                 return err;
 
             return CAHUTE_ERROR_SIZE;
@@ -356,7 +412,14 @@ sequence_found:
 
         /* We are now able to read the data from the link to the protocol
          * buffer! */
-        if ((err = cahute_read_from_link(link, state_data, frame_length)))
+        err = cahute_read_from_link(
+            link,
+            state_data,
+            frame_length,
+            TIMEOUT_PACKET_CONTENTS,
+            TIMEOUT_PACKET_CONTENTS
+        );
+        if (err)
             return err;
 
         state->picture_width = width;
@@ -367,7 +430,13 @@ sequence_found:
         msg(ll_error, "Unknown packet type %d (0x%02X).", buf[0], buf[0]);
 
         /* Skip the checksum. */
-        if ((err = cahute_skip_from_link(link, 2)))
+        err = cahute_skip_from_link(
+            link,
+            2,
+            TIMEOUT_PACKET_CONTENTS,
+            TIMEOUT_PACKET_CONTENTS
+        );
+        if (err)
             return err;
 
         return CAHUTE_ERROR_UNKNOWN;
@@ -379,7 +448,14 @@ sequence_found:
     /* We can now compute the checksum.
      * Note that adding checksums works, i.e.
      * checksum(A) + checksum(B) == checksum(AB). */
-    if ((err = cahute_read_from_link(link, &buf[packet_size], 2)))
+    err = cahute_read_from_link(
+        link,
+        &buf[packet_size],
+        2,
+        TIMEOUT_PACKET_CONTENTS,
+        TIMEOUT_PACKET_CONTENTS
+    );
+    if (err)
         return err;
 
     if (!IS_ASCII_HEX_DIGIT(buf[packet_size])

@@ -27,6 +27,12 @@
  * ************************************************************************* */
 
 #include "internals.h"
+
+/* TIMEOUT_PACKET_START is the timeout before a packet starts.
+ * TIMEOUT_PACKET_CONTENTS is the timeout in between bytes for a packet. */
+#define TIMEOUT_PACKET_START    0
+#define TIMEOUT_PACKET_CONTENTS 2000
+
 #define IS_ASCII_HEX_DIGIT(C) \
     (((C) >= '0' && (C) <= '9') || ((C) >= 'A' && (C) <= 'F'))
 #define ASCII_HEX_TO_NIBBLE(C) ((C) >= 'A' ? (C) - 'A' + 10 : (C) - '0')
@@ -329,7 +335,14 @@ CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
 
     /* The packet is at least 6 bytes long: type (1 B)
      * + subtype (2 B) + ex (1 B) + checksum (2 B). */
-    if ((err = cahute_read_from_link(link, buf, 6)))
+    err = cahute_read_from_link(
+        link,
+        buf,
+        6,
+        TIMEOUT_PACKET_START,
+        TIMEOUT_PACKET_CONTENTS
+    );
+    if (err)
         return err;
 
     /* We assume the packet is of basic or extended format from here.
@@ -349,7 +362,14 @@ CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
         /* Packet is extended, there is at least 10 bytes: Type (1 B)
          * + Subtype (2 B) + Extended (1 B) + Data size (4 B)
          * + Checksum (2 B). */
-        if ((err = cahute_read_from_link(link, &buf[6], 4)))
+        err = cahute_read_from_link(
+            link,
+            &buf[6],
+            4,
+            TIMEOUT_PACKET_CONTENTS,
+            TIMEOUT_PACKET_CONTENTS
+        );
+        if (err)
             return err;
 
         if (!IS_ASCII_HEX_DIGIT(buf[4]) || !IS_ASCII_HEX_DIGIT(buf[5])
@@ -376,14 +396,26 @@ CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
             mem(ll_info, buf, 10);
 
             if (data_size)
-                cahute_skip_from_link(link, data_size);
+                cahute_skip_from_link(
+                    link,
+                    data_size,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
 
             return CAHUTE_ERROR_SIZE;
         }
 
         /* We want to read the rest of the packet here, with the rest of the
          * data (since we've already read 2 bytes of data) and the checksum. */
-        if ((err = cahute_read_from_link(link, &buf[10], data_size)))
+        err = cahute_read_from_link(
+            link,
+            &buf[10],
+            data_size,
+            TIMEOUT_PACKET_CONTENTS,
+            TIMEOUT_PACKET_CONTENTS
+        );
+        if (err)
             return err;
 
         packet_size = 10 + data_size;

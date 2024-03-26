@@ -36,9 +36,19 @@
  *
  * @param link Link in which the stream data is defined.
  * @param size Size of the area to skip.
+ * @param first_timeout Timeout before the first byte is received,
+ *        in milliseconds.
+ * @param next_timeout Timeout in-between any byte past the first one,
+ *        in milliseconds.
  * @return Error, or CAHUTE_OK if no error has occurred.
  */
-CAHUTE_EXTERN(int) cahute_skip_from_link(cahute_link *link, size_t size) {
+CAHUTE_EXTERN(int)
+cahute_skip_from_link(
+    cahute_link *link,
+    size_t size,
+    unsigned long first_timeout,
+    unsigned long next_timeout
+) {
     if (size) {
         cahute_u8 buf[CAHUTE_LINK_STREAM_BUFFER_SIZE];
         int err;
@@ -48,7 +58,9 @@ CAHUTE_EXTERN(int) cahute_skip_from_link(cahute_link *link, size_t size) {
                 err = cahute_read_from_link(
                     link,
                     buf,
-                    CAHUTE_LINK_STREAM_BUFFER_SIZE
+                    CAHUTE_LINK_STREAM_BUFFER_SIZE,
+                    first_timeout,
+                    next_timeout
                 );
                 if (err)
                     return err;
@@ -57,8 +69,17 @@ CAHUTE_EXTERN(int) cahute_skip_from_link(cahute_link *link, size_t size) {
             } while (size >= CAHUTE_LINK_STREAM_BUFFER_SIZE);
         }
 
-        if (size && (err = cahute_read_from_link(link, buf, size)))
-            return err;
+        if (size) {
+            err = cahute_read_from_link(
+                link,
+                buf,
+                size,
+                first_timeout,
+                next_timeout
+            );
+            if (err)
+                return err;
+        }
     }
 
     return CAHUTE_OK;
@@ -70,13 +91,33 @@ CAHUTE_EXTERN(int) cahute_skip_from_link(cahute_link *link, size_t size) {
  * This function is guaranteed to fill the buffer completely, or return
  * an error.
  *
+ * If any timeout is provided as 0, the corresponding timeout will be
+ * unlimited, i.e. the function will wait indefinitely.
+ *
  * @param link Link in which the stream data is defined.
  * @param buf Buffer in which to write the read data.
  * @param size Size to read into the buffer.
+ * @param first_timeout Timeout before the first byte is received,
+ *        in milliseconds.
+ * @param next_timeout Timeout in-between any byte past the first one,
+ *        in milliseconds.
  * @return Error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_EXTERN(int)
-cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
+cahute_read_from_link(
+    cahute_link *link,
+    cahute_u8 *buf,
+    size_t size,
+    unsigned long first_timeout,
+    unsigned long next_timeout
+) {
+    size_t original_size = size; /* For logging. */
+    size_t bytes_read;
+    unsigned long timeout = first_timeout;
+    unsigned long iteration_timeout = first_timeout; /* For logging. */
+    unsigned long start_time, last_time;
+    int err;
+
     if (!size)
         return CAHUTE_OK;
 
@@ -102,6 +143,16 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
         link->stream_size = 0;
     }
 
+    /* Set ``bytes_read`` to 1 so the first round of the loop actually
+     * attempts at reading and does not remove time from the time. */
+    bytes_read = 1;
+
+    err = cahute_monotonic(&start_time);
+    if (err)
+        return err;
+
+    last_time = start_time;
+
     /* We need to complete the buffer here, by doing multiple passes on the
      * stream implementation specific read code until the caller's need is
      * fully satisfied.
@@ -115,10 +166,26 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
      * the link's stream read buffer. */
     while (size) {
         cahute_u8 *dest;
-        size_t target_size;    /* Size to ask for, optimistically. */
-        size_t bytes_read = 0; /* Must be filled by the implementation. */
+        size_t target_size; /* Size to ask for, optimistically. */
         int is_link_buffer;
 
+        /* If no bytes have been read since last time, we actually need to
+         * remove the difference using the monotonic clock! */
+        if (!bytes_read && timeout) {
+            unsigned long current_time;
+
+            err = cahute_monotonic(&current_time);
+            if (err)
+                return err;
+
+            if (current_time - last_time >= timeout)
+                goto time_out;
+
+            timeout -= current_time - last_time;
+            last_time = current_time;
+        }
+
+        bytes_read = 0;
         if (size >= CAHUTE_LINK_STREAM_BUFFER_SIZE) {
             is_link_buffer = 0;
             dest = buf;
@@ -137,7 +204,7 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
             cahute_u8 status_buf[16];
             cahute_u8 payload[16];
             size_t avail;
-            int err, attempts;
+            int attempts;
 
             /* We use custom command C0 to poll status and get avail. bytes.
              * See :ref:`ums-command-c0` for more information.
@@ -172,7 +239,16 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
             }
 
             if (!attempts) {
-                if ((err = cahute_sleep(200)))
+                if (!timeout)
+                    err = cahute_sleep(200);
+                else {
+                    if (timeout < 20)
+                        goto time_out;
+
+                    err = cahute_sleep(timeout >= 200 ? 200 : timeout - 10);
+                }
+
+                if (err)
                     return err;
 
                 continue;
@@ -204,8 +280,48 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
             switch (link->stream) {
 #ifdef CAHUTE_LINK_STREAM_UNIX
             case CAHUTE_LINK_STREAM_UNIX: {
-                ssize_t ret =
-                    read(link->stream_state.posix.fd, dest, target_size);
+                ssize_t ret;
+
+                if (timeout > 0) {
+                    /* Use select() to wait for input to be present. */
+                    fd_set read_fds, write_fds, except_fds;
+                    struct timeval timeout_tv;
+                    int select_ret;
+
+                    FD_ZERO(&read_fds);
+                    FD_ZERO(&write_fds);
+                    FD_ZERO(&except_fds);
+                    FD_SET(link->stream_state.posix.fd, &read_fds);
+
+                    timeout_tv.tv_sec = timeout / 1000;
+                    timeout_tv.tv_usec = (timeout % 1000) * 1000;
+
+                    select_ret = select(
+                        link->stream_state.posix.fd + 1,
+                        &read_fds,
+                        &write_fds,
+                        &except_fds,
+                        &timeout_tv
+                    );
+
+                    switch (select_ret) {
+                    case 1:
+                        /* Input is ready for us to read! */
+                        break;
+
+                    case 0:
+                        goto time_out;
+
+                    default:
+                        msg(ll_error,
+                            "An error occurred while calling select() %s (%d)",
+                            strerror(errno),
+                            errno);
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
+                }
+
+                ret = read(link->stream_state.posix.fd, dest, target_size);
 
                 if (ret < 0)
                     switch (errno) {
@@ -217,10 +333,10 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
                         return CAHUTE_ERROR_GONE;
 
                     default:
-                        msg(ll_fatal,
-                            "Error was %d: %s",
-                            errno,
-                            strerror(errno));
+                        msg(ll_error,
+                            "An error occurred while calling read() %s (%d)",
+                            strerror(errno),
+                            errno);
                         return CAHUTE_ERROR_UNKNOWN;
                     }
 
@@ -232,8 +348,25 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
 
 #ifdef CAHUTE_LINK_STREAM_WINDOWS
             case CAHUTE_LINK_STREAM_WINDOWS: {
+                COMMTIMEOUTS timeouts;
                 DWORD received;
                 BOOL ret;
+
+                timeouts.ReadIntervalTimeout = timeout;
+                timeouts.ReadTotalTimeoutMultiplier = 0;
+                timeouts.ReadTotalTimeoutConstant = 0;
+                timeouts.WriteTotalTimeoutMultiplier = 0;
+                timeouts.WriteTotalTimeoutConstant = 0;
+
+                ret = SetCommTimeouts(
+                    link->stream_state.windows.handle,
+                    &timeouts
+                );
+                if (!ret) {
+                    DWORD werr = GetLastError();
+                    log_windows_error("SetCommTimeouts", werr);
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
 
                 ret = ReadFile(
                     link->stream_state.windows.handle,
@@ -265,7 +398,7 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
                     dest,
                     target_size,
                     &received,
-                    0 /* Unlimited timeout by default. */
+                    timeout
                 );
 
                 switch (libusberr) {
@@ -310,9 +443,14 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
         if (!bytes_read)
             continue;
 
+        /* At least one byte has been read in this iteration; we can reset
+         * the timeout to the next timeout. */
+        timeout = next_timeout;
+        iteration_timeout = next_timeout;
+
         if (bytes_read >= size) {
             if (is_link_buffer) {
-                memcpy(buf, &link->stream_buffer[0], size);
+                memcpy(buf, link->stream_buffer, size);
                 link->stream_start = size;
                 link->stream_size = bytes_read;
             }
@@ -327,7 +465,23 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
         size -= bytes_read;
     }
 
+    if (!cahute_monotonic(&last_time)) {
+        msg(ll_info,
+            "Read %" CAHUTE_PRIuSIZE " bytes in %lums.",
+            original_size + link->stream_size - link->stream_start,
+            last_time - start_time);
+    }
+
     return CAHUTE_OK;
+
+time_out:
+    msg(ll_error,
+        "Hit a timeout of %lums after reading %" CAHUTE_PRIuSIZE
+        "/%" CAHUTE_PRIuSIZE " bytes.",
+        iteration_timeout,
+        original_size - size,
+        original_size);
+    return CAHUTE_ERROR_TIMEOUT;
 }
 
 /**

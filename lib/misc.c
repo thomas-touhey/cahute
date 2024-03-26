@@ -36,6 +36,11 @@ CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms) {
     return CAHUTE_OK;
 }
 
+CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
+    *msp = GetTickCount();
+    return CAHUTE_OK;
+}
+
 #elif defined(__unix__) || defined(__unix)
 # include <unistd.h>
 # include <time.h>
@@ -49,10 +54,35 @@ CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms) {
     return CAHUTE_OK;
 }
 
+CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
+    struct timespec res;
+    int ret;
+
+    ret = clock_gettime(
+# ifdef CLOCK_BOOTTIME
+        CLOCK_BOOTTIME,
+# else
+        CLOCK_MONOTONIC,
+# endif
+        &res
+    );
+
+    if (ret)
+        return CAHUTE_ERROR_IMPL;
+
+    *msp = res.tv_sec * 1000 + res.tv_nsec / 1000000;
+    return CAHUTE_OK;
+}
+
 #else
 
 CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms) {
     msg(ll_error, "No sleep implementation found!");
+    return CAHUTE_ERROR_IMPL;
+}
+
+CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
+    msg(ll_error, "No monotonic implementation found!");
     return CAHUTE_ERROR_IMPL;
 }
 
