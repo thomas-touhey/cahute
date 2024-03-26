@@ -202,19 +202,6 @@ cahute_read_from_link(cahute_link *link, cahute_u8 *buf, size_t size) {
             bytes_read = avail;
         } else {
             switch (link->stream) {
-            case CAHUTE_LINK_STREAM_STDIO:
-                bytes_read = fread(
-                    dest,
-                    1,
-                    target_size,
-                    link->stream_state.stdio.filep
-                );
-
-                if (!bytes_read)
-                    return CAHUTE_ERROR_UNKNOWN;
-
-                break;
-
 #ifdef CAHUTE_LINK_STREAM_UNIX
             case CAHUTE_LINK_STREAM_UNIX: {
                 ssize_t ret =
@@ -410,14 +397,6 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
             bytes_written = to_send;
         } else {
             switch (link->stream) {
-            case CAHUTE_LINK_STREAM_STDIO:
-                bytes_written =
-                    fwrite(buf, 1, size, link->stream_state.stdio.filep);
-                if (!bytes_written)
-                    return CAHUTE_ERROR_UNKNOWN;
-
-                break;
-
 #ifdef CAHUTE_LINK_STREAM_UNIX
             case CAHUTE_LINK_STREAM_UNIX: {
                 ssize_t ret;

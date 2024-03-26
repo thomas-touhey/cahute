@@ -156,7 +156,6 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000200 /* Cannot recover. */
 
 /* Stream types allowed. */
-#define CAHUTE_LINK_STREAM_STDIO 0x00000001
 #if UNIX_ENABLED
 # define CAHUTE_LINK_STREAM_UNIX 0x00000002
 #endif
@@ -178,15 +177,6 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_CASIOLINK_VARIANT_CAS40  1
 #define CAHUTE_CASIOLINK_VARIANT_CAS50  2
 #define CAHUTE_CASIOLINK_VARIANT_CAS100 3
-
-/**
- * stdio stream state.
- *
- * @property filep File pointer.
- */
-struct cahute_link_stdio {
-    FILE *filep;
-};
 
 #if UNIX_ENABLED
 /**
@@ -230,13 +220,11 @@ struct cahute_link_libusb {
 /**
  * Stream state, to be used depending on the link flags regarding the stream.
  *
- * @property stdio Stream state if the selected stream type is stdio.
  * @property posix Stream state if the selected stream type is POSIX.
  * @property windows Stream state if the selected stream type is Windows.
  * @property libusb Stream state if the selected stream type is libusb.
  */
 union cahute_link_stream_state {
-    struct cahute_link_stdio stdio;
 #if UNIX_ENABLED
     struct cahute_link_posix posix;
 #endif

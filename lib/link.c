@@ -909,10 +909,6 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
 
     if (link->flags & CAHUTE_LINK_FLAG_CLOSE_STREAM) {
         switch (link->stream) {
-        case CAHUTE_LINK_STREAM_STDIO:
-            fclose(link->stream_state.stdio.filep);
-            break;
-
 #ifdef CAHUTE_LINK_STREAM_UNIX
         case CAHUTE_LINK_STREAM_UNIX:
             close(link->stream_state.posix.fd);
