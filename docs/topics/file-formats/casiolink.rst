@@ -9,9 +9,15 @@ end with the ``.CAS`` extension.
 The file is a series of main memory files directly concatenated, where every
 file is constituted of the following:
 
-* A ``:`` (0x3A) byte.
-* A header, including a checksum.
-* A file contents.
+* A header, composed of:
+
+  * A ``:`` (0x3A) byte.
+  * A header, of CAS40 or CAS50 type, including a checksum.
+* Zero, one, or more data parts, depending on the header, composed of:
+
+  * A ``:`` (0x3A) byte.
+  * A contents, of the size provided by the header.
+  * A checksum (1 byte).
 
 The header format depends on the model of the calculator from or for which
 the file was made.
@@ -63,6 +69,8 @@ The format of such headers is the following:
 
 This header represents an end of sequence. It is only used with the CASIOLINK
 protocol, when using the CAS40 header format.
+
+This is not followed by any data parts.
 
 .. _casiolink-cas40-aa:
 
@@ -146,7 +154,8 @@ Type-specific data for such files are the following:
       -
       - Should be set to ``\x03``.
 
-.. todo:: What is the format of the data?
+This is followed by 3 data parts, each representing a monochrome picture with
+a one-byte prefix representing the color.
 
 .. _casiolink-cas40-dd:
 
@@ -190,7 +199,7 @@ Type-specific data for such files are the following:
             * - ``\x10DWF``
               - :ref:`picture-format-1bit-cas50`.
 
-.. todo:: What is the format of the data?
+This is followed by a single data part representing the monochrome picture.
 
 .. _casiolink-cas40-dm:
 
@@ -241,7 +250,7 @@ Type-specific data for such files are the following:
       - Password of the file for an editor program.
       - ``WORLD\xFF\xFF\xFF\xFF\xFF\xFF\xFF``
 
-The *FN* and *FP* fields from the header are also used.
+.. todo:: Find out what data parts are sent here!
 
 .. _casiolink-cas40-f1:
 .. _casiolink-cas40-f6:
@@ -263,6 +272,8 @@ it is in a context where multiple files exist.
 
     CaS also supports ``FP`` as a CAS40 file type in the ``FN`` loop.
     Maybe this should be placed in another section?
+
+.. todo:: Find out what data parts are sent here!
 
 .. _casiolink-cas40-ga:
 
@@ -308,8 +319,8 @@ it is in a context where multiple files exist.
 
 .. _casiolink-cas40-p1:
 
-``P1`` CAS40 Single Unnamed Program
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``P1`` CAS40 Single Numbered Program
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Type-specific data for such files are the following:
 
@@ -361,14 +372,14 @@ Type-specific data for such files are the following:
       -
       - Should be set to ``\0``.
 
-The content uses CASIO's variable size character encoding.
+This is followed by a single data part containing the program's content.
 
 .. _casiolink-cas40-pz:
 
-``PZ`` CAS40 Multiple Unnamed Programs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``PZ`` CAS40 Multiple Numbered Programs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This file contains all 38 unnamed programs from the program.
+This file contains all 38 numbered programs from the program.
 
 Type-specific data for such files are the following:
 
@@ -397,12 +408,12 @@ Type-specific data for such files are the following:
       -
       - Should be set to ``\0``.
 
-The content is composed of the following:
+This is followed by 2 data parts:
 
-* 38 times the type-specific data from ``P1``, including the data length.
-* The contents of every one of the 38 unnamed programs sequentially.
-
-This implies that the data is at least 190 bytes, i.e. *DL* is at least 192.
+* A part of 190 bytes, used to include 38 times the type-specific data from
+  ``P1`` (for 38 programs).
+* A part containing data for all 38 programs concatenated, for which the
+  length is equal to *DL* - 2.
 
 See :ref:`casiolink-cas40-p1` for more information.
 
@@ -462,42 +473,46 @@ The format of such headers is the following:
       - Type (*T*)
       - Basic purpose of the packet
       - ``END\0``
-    * - 2 (0x02)
+    * - 4 (0x04)
       - 2 B
       - File Type (*FT*)
       - File type, used by ``TXT`` packets.
       - ``PG``
-    * - 4 (0x04)
+    * - 6 (0x06)
       - 4 B
-      - File Size (*FS*)
+      - Size (*S*)
       - Size of the data accompanying the header (big endian).
+
+        For most data, this is either set to 0 if there are no data part, or
+        the size of the data part plus 2 otherwise. However, some types
+        override this behaviour to use it elsewhere.
       - ``\0\0\0\xFF``
-    * - 8 (0x08)
+    * - 10 (0x0A)
       - 8 B
       - File Name (*FN*)
       - Name of the file, with unset bytes being set to ``\xFF``.
       - ``HELLO\xFF\xFF\xFF``
-    * - 16 (0x10)
+    * - 18 (0x12)
       - 8 B
       - Alternative File Type (*AFT*)
       - Alternative file type used for some packet types, notably variables.
       - ``VariableR\x0A``
-    * - 24 (0x18)
+    * - 26 (0x1A)
       - 8 B
       - File Password (*FP*)
       - Password of the file, with unset bytes being set to ``\xFF``.
       - ``WORLD\xFF\xFF\xFF``
-    * - 32 (0x20)
+    * - 34 (0x22)
       - 2 B
       - Base, if the file is a program.
       - ``BN`` for Base programs, ``NL`` otherwise.
       - ``BN``
-    * - 34 (0x22)
+    * - 36 (0x24)
       - 6 B
       - Backup Size (*BS*) *(?)*
       - Size of the backup (big endian).
       - ``\0\x10\0\0\0\0``
-    * - 40 (0x28)
+    * - 42 (0x2A)
       - 6 B
       - (unknown)
       - Unknown, filled with ``\xFF``.
@@ -512,12 +527,13 @@ Note that any field not used by the packet type should be set to ``\xFF``.
 
 .. _casiolink-cas50-end:
 
-``END\0`` CAS50 End
-~~~~~~~~~~~~~~~~~~~
+``END\xFF`` CAS50 End
+~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe the packet's role.
+This header represents an end of sequence. It is only used with the CASIOLINK
+protocol, when using the CAS50 header format.
 
-All fields other than the type aren't used, and should be set to ``\xFF``.
+This is not followed by any data parts.
 
 .. _casiolink-cas50-fnc:
 

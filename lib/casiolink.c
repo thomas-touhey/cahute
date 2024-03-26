@@ -104,9 +104,12 @@ CAHUTE_INLINE(int) cahute_casiolink_is_end(cahute_link *link) {
 CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
     cahute_u8 *buf = link->protocol_buffer;
     size_t buf_capacity = link->protocol_buffer_capacity;
-    size_t buf_size, part_count = 1, part_size = 0;
-    int packet_type, err, type_found = 0, variant = 0, checksum, checksum_alt;
-    int ignore_invalid_data_checksum = 0;
+    size_t buf_size, part_count = 1, part_repeat = 1;
+    size_t part_sizes[2];
+    int packet_type, err, variant = 0, checksum, checksum_alt;
+    int log_part_data = 1, is_end = 0, is_final = 0;
+
+    part_sizes[0] = 0;
 
     do {
         err = cahute_read_from_link(
@@ -130,6 +133,7 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
             if (err)
                 return err;
 
+            link->flags &= ~CAHUTE_LINK_FLAG_TERMINATED;
             continue;
         }
 
@@ -180,9 +184,10 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
             msg(ll_info, "Received the following header:");
             mem(ll_info, buf, 40);
         } else if (
-            !memcmp(&buf[1], "END", 4) || !memcmp(&buf[1], "FNC", 4)
+            !memcmp(&buf[1], "END\xFF", 4) || !memcmp(&buf[1], "FNC", 4)
             || !memcmp(&buf[1], "IMG", 4) || !memcmp(&buf[1], "MEM", 4)
-            || !memcmp(&buf[1], "REQ", 4) || !memcmp(&buf[1], "VAL", 4)) {
+            || !memcmp(&buf[1], "REQ", 4) || !memcmp(&buf[1], "TXT", 4)
+            || !memcmp(&buf[1], "VAL", 4)) {
             /* The type seems to be a CAS50 header type.
              * This means that we actually have 10 more bytes to read for
              * a full header.
@@ -248,59 +253,108 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
     }
 
     /* We have a variant and a full header from which we can determine the
-     * type and, especially, the size of the associated data. */
+     * type and, especially, the size of the associated data.
+     *
+     * NOTE: These sections can either define:
+     *
+     * - 'part_sizes[0]' only, if there's only one part.
+     * - 'part_sizes[...]' and 'part_count' if there's multiple parts,
+     *   and/or with 'part_repeat' set if the number of repetitions is
+     *   arbitrary.
+     * - 'part_count' to 0 if there's no data part associated with the
+     *    header. */
     switch (variant) {
     case CAHUTE_CASIOLINK_VARIANT_CAS40:
         if (!memcmp(&buf[1], "\x17\xFF", 2)) {
             /* End packet for CAS40. */
-            type_found = 1;
+            part_count = 0;
+            is_end = 1;
         } else if (!memcmp(&buf[1], "DD", 2)) {
             int width = buf[3], height = buf[4];
 
             /* Monochrome Screenshot. */
-            if (!memcmp(&buf[5], "\x10\x44WF", 4)) {
-                type_found = 1;
-                part_size = ((width >> 3) + !!(width & 7)) * height;
-            }
+            if (!memcmp(&buf[5], "\x10\x44WF", 4))
+                part_sizes[0] = ((width >> 3) + !!(width & 7)) * height;
+
+            log_part_data = 0;
+            is_final = 1;
         } else if (!memcmp(&buf[1], "DC", 2)) {
             int width = buf[3], height = buf[4];
 
             /* Color Screenshot. */
             if (!memcmp(&buf[5], "\x11UWF\x03", 4)) {
-                type_found = 1;
-                part_count = 3;
-                part_size = 1 + ((width >> 3) + !!(width & 7)) * height;
+                part_repeat = 3;
+                part_sizes[0] = 1 + ((width >> 3) + !!(width & 7)) * height;
             }
+
+            log_part_data = 0;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "P1", 2)) {
+            /* Single Numbered Program. */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+        } else if (!memcmp(&buf[1], "PZ", 2)) {
+            /* Multiple Numbered Programs */
+            part_count = 2;
+            part_sizes[0] = 190;
+            part_sizes[1] = ((buf[4] << 8) | buf[5]) - 2;
         }
 
         /* TODO */
         break;
 
     case CAHUTE_CASIOLINK_VARIANT_CAS50:
-        if (!memcmp(&buf[1], "END", 4)) {
+        if (!memcmp(&buf[1], "END\xFF", 4)) {
             /* End packet for CAS50. */
-            type_found = 1;
-        }
+            part_count = 0;
+            is_end = 1;
+        } else if (!memcmp(&buf[1], "VAL", 4)) {
+            int height = (buf[7] << 8) | buf[8];
+            int width = (buf[9] << 8) | buf[10];
 
-        /* TODO */
+            /* Variable data use size as W*H, or only W, or only H depending
+             * on the case. */
+            if (!width)
+                width = 1;
+
+            part_sizes[0] = 14;
+            part_repeat = height * width;
+        } else {
+            /* For other packets, the size should always be located at
+             * offset 6 of the header, i.e. offset 7 of the buffer. */
+            part_sizes[0] =
+                ((buf[7] << 24) | (buf[8] << 16) | (buf[9] << 8) | buf[10]);
+            if (part_sizes[0] > 2)
+                part_sizes[0] -= 2;
+            else
+                part_count = 0;
+
+            if (!memcmp(&buf[1], "MEM\0BU", 6)) {
+                /* Backups are guaranteed to be the final (and only) file
+                 * sent in the communication. */
+                is_final = 1;
+            }
+        }
         break;
 
     case CAHUTE_CASIOLINK_VARIANT_CAS100:
         if (!memcmp(&buf[1], "END1", 4)) {
             /* End packet for CAS100. */
-            type_found = 1;
+            part_count = 0;
+            is_end = 1;
         }
 
         /* TODO */
         break;
     }
 
-    if (!type_found) {
+    if (part_count && !part_sizes[0]) {
+        /* 'part_count' and 'part_sizes[0]' were left to their default values
+         * of 1 and 0 respectively, which means they have not been set to
+         * a found type. */
         cahute_u8 send_buf[1] = {PACKET_TYPE_INVALID_DATA};
 
         msg(ll_error,
             "Could not determine the data length out of the header.");
-        link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
 
         /* The type has not been recognized, therefore we cannot determine
          * the size of the data to read (or the number of data parts). */
@@ -311,26 +365,32 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
         return CAHUTE_ERROR_IMPL;
     }
 
-    if (part_size && buf_size + part_count * part_size > buf_capacity) {
-        msg(ll_error,
-            "Cannot get %" CAHUTE_PRIuSIZE "B into a %" CAHUTE_PRIuSIZE
-            "B protocol buffer.",
-            buf_size + part_count * part_size,
-            buf_capacity);
+    if (part_count) {
+        size_t total_size = buf_size;
+        size_t part_i;
 
-        link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
+        for (part_i = 0; part_i < part_count; part_i++)
+            total_size += part_sizes[part_i] * part_repeat;
 
-        {
-            cahute_u8 send_buf[1] = {PACKET_TYPE_INVALID_DATA};
+        if (total_size > buf_capacity) {
+            msg(ll_error,
+                "Cannot get %" CAHUTE_PRIuSIZE "B into a %" CAHUTE_PRIuSIZE
+                "B protocol buffer.",
+                total_size,
+                buf_capacity);
 
-            /* We actually send like we don't recognize the data, in
-                * order not to make the link irrecoverable. */
-            err = cahute_write_to_link(link, send_buf, 1);
-            if (err)
-                return err;
+            {
+                cahute_u8 send_buf[1] = {PACKET_TYPE_INVALID_DATA};
+
+                /* We actually send like we don't recognize the data, in
+                 * order not to make the link irrecoverable. */
+                err = cahute_write_to_link(link, send_buf, 1);
+                if (err)
+                    return err;
+            }
+
+            return CAHUTE_ERROR_SIZE;
         }
-
-        return CAHUTE_ERROR_SIZE;
     }
 
     /* Acknowledge the file so that we can actually receive it. */
@@ -342,9 +402,9 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
             return err;
     }
 
-    if (part_size) {
+    if (part_count) {
         cahute_u8 tmp_buf[2];
-        size_t part_i;
+        size_t part_i, part_j, index, total;
 
         /* There is data to be read.
          * The method to transfer data here varies depending on the variant:
@@ -358,71 +418,83 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
         case CAHUTE_CASIOLINK_VARIANT_CAS50:
             buf = &buf[buf_size];
 
-            for (part_i = 0; part_i < part_count; part_i++) {
-                err = cahute_read_from_link(
-                    link,
-                    tmp_buf,
-                    1,
-                    TIMEOUT_PACKET_CONTENTS,
-                    TIMEOUT_PACKET_CONTENTS
-                );
-                if (err == CAHUTE_ERROR_TIMEOUT_START)
-                    return CAHUTE_ERROR_TIMEOUT;
-                if (err)
-                    return err;
+            index = 1;
+            total = part_count * part_repeat;
+            for (part_j = 0; part_j < part_repeat; part_j++) {
+                for (part_i = 0; part_i < part_count; part_i++, index++) {
+                    size_t part_size = part_sizes[part_i];
 
-                if (tmp_buf[0] != PACKET_TYPE_HEADER) {
-                    msg(ll_error,
-                        "Expected 0x3A (':') packet type, got 0x%02X.",
-                        buf[0]);
-                    return CAHUTE_ERROR_UNKNOWN;
-                }
+                    err = cahute_read_from_link(
+                        link,
+                        tmp_buf,
+                        1,
+                        TIMEOUT_PACKET_CONTENTS,
+                        TIMEOUT_PACKET_CONTENTS
+                    );
+                    if (err == CAHUTE_ERROR_TIMEOUT_START)
+                        return CAHUTE_ERROR_TIMEOUT;
+                    if (err)
+                        return err;
 
-                msg(ll_info,
-                    "Reading data part %d/%d (%" CAHUTE_PRIuSIZE "o).",
-                    1 + part_i,
-                    part_count,
-                    part_size);
+                    if (tmp_buf[0] != PACKET_TYPE_HEADER) {
+                        msg(ll_error,
+                            "Expected 0x3A (':') packet type, got 0x%02X.",
+                            buf[0]);
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
 
-                err = cahute_read_from_link(
-                    link,
-                    buf,
-                    part_size,
-                    TIMEOUT_PACKET_CONTENTS,
-                    TIMEOUT_PACKET_CONTENTS
-                );
-                if (err == CAHUTE_ERROR_TIMEOUT_START)
-                    return CAHUTE_ERROR_TIMEOUT;
-                if (err)
-                    return err;
+                    msg(ll_info,
+                        "Reading data part %d/%d (%" CAHUTE_PRIuSIZE "o).",
+                        index,
+                        total,
+                        part_size);
 
-                /* Read and check the checksum. */
-                err = cahute_read_from_link(
-                    link,
-                    tmp_buf + 1,
-                    1,
-                    TIMEOUT_PACKET_CONTENTS,
-                    TIMEOUT_PACKET_CONTENTS
-                );
-                if (err == CAHUTE_ERROR_TIMEOUT_START)
-                    return CAHUTE_ERROR_TIMEOUT;
-                if (err)
-                    return err;
+                    err = cahute_read_from_link(
+                        link,
+                        buf,
+                        part_size,
+                        TIMEOUT_PACKET_CONTENTS,
+                        TIMEOUT_PACKET_CONTENTS
+                    );
+                    if (err == CAHUTE_ERROR_TIMEOUT_START)
+                        return CAHUTE_ERROR_TIMEOUT;
+                    if (err)
+                        return err;
 
-                checksum = cahute_casiolink_checksum(buf, part_size);
-                checksum_alt =
-                    cahute_casiolink_checksum(buf + 1, part_size - 1);
+                    /* Read and check the checksum. */
+                    err = cahute_read_from_link(
+                        link,
+                        tmp_buf + 1,
+                        1,
+                        TIMEOUT_PACKET_CONTENTS,
+                        TIMEOUT_PACKET_CONTENTS
+                    );
+                    if (err == CAHUTE_ERROR_TIMEOUT_START)
+                        return CAHUTE_ERROR_TIMEOUT;
+                    if (err)
+                        return err;
 
-                if (checksum != tmp_buf[1] && checksum_alt != tmp_buf[1]) {
-                    cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA};
+                    /* For color screenshots, sometimes the first byte is not
+                     * taken into account in the checksum calculation, as it's
+                     * metadata for the sheet and not the "actual data" of the
+                     * sheet. But sometimes it also gets the checksum right!
+                     * In any case, we want to compute and check both checksums
+                     * to see if at least one matches. */
+                    checksum = cahute_casiolink_checksum(buf, part_size);
+                    checksum_alt =
+                        cahute_casiolink_checksum(buf + 1, part_size - 1);
 
-                    msg(ll_warn,
-                        "Invalid checksum (expected: 0x%02X, computed: "
-                        "0x%02X).",
-                        tmp_buf[1],
-                        checksum);
+                    if (checksum != tmp_buf[1] && checksum_alt != tmp_buf[1]) {
+                        cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA
+                        };
 
-                    if (!ignore_invalid_data_checksum) {
+                        msg(ll_warn,
+                            "Invalid checksum (expected: 0x%02X, computed: "
+                            "0x%02X).",
+                            tmp_buf[1],
+                            checksum);
+                        mem(ll_info, buf, part_size);
+
                         msg(ll_error, "Transfer will abort.");
                         link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
 
@@ -431,27 +503,27 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
                             return err;
 
                         return CAHUTE_ERROR_CORRUPT;
-                    } else {
-                        msg(ll_warn, "This error will be ignored.");
                     }
+
+                    /* Acknowledge the data. */
+                    {
+                        cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
+
+                        err = cahute_write_to_link(link, send_buf, 1);
+                        if (err)
+                            return err;
+                    }
+
+                    msg(ll_info,
+                        "Data part %d/%d received and acknowledged.",
+                        index,
+                        total);
+                    if (log_part_data)
+                        mem(ll_info, buf, part_size);
+
+                    buf += part_size;
+                    buf_size += part_size;
                 }
-
-                /* Acknowledge the data. */
-                {
-                    cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
-
-                    err = cahute_write_to_link(link, send_buf, 1);
-                    if (err)
-                        return err;
-                }
-
-                msg(ll_info,
-                    "Data part %d/%d received and acknowledged.",
-                    1 + part_i,
-                    part_count);
-
-                buf += part_size;
-                buf_size += part_size;
             }
             break;
 
@@ -461,11 +533,22 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
         }
     }
 
-    /* TODO: "If the data is a backup or a screen capture, it's the end of
-     * the transfer, exit the loop". */
-
     link->protocol_state.casiolink.last_variant = variant;
     link->protocol_buffer_size = buf_size;
+
+    if (is_end) {
+        /* The packet was an end packet. */
+        link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
+        msg(ll_info, "Received data was a sentinel!");
+        return CAHUTE_ERROR_GONE;
+    }
+
+    if (is_final) {
+        /* The packet was a final one in the communication. */
+        link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
+        msg(ll_info, "Received data was final!");
+    }
+
     return CAHUTE_OK;
 }
 
@@ -536,6 +619,9 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
  */
 CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
     int err;
+
+    if (link->flags & CAHUTE_LINK_FLAG_TERMINATED)
+        return CAHUTE_OK;
 
     if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
         /* We need to receive an END header. */
@@ -617,6 +703,11 @@ cahute_casiolink_get_screen(
 
     do {
         err = cahute_casiolink_receive_data(link);
+        if (err == CAHUTE_ERROR_TIMEOUT_START) {
+            msg(ll_error, "No data received in a timely matter, exiting.");
+            break;
+        }
+
         if (err)
             return err;
 
