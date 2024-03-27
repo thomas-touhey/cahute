@@ -886,20 +886,37 @@ cahute_seven_decode_command(
 CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link) {
     int err;
 
-    err = cahute_seven_send_basic(
-        link,
-        0,
-        PACKET_TYPE_CHECK,
-        PACKET_SUBTYPE_CHECK_INIT
-    );
-    if (err)
-        return err;
+    if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
+        err = cahute_seven_receive(link);
+        if (err)
+            return err;
 
-    if (link->protocol_state.seven.last_packet_type != PACKET_TYPE_ACK
-        || link->protocol_state.seven.last_packet_subtype
-               != PACKET_SUBTYPE_ACK_BASIC) {
-        msg(ll_error, "Calculator did not answer a basic ACK.");
-        return CAHUTE_ERROR_UNKNOWN;
+        EXPECT_PACKET(PACKET_TYPE_CHECK, PACKET_SUBTYPE_CHECK_INIT);
+
+        err = cahute_seven_send_basic(
+            link,
+            SEND_FLAG_DISABLE_RECEIVE,
+            PACKET_TYPE_ACK,
+            PACKET_SUBTYPE_ACK_BASIC
+        );
+        if (err)
+            return err;
+    } else {
+        err = cahute_seven_send_basic(
+            link,
+            0,
+            PACKET_TYPE_CHECK,
+            PACKET_SUBTYPE_CHECK_INIT
+        );
+        if (err)
+            return err;
+
+        if (link->protocol_state.seven.last_packet_type != PACKET_TYPE_ACK
+            || link->protocol_state.seven.last_packet_subtype
+                   != PACKET_SUBTYPE_ACK_BASIC) {
+            msg(ll_error, "Calculator did not answer a basic ACK.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
     }
 
     return CAHUTE_OK;
@@ -908,6 +925,7 @@ CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link) {
 /**
  * Terminate the Protocol 7.00 communication.
  *
+ * This must be called while the link is in sender / active mode.
  * For more information on this flow, see :ref:`seven-terminate-link`.
  *
  * @param link Link on which to initiate the Protocol 7.00 communication.
@@ -915,6 +933,9 @@ CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link) {
  */
 CAHUTE_EXTERN(int) cahute_seven_terminate(cahute_link *link) {
     int err;
+
+    if (link->flags & CAHUTE_LINK_FLAG_TERMINATED)
+        return CAHUTE_OK;
 
     err = cahute_seven_send_basic(
         link,

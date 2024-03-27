@@ -611,76 +611,61 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 /**
  * Terminate the connection, for any CASIOLINK variant.
  *
- * Note that this function is to be called whether we are the sender or
- * receiver.
+ * This must be called while the link is in sender / active mode.
  *
  * @param link Link for which to terminate the connection.
  * @return Cahute error, or 0 if successful.
  */
 CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
-    int err;
+    cahute_u8 buf[50];
+    size_t buf_size;
 
     if (link->flags & CAHUTE_LINK_FLAG_TERMINATED)
         return CAHUTE_OK;
 
-    if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
-        /* We need to receive an END header. */
-        err = cahute_casiolink_receive_data(link);
-        if (err)
-            return err;
+    buf_size = 40;
+    memset(buf, '\xFF', 50);
+    buf[0] = ':';
 
-        if (!cahute_casiolink_is_end(link)) {
-            msg(ll_warn, "Last received packet was not an END packet!");
-            return CAHUTE_ERROR_UNKNOWN;
-        }
-    } else {
-        cahute_u8 buf[50];
-        size_t buf_size = 40;
+    switch (link->protocol_state.casiolink.variant) {
+    case CAHUTE_CASIOLINK_VARIANT_CAS40:
+        buf[1] = '\x17';
+        buf[2] = '\xFF';
+        break;
 
-        memset(buf, '\xFF', 50);
-        buf[0] = ':';
+    case CAHUTE_CASIOLINK_VARIANT_CAS50:
+        buf[1] = 'E';
+        buf[2] = 'N';
+        buf[3] = 'D';
+        buf[4] = '\0';
 
-        switch (link->protocol_state.casiolink.variant) {
-        case CAHUTE_CASIOLINK_VARIANT_CAS40:
-            buf[1] = '\x17';
-            buf[2] = '\xFF';
-            break;
+        buf_size = 50;
+        break;
 
-        case CAHUTE_CASIOLINK_VARIANT_CAS50:
-            buf[1] = 'E';
-            buf[2] = 'N';
-            buf[3] = 'D';
-            buf[4] = '\0';
-
-            buf_size = 50;
-            break;
-
-        case CAHUTE_CASIOLINK_VARIANT_CAS100:
-            buf[1] = 'E';
-            buf[2] = 'N';
-            buf[3] = 'D';
-            buf[4] = '1';
-            break;
-        }
-
-        /* Compute the checksum as well! */
-        {
-            cahute_u8 const *p = buf + 1;
-            size_t left = buf_size - 2;
-            int checksum = 0;
-
-            for (p = buf + 1, left = buf_size - 2; left; p++, left--)
-                checksum += *p;
-
-            buf[buf_size - 1] = checksum & 255;
-        }
-
-        err = cahute_write_to_link(link, buf, buf_size);
-        if (err)
-            return err;
+    case CAHUTE_CASIOLINK_VARIANT_CAS100:
+        buf[1] = 'E';
+        buf[2] = 'N';
+        buf[3] = 'D';
+        buf[4] = '1';
+        break;
     }
 
-    return CAHUTE_OK;
+    /* Compute the checksum as well! */
+    {
+        cahute_u8 const *p = buf + 1;
+        size_t left = buf_size - 2;
+        int checksum = 0;
+
+        for (p = buf + 1, left = buf_size - 2; left; p++, left--)
+            checksum += *p;
+
+        buf[buf_size - 1] = checksum & 255;
+    }
+
+    msg(ll_info, "Sending the following end packet:");
+    mem(ll_info, buf, buf_size);
+
+    return cahute_write_to_link(link, buf, buf_size);
 }
 
 /**

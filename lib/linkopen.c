@@ -35,6 +35,13 @@
 #define PROTOCOL_FLAG_NODISC   0x00000400 /* Should not run discovery. */
 #define PROTOCOL_FLAG_RECEIVER 0x00000800 /* Act as a receiver. */
 
+/* Full check packets. */
+CAHUTE_LOCAL_DATA(cahute_u8 const)
+seven_check_packet[] = {5, '0', '0', '0', '7', '0'};
+CAHUTE_LOCAL_DATA(cahute_u8 const)
+seven_ack_packet[] = {6, '0', '0', '0', '7', '0'};
+CAHUTE_LOCAL_DATA(cahute_u8 const) casiolink_start_packet[] = {0x16};
+
 /**
  * Cookie for detection in the context of simple USB link opening.
  *
@@ -60,8 +67,6 @@ struct simple_usb_detection_cookie {
  */
 CAHUTE_INLINE(char const *) get_protocol_name(int protocol) {
     switch (protocol) {
-    case CAHUTE_LINK_PROTOCOL_SERIAL_AUTO:
-        return "Automatic (serial)";
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
         return "CASIOLINK (serial)";
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
@@ -79,6 +84,156 @@ CAHUTE_INLINE(char const *) get_protocol_name(int protocol) {
     default:
         return "(unknown)";
     }
+}
+
+/**
+ * Determine the protocol for a serial link as a receiver.
+ *
+ * @param link Link to initialize.
+ * @param protocolp Pointer to the protocol to set.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_LOCAL(int)
+determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
+    cahute_u8 buf[6];
+    size_t received = 1;
+    int err;
+
+    msg(ll_info, "Waiting for input to determine the protocol.");
+
+    err = cahute_read_from_link(link, buf, 1, 0, 0);
+    if (err)
+        goto fail;
+
+    if (buf[0] == 0x05) {
+        /* This is the beginning of a Protocol 7.00 check packet.
+         * We want to read the rest of the packet to ensure that
+         * everything is correct. */
+        err = cahute_read_from_link(link, &buf[1], 5, 0, 0);
+        if (err)
+            goto fail;
+
+        received = 6;
+        if (!memcmp(buf, seven_check_packet, 6)) {
+            /* That's a check packet! We can answer with an ACK, then
+             * set the protocol to Protocol 7.00. */
+            err = cahute_write_to_link(link, seven_ack_packet, 6);
+            if (err)
+                goto fail;
+
+            *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
+            return CAHUTE_OK;
+        }
+    } else if (buf[0] == 0x0B) {
+        /* This is the beginning of a Protocol 7.00 Screenstreaming packet.
+         * We don't want to read the rest of the packet, the receiving routine
+         * for Protocol 7.00 screenstreaming will realign itself. */
+        *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP;
+        return CAHUTE_OK;
+    } else if (buf[0] == 0x16) {
+        /* This is a CASIOLINK start packet.
+         * We can answer with an 'established' packet and set the protocol
+         * to CASIOLINK. */
+        buf[0] = 0x13;
+
+        err = cahute_write_to_link(link, buf, 1);
+        if (err)
+            goto fail;
+
+        *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
+        return CAHUTE_OK;
+    }
+
+    msg(ll_error, "Unable to determine a protocol out of the following:");
+    mem(ll_error, buf, received);
+
+    err = CAHUTE_ERROR_UNKNOWN;
+fail:
+    if (err == CAHUTE_ERROR_TIMEOUT_START)
+        err = CAHUTE_ERROR_TIMEOUT;
+    return err;
+}
+
+/**
+ * Determine the protocol for a serial link as a sender or control.
+ *
+ * @param link Link to initialize.
+ * @param protocolp Pointer to the protocol to set.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_LOCAL(int)
+determine_protocol_as_sender(cahute_link *link, int *protocolp) {
+    cahute_u8 buf[6];
+    size_t received = 1;
+    int err, attempts;
+
+    for (attempts = 3; attempts; attempts--) {
+        /* Try writing a Protocol 7.00 check packet to see if we get an
+         * answer. */
+        msg(ll_info, "Sending the Protocol 7.00 check packet:");
+        mem(ll_info, seven_check_packet, 6);
+
+        err = cahute_write_to_link(link, seven_check_packet, 6);
+        if (err)
+            return err;
+
+        err = cahute_read_from_link(link, buf, 1, 100, 0);
+        if (!err)
+            break;
+        else if (err != CAHUTE_ERROR_TIMEOUT_START)
+            return err;
+
+        /* Try writing a CASIOLINK start packet to see if we get an answer. */
+        msg(ll_info, "Sending the CASIOLINK check packet:");
+        mem(ll_info, casiolink_start_packet, 1);
+        err = cahute_write_to_link(link, casiolink_start_packet, 1);
+        if (err)
+            return err;
+
+        err = cahute_read_from_link(link, buf, 1, 300, 0);
+        if (!err)
+            break;
+        else if (err != CAHUTE_ERROR_TIMEOUT_START)
+            return err;
+    }
+
+    if (!attempts) {
+        msg(ll_error, "No answer detected, protocol could not be determined.");
+        return CAHUTE_ERROR_NOT_FOUND;
+    }
+
+    if (buf[0] == 0x06) {
+        /* This is the beginning of a Protocol 7.00 ack packet.
+         * We want to read the rest of the packet to ensure that
+         * everything is correct. */
+        err = cahute_read_from_link(link, &buf[1], 5, 0, 0);
+        if (err)
+            goto fail;
+
+        received = 6;
+        if (!memcmp(buf, seven_ack_packet, 6)) {
+            /* That's a check packet! We can answer with an ACK, then
+             * set the protocol to Protocol 7.00. */
+            *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
+            return CAHUTE_OK;
+        }
+    } else if (buf[0] == 0x13) {
+        /* This is a CASIOLINK start packet.
+         * We can answer with an 'established' packet and set the protocol
+         * to CASIOLINK. */
+        *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
+        return CAHUTE_OK;
+    }
+
+    msg(ll_error,
+        "Unable to determine a protocol out of the received packet:");
+    mem(ll_error, buf, received);
+    err = CAHUTE_ERROR_UNKNOWN;
+
+fail:
+    if (err == CAHUTE_ERROR_TIMEOUT_START)
+        err = CAHUTE_ERROR_TIMEOUT;
+    return err;
 }
 
 /**
@@ -102,16 +257,31 @@ initialize_link_protocol(
     struct cahute_seven_ohp_state *seven_ohp_state;
     int err, protocol = link->protocol;
 
+    if (~flags & PROTOCOL_FLAG_NOTERM)
+        link->flags |= CAHUTE_LINK_FLAG_TERMINATE;
+    if (flags & PROTOCOL_FLAG_RECEIVER)
+        link->flags |= CAHUTE_LINK_FLAG_RECEIVER;
+
+    if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_AUTO) {
+        if (flags & PROTOCOL_FLAG_RECEIVER)
+            err = determine_protocol_as_receiver(link, &protocol);
+        else
+            err = determine_protocol_as_sender(link, &protocol);
+
+        if (err)
+            return err;
+
+        /* The protocol has been found using automatic discovery, by tweaking
+         * the check handshake! It should not be re-done. */
+        link->protocol = protocol;
+        flags |= PROTOCOL_FLAG_NOCHECK;
+    }
+
     msg(ll_info, "Using %s.", get_protocol_name(protocol));
     msg(ll_info,
         "Playing the role of %s.",
         flags & PROTOCOL_FLAG_RECEIVER ? "receiver / passive side"
                                        : "sender / active side");
-
-    if (~flags & PROTOCOL_FLAG_NOTERM)
-        link->flags |= CAHUTE_LINK_FLAG_TERMINATE;
-    if (flags & PROTOCOL_FLAG_RECEIVER)
-        link->flags |= CAHUTE_LINK_FLAG_RECEIVER;
 
     switch (protocol) {
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
@@ -134,7 +304,6 @@ initialize_link_protocol(
             if (err)
                 return err;
         }
-
         break;
 
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
@@ -155,13 +324,18 @@ initialize_link_protocol(
         seven_state->last_packet_type = -1;
         seven_state->last_packet_subtype = -1;
 
-        if (~flags & PROTOCOL_FLAG_NOCHECK
-            && (err = cahute_seven_initiate(link)))
-            return err;
+        if (~flags & PROTOCOL_FLAG_NOCHECK) {
+            err = cahute_seven_initiate(link);
+            if (err)
+                return err;
+        }
 
-        if (~flags & PROTOCOL_FLAG_NODISC
-            && (err = cahute_seven_discover(link)))
-            return err;
+        if (~flags & PROTOCOL_FLAG_RECEIVER
+            && (~flags & PROTOCOL_FLAG_NODISC)) {
+            err = cahute_seven_discover(link);
+            if (err)
+                return err;
+        }
 
         break;
 
@@ -196,7 +370,7 @@ initialize_link_protocol(
 CAHUTE_LOCAL(int) deinitialize_link_protocol(cahute_link *link) {
     if (!(link->flags
           & (CAHUTE_LINK_FLAG_IRRECOVERABLE | CAHUTE_LINK_FLAG_TERMINATED
-             | CAHUTE_LINK_FLAG_GONE))) {
+             | CAHUTE_LINK_FLAG_GONE | CAHUTE_LINK_FLAG_RECEIVER))) {
         switch (link->protocol) {
         case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
             if (link->flags & CAHUTE_LINK_FLAG_TERMINATE)
@@ -235,7 +409,8 @@ cahute_open_serial_link(
     cahute_link *link = NULL;
     unsigned long protocol_flags = 0;
     unsigned long unsupported_flags;
-    int protocol, casiolink_variant = 0, err = CAHUTE_OK;
+    int protocol, casiolink_variant = CAHUTE_CASIOLINK_VARIANT_AUTO,
+                  err = CAHUTE_OK;
 
     unsupported_flags =
         flags
@@ -266,10 +441,7 @@ cahute_open_serial_link(
         }
 
         protocol = CAHUTE_LINK_PROTOCOL_SERIAL_AUTO;
-
-        /* TODO */
-        msg(ll_error, "Automatic protocol detection is not yet implemented.");
-        return CAHUTE_ERROR_IMPL;
+        break;
 
     case CAHUTE_SERIAL_PROTOCOL_CASIOLINK:
         protocol = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
@@ -310,9 +482,7 @@ cahute_open_serial_link(
             /* By default, if not provided, make the same choice as
              * the fx-9860G in compatibility mode, use CAS50 if sender
              * or detect if receiver. */
-            if (flags & CAHUTE_SERIAL_RECEIVER)
-                casiolink_variant = CAHUTE_CASIOLINK_VARIANT_AUTO;
-            else
+            if (~flags & CAHUTE_SERIAL_RECEIVER)
                 casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS50;
 
             break;
