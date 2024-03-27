@@ -164,6 +164,11 @@ cahute_negotiate_serial_params(
         return err;
     }
 
+    /* Wait until the new serial parameters have been applied by the device. */
+    err = cahute_sleep(50);
+    if (err)
+        return err;
+
     return CAHUTE_OK;
 }
 
