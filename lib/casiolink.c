@@ -158,6 +158,8 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
         TIMEOUT_PACKET_CONTENTS,
         TIMEOUT_PACKET_CONTENTS
     );
+    if (err == CAHUTE_ERROR_TIMEOUT_START)
+        return CAHUTE_ERROR_TIMEOUT;
     if (err)
         return err;
 
@@ -200,6 +202,8 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
             if (err) {
                 msg(ll_info, "Reading failed. The header base was:");
                 mem(ll_info, buf, 40);
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
                 return err;
             }
 
@@ -362,6 +366,8 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
                     TIMEOUT_PACKET_CONTENTS,
                     TIMEOUT_PACKET_CONTENTS
                 );
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
                 if (err)
                     return err;
 
@@ -385,6 +391,8 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
                     TIMEOUT_PACKET_CONTENTS,
                     TIMEOUT_PACKET_CONTENTS
                 );
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
                 if (err)
                     return err;
 
@@ -396,6 +404,8 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
                     TIMEOUT_PACKET_CONTENTS,
                     TIMEOUT_PACKET_CONTENTS
                 );
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
                 if (err)
                     return err;
 

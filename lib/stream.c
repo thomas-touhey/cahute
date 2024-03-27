@@ -115,7 +115,8 @@ cahute_read_from_link(
     size_t bytes_read;
     unsigned long timeout = first_timeout;
     unsigned long iteration_timeout = first_timeout; /* For logging. */
-    unsigned long start_time, last_time;
+    unsigned long start_time, first_time = 0, last_time;
+    int timeout_error = CAHUTE_ERROR_TIMEOUT_START;
     int err;
 
     if (!size)
@@ -412,7 +413,7 @@ cahute_read_from_link(
                     return CAHUTE_ERROR_GONE;
 
                 case LIBUSB_ERROR_TIMEOUT:
-                    return CAHUTE_ERROR_TIMEOUT;
+                    goto time_out;
 
                 default:
                     msg(ll_error,
@@ -447,6 +448,13 @@ cahute_read_from_link(
          * the timeout to the next timeout. */
         timeout = next_timeout;
         iteration_timeout = next_timeout;
+        timeout_error = CAHUTE_ERROR_TIMEOUT;
+
+        if (!first_time) {
+            err = cahute_monotonic(&first_time);
+            if (err)
+                return err;
+        }
 
         if (bytes_read >= size) {
             if (is_link_buffer) {
@@ -466,10 +474,19 @@ cahute_read_from_link(
     }
 
     if (!cahute_monotonic(&last_time)) {
-        msg(ll_info,
-            "Read %" CAHUTE_PRIuSIZE " bytes in %lums.",
-            original_size + link->stream_size - link->stream_start,
-            last_time - start_time);
+        if (first_time > start_time + 20) {
+            msg(ll_info,
+                "Read %" CAHUTE_PRIuSIZE
+                " bytes in %lums (after waiting %lums).",
+                original_size + link->stream_size - link->stream_start,
+                last_time - first_time,
+                first_time - start_time);
+        } else {
+            msg(ll_info,
+                "Read %" CAHUTE_PRIuSIZE " bytes in %lums.",
+                original_size + link->stream_size - link->stream_start,
+                last_time - start_time);
+        }
     }
 
     return CAHUTE_OK;
@@ -481,7 +498,7 @@ time_out:
         iteration_timeout,
         original_size - size,
         original_size);
-    return CAHUTE_ERROR_TIMEOUT;
+    return timeout_error;
 }
 
 /**

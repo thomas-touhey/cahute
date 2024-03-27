@@ -40,13 +40,14 @@ CAHUTE_BEGIN_NAMESPACE
 #define CAHUTE_ERROR_INT     0x0005 /* Interrupted by a callback. */
 #define CAHUTE_ERROR_SIZE    0x0006 /* Some received data was too big. */
 
-#define CAHUTE_ERROR_NOT_FOUND 0x0101 /* Device could not be found. */
-#define CAHUTE_ERROR_TOO_MANY  0x0102 /* Too Many Devices found. */
-#define CAHUTE_ERROR_INCOMPAT  0x0103 /* Found device is incompatible. */
-#define CAHUTE_ERROR_GONE      0x0104 /* Device is gone or I/O has failed. */
-#define CAHUTE_ERROR_TIMEOUT   0x0105 /* A timeout has occurred. */
-#define CAHUTE_ERROR_CORRUPT   0x0106 /* Corrupted packet (invalid checksum) */
-#define CAHUTE_ERROR_IRRECOV   0x0107 /* Irrecoverable link */
+#define CAHUTE_ERROR_NOT_FOUND     0x0101 /* Device could not be found. */
+#define CAHUTE_ERROR_TOO_MANY      0x0102 /* Too Many Devices found. */
+#define CAHUTE_ERROR_INCOMPAT      0x0103 /* Found device is incompatible. */
+#define CAHUTE_ERROR_GONE          0x0104 /* Device is gone, I/O has failed. */
+#define CAHUTE_ERROR_TIMEOUT_START 0x0105 /* A timeout has occurred on 1st. */
+#define CAHUTE_ERROR_TIMEOUT       0x0106 /* A timeout has occurred on next. */
+#define CAHUTE_ERROR_CORRUPT       0x0107 /* Corrupted packet. */
+#define CAHUTE_ERROR_IRRECOV       0x0108 /* Irrecoverable link */
 
 #define CAHUTE_ERROR_NOOW 0x0201 /* File was not overwritten. */
 

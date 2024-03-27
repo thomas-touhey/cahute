@@ -189,6 +189,8 @@ sequence_found:
                     TIMEOUT_PACKET_CONTENTS,
                     TIMEOUT_PACKET_CONTENTS
                 );
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
                 if (err)
                     return err;
 
@@ -216,6 +218,8 @@ sequence_found:
                     TIMEOUT_PACKET_CONTENTS,
                     TIMEOUT_PACKET_CONTENTS
                 );
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
                 if (err)
                     return err;
 
@@ -258,6 +262,8 @@ sequence_found:
                     TIMEOUT_PACKET_CONTENTS,
                     TIMEOUT_PACKET_CONTENTS
                 );
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
                 if (err)
                     return err;
 
@@ -328,6 +334,8 @@ sequence_found:
                 TIMEOUT_PACKET_CONTENTS,
                 TIMEOUT_PACKET_CONTENTS
             );
+            if (err == CAHUTE_ERROR_TIMEOUT_START)
+                return CAHUTE_ERROR_TIMEOUT;
             if (err)
                 return err;
 
@@ -342,6 +350,8 @@ sequence_found:
                 TIMEOUT_PACKET_CONTENTS,
                 TIMEOUT_PACKET_CONTENTS
             );
+            if (err == CAHUTE_ERROR_TIMEOUT_START)
+                return CAHUTE_ERROR_TIMEOUT;
             if (err)
                 return err;
 
@@ -382,6 +392,8 @@ sequence_found:
                 TIMEOUT_PACKET_CONTENTS,
                 TIMEOUT_PACKET_CONTENTS
             );
+            if (err == CAHUTE_ERROR_TIMEOUT_START)
+                return CAHUTE_ERROR_TIMEOUT;
             if (err)
                 return err;
 
@@ -404,6 +416,8 @@ sequence_found:
                 TIMEOUT_PACKET_CONTENTS,
                 TIMEOUT_PACKET_CONTENTS
             );
+            if (err == CAHUTE_ERROR_TIMEOUT_START)
+                return CAHUTE_ERROR_TIMEOUT;
             if (err)
                 return err;
 
@@ -419,6 +433,8 @@ sequence_found:
             TIMEOUT_PACKET_CONTENTS,
             TIMEOUT_PACKET_CONTENTS
         );
+        if (err == CAHUTE_ERROR_TIMEOUT_START)
+            return CAHUTE_ERROR_TIMEOUT;
         if (err)
             return err;
 
@@ -436,6 +452,8 @@ sequence_found:
             TIMEOUT_PACKET_CONTENTS,
             TIMEOUT_PACKET_CONTENTS
         );
+        if (err == CAHUTE_ERROR_TIMEOUT_START)
+            return CAHUTE_ERROR_TIMEOUT;
         if (err)
             return err;
 
@@ -455,6 +473,8 @@ sequence_found:
         TIMEOUT_PACKET_CONTENTS,
         TIMEOUT_PACKET_CONTENTS
     );
+    if (err == CAHUTE_ERROR_TIMEOUT_START)
+        return CAHUTE_ERROR_TIMEOUT;
     if (err)
         return err;
 

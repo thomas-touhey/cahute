@@ -369,6 +369,8 @@ CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
             TIMEOUT_PACKET_CONTENTS,
             TIMEOUT_PACKET_CONTENTS
         );
+        if (err == CAHUTE_ERROR_TIMEOUT_START)
+            return CAHUTE_ERROR_TIMEOUT;
         if (err)
             return err;
 
@@ -415,6 +417,8 @@ CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
             TIMEOUT_PACKET_CONTENTS,
             TIMEOUT_PACKET_CONTENTS
         );
+        if (err == CAHUTE_ERROR_TIMEOUT_START)
+            return CAHUTE_ERROR_TIMEOUT;
         if (err)
             return err;
 

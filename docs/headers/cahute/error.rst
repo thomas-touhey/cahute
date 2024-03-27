@@ -68,9 +68,15 @@ Macro definitions
     Error raised if a device with which communication was previously
     established is no longer accessible.
 
+.. c:macro:: CAHUTE_ERROR_TIMEOUT_START
+
+    Error raised if a read timeout has been encountered on the start of a
+    block, e.g. at the start of a packet.
+
 .. c:macro:: CAHUTE_ERROR_TIMEOUT
 
-    Error raised if a timeout has been encountered on an I/O operation.
+    Error raised if a read timeout has been encountered within or at the
+    end of a block, e.g. within or at the end of a packet.
 
 .. c:macro:: CAHUTE_ERROR_CORRUPT
 
