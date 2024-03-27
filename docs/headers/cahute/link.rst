@@ -141,14 +141,6 @@ Type definitions
     :c:func:`cahute_open_usb_link`, :c:func:`cahute_open_simple_usb_link`
     or :c:func:`cahute_open_serial_link`.
 
-.. c:type:: int (cahute_process_frame_func)(void *cookie, \
-    cahute_frame const *frame)
-
-    Function that can be called when a frame has been received in a
-    screenstreaming mode.
-
-    See :c:func:`cahute_receive_screen` for more information.
-
 .. c:type:: int (cahute_confirm_overwrite_func)(void *cookie)
 
     Function that can be called to confirm overwrite.
@@ -171,8 +163,8 @@ Type definitions
     See :c:func:`cahute_send_file_to_storage` and
     :c:func:`cahute_request_file_from_storage` for more information.
 
-Function declarations
----------------------
+Link management related function declarations
+---------------------------------------------
 
 .. c:function:: int cahute_open_serial_link(cahute_link **linkp, \
     unsigned long flags, char const *name, unsigned long speed)
@@ -500,12 +492,6 @@ Function declarations
     :param flags: The flags to set the USB link.
     :return: The error, or 0 if the operation was successful.
 
-.. c:function:: void cahute_close_link(cahute_link *link)
-
-    Close and free a link.
-
-    :param link: The link to close.
-
 .. c:function:: int cahute_get_device_info(cahute_link *link, \
     cahute_device_info **infop)
 
@@ -520,6 +506,29 @@ Function declarations
     :param infop: The pointer to set to the information to.
     :return: The error, or 0 if the operation was successful.
 
+.. c:function:: void cahute_close_link(cahute_link *link)
+
+    Close and free a link.
+
+    :param link: The link to close.
+
+Data transfer related function declarations
+-------------------------------------------
+
+.. c:function:: int cahute_receive_screen(cahute_link *link, \
+    cahute_frame const **framep, unsigned long timeout)
+
+    Receive the next screen.
+
+    :param link: Link with which to receive the screen frame.
+    :param framep: Pointer to the frame to define.
+    :param timeout: Timeout in milliseconds in which to receive the screen.
+        If this is set to 0,
+    :return: Error, or 0 if the operation was successful.
+
+Link control related function declarations
+------------------------------------------
+
 .. c:function:: int cahute_negotiate_serial_params(cahute_link *link, \
     unsigned long flags, unsigned long speed)
 
@@ -532,20 +541,6 @@ Function declarations
     :param link: Link to which to define the new attributes.
     :param flags: New flags to set to the serial link.
     :param speed: New speed to set to the serial link.
-    :return: Error, or 0 if the operation was successful.
-
-.. c:function:: int cahute_receive_screen(cahute_link *link, \
-    cahute_process_frame_func *callback, void *cookie)
-
-    Receive screen continuously, using screenstreaming, and call the provided
-    function for every received frame.
-
-    If the provided function returns any non-zero value, the process is
-    interrupted.
-
-    :param link: Link with which to receive screen frames.
-    :param callback: Function to call for every received frame.
-    :param cookie: Cookie to provide to the function on every call.
     :return: Error, or 0 if the operation was successful.
 
 .. c:function:: int cahute_request_storage_capacity(cahute_link *link, \

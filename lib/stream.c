@@ -206,7 +206,6 @@ cahute_read_from_link(
             cahute_u8 status_buf[16];
             cahute_u8 payload[16];
             size_t avail;
-            int attempts;
 
             /* We use custom command C0 to poll status and get avail. bytes.
              * See :ref:`ums-command-c0` for more information.
@@ -214,33 +213,19 @@ cahute_read_from_link(
              * Note that it may take time for the calculator to "recharge"
              * the buffer, so we want to try several times in a row before
              * declaring there is no data available yet. */
-            for (attempts = 3; --attempts;) {
-                err = cahute_scsi_request_from_link(
-                    link,
-                    (cahute_u8 *)"\xC0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
-                    16,
-                    status_buf,
-                    16,
-                    NULL
-                );
-                if (err)
-                    return err;
+            err = cahute_scsi_request_from_link(
+                link,
+                (cahute_u8 *)"\xC0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
+                16,
+                status_buf,
+                16,
+                NULL
+            );
+            if (err)
+                return err;
 
-                avail = (status_buf[6] << 8) | status_buf[7];
-                if (!avail) {
-                    if ((err = cahute_sleep(10)))
-                        return err;
-
-                    continue;
-                }
-
-                if (avail > target_size)
-                    avail = target_size;
-
-                break;
-            }
-
-            if (!attempts) {
+            avail = (status_buf[6] << 8) | status_buf[7];
+            if (!avail) {
                 if (!timeout)
                     err = cahute_sleep(200);
                 else {
@@ -255,6 +240,9 @@ cahute_read_from_link(
 
                 continue;
             }
+
+            if (avail > target_size)
+                avail = target_size;
 
             /* We now use custom command C1 to request avail. bytes.
              * See :ref:`ums-command-c1` for more information. */

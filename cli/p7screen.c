@@ -30,6 +30,8 @@
 #include <string.h>
 #include <SDL.h>
 
+#define FRAME_TIMEOUT_MS 400 /* Timeout for a frame to be received. */
+
 /**
  * Display cookie.
  *
@@ -116,7 +118,6 @@ static void scale_up_picture(Uint32 *pixels, int width, int height, int zoom) {
 static int
 display_frame(struct display_cookie *cookie, cahute_frame const *frame) {
     int width, height, format, zoom;
-    SDL_Event event;
 
     width = frame->cahute_frame_width;
     height = frame->cahute_frame_height;
@@ -166,14 +167,9 @@ display_frame(struct display_cookie *cookie, cahute_frame const *frame) {
             return 1;
         }
 
-        /* Update and read the event queue, ignoring events for now.
-	    * This is needed for MacOS to show and update the window. */
-        SDL_PumpEvents();
-        while (SDL_PollEvent(&event) != 0) {}
-
         /* Finally, create the texture we're gonna use for drawing
-            * the picture as a classic ARGB pixel matric (8 bits per
-            * component). */
+         * the picture as a classic ARGB pixel matric (8 bits per
+         * component). */
         cookie->texture = SDL_CreateTexture(
             cookie->renderer,
             SDL_PIXELFORMAT_ARGB8888,
@@ -192,8 +188,6 @@ display_frame(struct display_cookie *cookie, cahute_frame const *frame) {
 
         cookie->saved_width = width;
         cookie->saved_height = height;
-
-        puts("Turn off your calculator (SHIFT+AC) when you have finished.\n");
     } else if (cookie->saved_width != width || cookie->saved_height != height) {
         /* The dimensions have changed somehow, we don't support this. */
         fprintf(stderr, "Unmanaged dimensions changed.\n");
@@ -247,7 +241,7 @@ int main(int ac, char **av) {
     cahute_link *link = NULL;
     struct args args;
     struct display_cookie cookie;
-    int err, ret = 0;
+    int err, ret = 1;
 
     if (!parse_args(ac, av, &args))
         return 0;
@@ -293,28 +287,41 @@ int main(int ac, char **av) {
     cookie.saved_height = -1;
     cookie.zoom = args.zoom;
 
-    err = cahute_receive_screen(
-        link,
-        (cahute_process_frame_func *)display_frame,
-        &cookie
-    );
-    if (err) {
-        ret = 1;
+    while (1) {
+        SDL_Event event;
+        cahute_frame *frame;
+
+        while (SDL_PollEvent(&event) != 0) {
+            if (event.type == SDL_QUIT) {
+                ret = 0;
+                goto end;
+            }
+        }
+
+        err = cahute_receive_screen(link, &frame, FRAME_TIMEOUT_MS);
         switch (err) {
-        case CAHUTE_ERROR_INT:
-            /* Interrupted; the error message was already displayed. */
+        case 0:
+            /* A frame was received! */
+            display_frame(&cookie, frame);
             break;
+
+        case CAHUTE_ERROR_TIMEOUT_START:
+            /* No frame was received in the given time. */
+            continue;
 
         case CAHUTE_ERROR_GONE:
         case CAHUTE_ERROR_TERMINATED:
             ret = 0;
-            break;
+            goto end;
 
         default:
             fprintf(stderr, error_unplanned);
-            break;
+            goto end;
         }
     }
+
+end:
+    cahute_close_link(link);
 
     if (cookie.texture)
         SDL_DestroyTexture(cookie.texture);
@@ -323,6 +330,5 @@ int main(int ac, char **av) {
     if (cookie.window)
         SDL_DestroyWindow(cookie.window);
 
-    cahute_close_link(link);
     return ret;
 }

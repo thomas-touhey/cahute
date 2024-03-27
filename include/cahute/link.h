@@ -73,10 +73,6 @@ struct cahute_device_info {
     char const *cahute_device_info_cpuid;
 };
 
-typedef int(cahute_process_frame_func)(
-    void *cahute__cookie,
-    cahute_frame const *cahute__frame
-);
 typedef int(cahute_confirm_overwrite_func)(void *cahute__cookie);
 
 struct cahute_storage_entry {
@@ -97,9 +93,9 @@ typedef void(cahute_progress_func)(
 );
 
 /* ---
- * Open a serial link.
+ * Link management.
  * ---
- * Protocol to open the link with. */
+ * Protocol to open a serial link with. */
 
 #define CAHUTE_SERIAL_PROTOCOL_MASK      0x0000000F
 #define CAHUTE_SERIAL_PROTOCOL_AUTO      0x00000000 /* Protocol detection. */
@@ -155,19 +151,7 @@ typedef void(cahute_progress_func)(
 #define CAHUTE_SERIAL_NODISC   0x00400000 /* Disable platform discovery. */
 #define CAHUTE_SERIAL_NOTERM   0x00800000 /* Disable the term handshake. */
 
-CAHUTE_BEGIN_DECLS
-
-CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_serial_link
-    OF((cahute_link * *cahute__linkp,
-        unsigned long cahute__flags,
-        char const *cahute__name,
-        unsigned long cahute__speed));
-
-CAHUTE_END_DECLS
-
-/* ---
- * Open a USB link.
- * --- */
+/* USB flags. */
 
 #define CAHUTE_USB_NOCHECK  0x0001 /* Disable the initial handshake. */
 #define CAHUTE_USB_NODISC   0x0002 /* Disable platform discovery. */
@@ -176,6 +160,12 @@ CAHUTE_END_DECLS
 #define CAHUTE_USB_OHP      0x0020 /* Use screen streaming mode. */
 
 CAHUTE_BEGIN_DECLS
+
+CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_serial_link
+    OF((cahute_link * *cahute__linkp,
+        unsigned long cahute__flags,
+        char const *cahute__name,
+        unsigned long cahute__speed));
 
 CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_usb_link
     OF((cahute_link * *cahute__linkp,
@@ -186,31 +176,33 @@ CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_usb_link
 CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_simple_usb_link
     OF((cahute_link * *cahute__linkp, unsigned long cahute__flags));
 
-CAHUTE_END_DECLS
-
-/* ---
- * Common link operations.
- * --- */
-
-CAHUTE_BEGIN_DECLS
-
-CAHUTE_EXTERN(void) cahute_close_link OF((cahute_link * cahute__link));
-
 CAHUTE_EXTERN(int)
 cahute_get_device_info
     OF((cahute_link * cahute__link, cahute_device_info **cahute__infop));
+
+CAHUTE_EXTERN(void) cahute_close_link OF((cahute_link * cahute__link));
+
+CAHUTE_END_DECLS
+
+/* ---
+ * Data transfer operations.
+ * --- */
+
+CAHUTE_EXTERN(int)
+cahute_receive_screen
+    OF((cahute_link * cahute__link,
+        cahute_frame **cahute__framep,
+        unsigned long cahute__timeout));
+
+/* ---
+ * Control operations.
+ * --- */
 
 CAHUTE_EXTERN(int)
 cahute_negotiate_serial_params
     OF((cahute_link * cahute__link,
         unsigned long cahute__flags,
         unsigned long cahute__speed));
-
-CAHUTE_EXTERN(int)
-cahute_receive_screen
-    OF((cahute_link * cahute__link,
-        cahute_process_frame_func *cahute__callback,
-        void *cahute__cookie));
 
 CAHUTE_EXTERN(int)
 cahute_request_storage_capacity

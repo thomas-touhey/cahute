@@ -385,6 +385,10 @@ struct cahute_link {
     cahute_u8 *protocol_buffer;
     size_t protocol_buffer_size, protocol_buffer_capacity;
 
+    /* Stored frame, so that screen reception does not use dynamic
+     * memory allocation for every frame. */
+    cahute_frame stored_frame;
+
     /* Read buffer. See ``cahute_read`` definition for more information. */
     size_t stream_start, stream_size;
     cahute_u8 stream_buffer[CAHUTE_LINK_STREAM_BUFFER_SIZE];
@@ -457,10 +461,10 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link);
 CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link);
 
 CAHUTE_EXTERN(int)
-cahute_casiolink_get_screen(
+cahute_casiolink_receive_screen(
     cahute_link *link,
-    cahute_process_frame_func *callback,
-    void *cookie
+    cahute_frame *frame,
+    unsigned long timeout
 );
 
 /* ---
@@ -581,10 +585,10 @@ cahute_seven_flash_system_using_fxremote_method(
  * --- */
 
 CAHUTE_EXTERN(int)
-cahute_seven_ohp_get_screen(
+cahute_seven_ohp_receive_screen(
     cahute_link *link,
-    cahute_process_frame_func *callback,
-    void *cookie
+    cahute_frame *frame,
+    unsigned long timeout
 );
 
 #endif /* INTERNALS_H */

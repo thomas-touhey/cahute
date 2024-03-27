@@ -52,6 +52,50 @@ CAHUTE_LOCAL(int) cahute_check_link(cahute_link *link, unsigned long flags) {
     return CAHUTE_OK;
 }
 
+/* ---
+ * Data transfer operations.
+ * --- */
+
+/**
+ * Get a screen through screenstreaming or else.
+ *
+ * @param link Link to the device.
+ * @param framep Pointer to the frame to define.
+ * @param timeout Timeout.
+ * @return Cahute error.
+ */
+CAHUTE_EXTERN(int)
+cahute_receive_screen(
+    cahute_link *link,
+    cahute_frame **framep,
+    unsigned long timeout
+) {
+    cahute_frame *frame = &link->stored_frame;
+    int err;
+
+    err = cahute_check_link(link, CHECK_RECEIVER);
+    if (err)
+        return err;
+
+    *framep = frame;
+
+    switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+        return cahute_casiolink_receive_screen(link, frame, timeout);
+
+    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
+    case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
+    case CAHUTE_LINK_PROTOCOL_UMS_OHP:
+        return cahute_seven_ohp_receive_screen(link, frame, timeout);
+    }
+
+    return CAHUTE_ERROR_IMPL;
+}
+
+/* ---
+ * Control operations.
+ * --- */
+
 /**
  * Update the serial parameters for the current link.
  *
@@ -216,38 +260,6 @@ cahute_get_device_info(cahute_link *link, cahute_device_info **infop) {
 
     *infop = link->cached_device_info;
     return CAHUTE_OK;
-}
-
-/**
- * Subscribe to screen update events through screenstreaming or equiv.
- *
- * @param link Link for which to get the information.
- * @param callback Callback to set.
- * @param cookie Cookie to send the callback on every call.
- * @return Cahute error.
- */
-CAHUTE_EXTERN(int)
-cahute_receive_screen(
-    cahute_link *link,
-    cahute_process_frame_func *callback,
-    void *cookie
-) {
-    int err;
-
-    err = cahute_check_link(link, CHECK_RECEIVER);
-    if (err)
-        return err;
-
-    switch (link->protocol) {
-    case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
-        return cahute_casiolink_get_screen(link, callback, cookie);
-
-    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
-    case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
-        return cahute_seven_ohp_get_screen(link, callback, cookie);
-    }
-
-    return CAHUTE_ERROR_IMPL;
 }
 
 /**

@@ -32,7 +32,6 @@
 /* TIMEOUT_PACKET_TYPE is the timeout before reading the packet type, i.e.
  * the first byte, while TIMEOUT_PACKET_CONTENTS is the timeout before
  * reading any of the following bytes. */
-#define TIMEOUT_PACKET_TYPE     0
 #define TIMEOUT_PACKET_CONTENTS 1000
 
 #define PACKET_TYPE_ACK          0x06
@@ -99,9 +98,11 @@ CAHUTE_INLINE(int) cahute_casiolink_is_end(cahute_link *link) {
  * in protocol initialization in link.c.
  *
  * @param link Link on which to receive the CASIOLINK packet.
+ * @param timeout Timeout before the first packet.
  * @return Cahute error, or 0 if ok.
  */
-CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
+CAHUTE_LOCAL(int)
+cahute_casiolink_receive_data(cahute_link *link, unsigned long timeout) {
     cahute_u8 *buf = link->protocol_buffer;
     size_t buf_capacity = link->protocol_buffer_capacity;
     size_t buf_size, part_count = 1, part_repeat = 1;
@@ -116,7 +117,7 @@ CAHUTE_LOCAL(int) cahute_casiolink_receive_data(cahute_link *link) {
             link,
             buf,
             1,
-            TIMEOUT_PACKET_TYPE,
+            timeout,
             TIMEOUT_PACKET_CONTENTS
         );
         if (err)
@@ -567,7 +568,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 
     if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
         /* Expect an initiation flow. */
-        err = cahute_read_from_link(link, buf, 1, TIMEOUT_PACKET_TYPE, 0);
+        err = cahute_read_from_link(link, buf, 1, 0, 0);
         if (err)
             return err;
 
@@ -591,7 +592,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
         if (err)
             return err;
 
-        err = cahute_read_from_link(link, buf, 1, TIMEOUT_PACKET_TYPE, 0);
+        err = cahute_read_from_link(link, buf, 1, 0, 0);
         if (err)
             return err;
 
@@ -669,25 +670,25 @@ CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
 }
 
 /**
- * Call a function for every frame received through screenstreaming.
+ * Receive a frame through screen capture.
  *
  * @param link Link for which to receive screens.
- * @param callback Function to call back.
- * @param cookie Cookie with which to call back the function.
+ * @param frame Function to call back.
+ * @param timeout Timeout to apply.
+ * @return Cahute error.
  */
 CAHUTE_EXTERN(int)
-cahute_casiolink_get_screen(
+cahute_casiolink_receive_screen(
     cahute_link *link,
-    cahute_process_frame_func *callback,
-    void *cookie
+    cahute_frame *frame,
+    unsigned long timeout
 ) {
-    cahute_frame frame;
     cahute_u8 *buf = link->protocol_buffer;
     size_t sheet_size;
     int err;
 
     do {
-        err = cahute_casiolink_receive_data(link);
+        err = cahute_casiolink_receive_data(link, timeout);
         if (err == CAHUTE_ERROR_TIMEOUT_START) {
             msg(ll_error, "No data received in a timely matter, exiting.");
             break;
@@ -700,14 +701,14 @@ cahute_casiolink_get_screen(
         case CAHUTE_CASIOLINK_VARIANT_CAS40:
             if (!memcmp(&buf[1], "DD", 2)) {
                 if (!memcmp(&buf[5], "\x10\x44WF", 4))
-                    frame.cahute_frame_format =
+                    frame->cahute_frame_format =
                         CAHUTE_PICTURE_FORMAT_1BIT_MONO_CAS50;
                 else
                     continue;
 
-                frame.cahute_frame_height = buf[3];
-                frame.cahute_frame_width = buf[4];
-                frame.cahute_frame_data = &buf[40];
+                frame->cahute_frame_height = buf[3];
+                frame->cahute_frame_width = buf[4];
+                frame->cahute_frame_data = &buf[40];
             } else if (!memcmp(&buf[1], "DC", 2)) {
                 if (!memcmp(&buf[5], "\x11UWF\x03", 5)) {
                     sheet_size = buf[3] * ((buf[4] >> 3) + !!(buf[4] & 7));
@@ -735,14 +736,14 @@ cahute_casiolink_get_screen(
                         continue;
                     }
 
-                    frame.cahute_frame_format =
+                    frame->cahute_frame_format =
                         CAHUTE_PICTURE_FORMAT_1BIT_TRIPLE_CAS50;
                 } else
                     continue;
 
-                frame.cahute_frame_height = buf[3];
-                frame.cahute_frame_width = buf[4];
-                frame.cahute_frame_data = &buf[40];
+                frame->cahute_frame_height = buf[3];
+                frame->cahute_frame_width = buf[4];
+                frame->cahute_frame_data = &buf[40];
             } else
                 continue;
 
@@ -752,9 +753,13 @@ cahute_casiolink_get_screen(
             continue;
         }
 
-        if ((*callback)(cookie, &frame))
-            return CAHUTE_ERROR_INT;
+        /* Frame is ready! */
+        break;
     } while (1);
+
+    /* We actually unset the fact that the link is terminated here, since
+     * every screen is actually its own exchange. */
+    link->flags &= ~CAHUTE_LINK_FLAG_TERMINATED;
 
     return CAHUTE_OK;
 }

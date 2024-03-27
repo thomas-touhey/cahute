@@ -27,7 +27,6 @@
  * ************************************************************************* */
 
 #include "internals.h"
-#define TIMEOUT_PACKET_START    0    /* Timeout for the packet start. */
 #define TIMEOUT_PACKET_CONTENTS 2000 /* Timeout for the rest of the packet. */
 
 #define IS_ASCII_HEX_DIGIT(C) \
@@ -92,10 +91,11 @@ cahute_seven_set_ascii_hex(cahute_u8 *buf, unsigned int number) {
  * @param link Link to use to receive the Protocol 7.00 packet.
  * @param align Whether we should align ourselves. to the beginning of the next
  *        packet, to avoid missing bytes from corrupting the whole connection.
+ * @param timeout Timeout before the first byte.
  * @return Cahute error.
  */
 CAHUTE_LOCAL(int)
-cahute_seven_ohp_receive(cahute_link *link, int align) {
+cahute_seven_ohp_receive(cahute_link *link, int align, unsigned long timeout) {
     struct cahute_seven_ohp_state *state = &link->protocol_state.seven_ohp;
     cahute_u8 buf[50], *state_data = link->protocol_buffer;
     size_t packet_size;
@@ -121,7 +121,7 @@ cahute_seven_ohp_receive(cahute_link *link, int align) {
                 link,
                 &buf[6 - to_complete],
                 to_complete,
-                TIMEOUT_PACKET_START,
+                timeout,
                 TIMEOUT_PACKET_CONTENTS
             );
             if (err)
@@ -536,24 +536,24 @@ cahute_seven_ohp_send_basic(
 }
 
 /**
- * Call a function for every frame received through screenstreaming.
+ * Receive a frame through screenstreaming.
  *
  * @param link Link for which to receive screens.
- * @param callback Function to call back.
- * @param cookie Cookie with which to call back the function.
+ * @param frame Function to call back.
+ * @param timeout Timeout to apply.
+ * @return Cahute error.
  */
 CAHUTE_EXTERN(int)
-cahute_seven_ohp_get_screen(
+cahute_seven_ohp_receive_screen(
     cahute_link *link,
-    cahute_process_frame_func *callback,
-    void *cookie
+    cahute_frame *frame,
+    unsigned long timeout
 ) {
     struct cahute_seven_ohp_state *state = &link->protocol_state.seven_ohp;
-    cahute_frame frame;
     int err;
 
     while (1) {
-        err = cahute_seven_ohp_receive(link, 1);
+        err = cahute_seven_ohp_receive(link, 1, timeout);
         switch (err) {
         case CAHUTE_OK:
             /* Continue. */
@@ -571,14 +571,12 @@ cahute_seven_ohp_get_screen(
 
         switch (state->last_packet_type) {
         case PACKET_TYPE_FRAME:
-            frame.cahute_frame_width = state->picture_width;
-            frame.cahute_frame_height = state->picture_height;
-            frame.cahute_frame_format = state->picture_format;
-            frame.cahute_frame_data = link->protocol_buffer;
+            frame->cahute_frame_width = state->picture_width;
+            frame->cahute_frame_height = state->picture_height;
+            frame->cahute_frame_format = state->picture_format;
+            frame->cahute_frame_data = link->protocol_buffer;
 
-            if (callback(cookie, &frame))
-                return CAHUTE_ERROR_INT;
-            break;
+            return CAHUTE_OK;
 
         case PACKET_TYPE_CHECK:
             err = cahute_seven_ohp_send_basic(
