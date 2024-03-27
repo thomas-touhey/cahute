@@ -169,10 +169,11 @@ CAHUTE_END_DECLS
  * Open a USB link.
  * --- */
 
-#define CAHUTE_USB_NOCHECK 0x0001 /* Disable the initial handshake. */
-#define CAHUTE_USB_NODISC  0x0002 /* Disable platform discovery. */
-#define CAHUTE_USB_NOTERM  0x0004 /* Disable the terminating handshake. */
-#define CAHUTE_USB_OHP     0x0008 /* Use screen streaming mode. */
+#define CAHUTE_USB_NOCHECK  0x0001 /* Disable the initial handshake. */
+#define CAHUTE_USB_NODISC   0x0002 /* Disable platform discovery. */
+#define CAHUTE_USB_NOTERM   0x0004 /* Disable the terminating handshake. */
+#define CAHUTE_USB_RECEIVER 0x0010 /* Act as the receiver. */
+#define CAHUTE_USB_OHP      0x0020 /* Use screen streaming mode. */
 
 CAHUTE_BEGIN_DECLS
 

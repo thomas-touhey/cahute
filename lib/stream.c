@@ -201,7 +201,8 @@ cahute_read_from_link(
          * ``target_size`` (while the caller only requires ``size``).
          * It must set ``bytes_read`` to the actual number of bytes read
          * this pass. */
-        if (link->flags & CAHUTE_LINK_FLAG_SCSI) {
+        if (link->protocol == CAHUTE_LINK_PROTOCOL_UMS
+            || link->protocol == CAHUTE_LINK_PROTOCOL_UMS_OHP) {
             cahute_u8 status_buf[16];
             cahute_u8 payload[16];
             size_t avail;
@@ -331,6 +332,7 @@ cahute_read_from_link(
 
                     case ENODEV:
                     case EIO:
+                        link->flags |= CAHUTE_LINK_FLAG_GONE;
                         return CAHUTE_ERROR_GONE;
 
                     default:
@@ -410,6 +412,7 @@ cahute_read_from_link(
                 case LIBUSB_ERROR_NO_DEVICE:
                 case LIBUSB_ERROR_IO:
                     msg(ll_error, "USB device is no longer available.");
+                    link->flags |= CAHUTE_LINK_FLAG_GONE;
                     return CAHUTE_ERROR_GONE;
 
                 case LIBUSB_ERROR_TIMEOUT:
@@ -526,7 +529,8 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
          *
          * This way, if only a partial write was achieved, the
          * implementation-specific write function can be called again. */
-        if (link->flags & CAHUTE_LINK_FLAG_SCSI) {
+        if (link->protocol == CAHUTE_LINK_PROTOCOL_UMS
+            || link->protocol == CAHUTE_LINK_PROTOCOL_UMS_OHP) {
             size_t to_send = size > 0xFFFF ? 0xFFFF : size;
             cahute_u8 payload[16], status_buf[16];
             int err;
@@ -576,6 +580,7 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
                 if (ret < 0)
                     switch (errno) {
                     case ENODEV:
+                        link->flags |= CAHUTE_LINK_FLAG_GONE;
                         return CAHUTE_ERROR_GONE;
 
                     default:
@@ -636,6 +641,7 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
                 case LIBUSB_ERROR_NO_DEVICE:
                 case LIBUSB_ERROR_IO:
                     msg(ll_error, "USB device is no longer available.");
+                    link->flags |= CAHUTE_LINK_FLAG_GONE;
                     return CAHUTE_ERROR_GONE;
 
                 default:
@@ -685,7 +691,14 @@ cahute_set_serial_params_to_link(
     unsigned long flags,
     unsigned long speed
 ) {
-    if (~link->flags & CAHUTE_LINK_FLAG_SERIAL) {
+    switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_AUTO:
+    case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
+    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
+        break;
+
+    default:
         msg(ll_error, "Cannot set serial parameters on a non-serial link.");
         return CAHUTE_ERROR_UNKNOWN;
     }
@@ -1028,6 +1041,7 @@ cahute_scsi_request(
         case LIBUSB_ERROR_NO_DEVICE:
         case LIBUSB_ERROR_IO:
             msg(ll_error, "USB device is no longer available.");
+            link->flags |= CAHUTE_LINK_FLAG_GONE;
             return CAHUTE_ERROR_GONE;
 
         default:
@@ -1061,6 +1075,7 @@ cahute_scsi_request(
             case LIBUSB_ERROR_NO_DEVICE:
             case LIBUSB_ERROR_IO:
                 msg(ll_error, "USB device is no longer available.");
+                link->flags |= CAHUTE_LINK_FLAG_GONE;
                 return CAHUTE_ERROR_GONE;
 
             default:
@@ -1090,6 +1105,7 @@ cahute_scsi_request(
                 case LIBUSB_ERROR_NO_DEVICE:
                 case LIBUSB_ERROR_IO:
                     msg(ll_error, "USB device is no longer available.");
+                    link->flags |= CAHUTE_LINK_FLAG_GONE;
                     return CAHUTE_ERROR_GONE;
 
                 default:
@@ -1131,6 +1147,7 @@ cahute_scsi_request(
                 case LIBUSB_ERROR_NO_DEVICE:
                 case LIBUSB_ERROR_IO:
                     msg(ll_error, "USB device is no longer available.");
+                    link->flags |= CAHUTE_LINK_FLAG_GONE;
                     return CAHUTE_ERROR_GONE;
 
                 default:

@@ -63,6 +63,11 @@ Macro definitions
     Error raised if a device was not suitable to be opened to be used by
     a link.
 
+.. c:macro:: CAHUTE_ERROR_TERMINATED
+
+    Error raised if a device is still present, but has terminated the
+    communication.
+
 .. c:macro:: CAHUTE_ERROR_GONE
 
     Error raised if a device with which communication was previously

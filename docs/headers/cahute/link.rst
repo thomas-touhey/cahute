@@ -402,20 +402,26 @@ Function declarations
 
     .. c:macro:: CAHUTE_USB_NOCHECK
 
-        If this flag is provided, the initial handshake will not be
-        done when the link is established on the underlying medium.
+        If this flag is provided:
+
+        * If :c:macro:`CAHUTE_USB_RECEIVER` is provided, the initial
+          handshake is no longer required from the sender or active side,
+          albeit still accepted.
+        * Otherwise, the initial handshake will not be done when the link
+          is established on the underlying medium.
 
         This flag is mostly useful when resuming a connection initiated by
         another process, or when the passive process does not require or
         implement the initial handshake.
 
-        It is only effective when using protocol 7.00.
+        It is only effective when using Protocol 7.00.
         See :ref:`protocol-seven` for more information.
 
     .. c:macro:: CAHUTE_USB_NODISC
 
-        If this flag is provided, command :ref:`seven-command-01` is
-        not issued once the link is established to get the device information.
+        If this flag is provided, and :c:macro:`CAHUTE_USB_RECEIVER` is
+        **not** provided, command :ref:`seven-command-01` is not issued once
+        the link is established to get the device information.
 
         This flag is mostly useful when dealing with bootcode or custom
         link implementations that may not have implemented this command.
@@ -428,8 +434,9 @@ Function declarations
 
     .. c:macro:: CAHUTE_USB_NOTERM
 
-        If this flag is provided, the terminate flow is not run when
-        the link is closed.
+        If this flag is provided, and :c:macro:`CAHUTE_USB_RECEIVER` is
+        **not** provided, the terminate flow is not run when the link
+        is closed.
 
         This flag is mostly useful to let the connection still opened for
         other processes to run commands. Combined with
@@ -438,6 +445,14 @@ Function declarations
 
         It is only effective when using protocol 7.00.
         See :ref:`protocol-seven` for more information.
+
+    .. c:macro:: CAHUTE_USB_RECEIVER
+
+        If this flag is provided, we will act as a receiver / passive side
+        rather than a sender.
+
+        This is mostly useful if the "Transmit" option is selected on the
+        calculator's LINK application, instead of the "Receive" option.
 
     .. c:macro:: CAHUTE_USB_OHP
 

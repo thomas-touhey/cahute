@@ -70,6 +70,7 @@ add_library(${PROJECT_NAME} STATIC
     lib/cdefs.c
     lib/detection.c
     lib/link.c
+    lib/linkopen.c
     lib/logging.c
     lib/misc.c
     lib/picture.c

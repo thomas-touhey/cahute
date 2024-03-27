@@ -321,6 +321,7 @@ cahute_detect_usb(
     }
 
     libusb_free_device_list(device_list, 1);
+    libusb_exit(context);
     return err;
 #else
     msg(ll_fatal, "No USB detection method enabled.");

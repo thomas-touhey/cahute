@@ -483,6 +483,7 @@ fail:
         break;
 
     case CAHUTE_ERROR_GONE:
+    case CAHUTE_ERROR_TERMINATED:
         fprintf(stderr, error_disconnected);
         break;
 

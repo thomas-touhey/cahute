@@ -252,7 +252,11 @@ int main(int ac, char **av) {
     if (!parse_args(ac, av, &args))
         return 0;
 
-    if ((err = cahute_open_simple_usb_link(&link, CAHUTE_USB_OHP))) {
+    err = cahute_open_simple_usb_link(
+        &link,
+        CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP
+    );
+    if (err) {
         switch (err) {
         case CAHUTE_ERROR_NOT_FOUND:
             fprintf(stderr, error_notfound);
@@ -302,6 +306,7 @@ int main(int ac, char **av) {
             break;
 
         case CAHUTE_ERROR_GONE:
+        case CAHUTE_ERROR_TERMINATED:
             ret = 0;
             break;
 

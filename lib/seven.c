@@ -970,7 +970,8 @@ cahute_seven_send_data(
     cahute_seven_set_ascii_hex(buf, (packet_count >> 8) & 255);
     cahute_seven_set_ascii_hex(&buf[2], packet_count & 255);
 
-    if (packet_count >= 3 && (~link->flags & CAHUTE_LINK_FLAG_SERIAL)
+    if (packet_count >= 3
+        && link->protocol != CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN
         && (~flags & SEND_DATA_FLAG_DISABLE_SHIFTING)) {
         /* We are about to start packet shifting.
          * For more information, please consult the following:
@@ -1161,7 +1162,8 @@ cahute_seven_send_data_from_buf(
     cahute_seven_set_ascii_hex(buf, (packet_count >> 8) & 255);
     cahute_seven_set_ascii_hex(&buf[2], packet_count & 255);
 
-    if (packet_count >= 3 && (~link->flags & CAHUTE_LINK_FLAG_SERIAL)
+    if (packet_count >= 3
+        && link->protocol != CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN
         && (~flags & SEND_DATA_FLAG_DISABLE_SHIFTING)) {
         /* We are about to start packet shifting.
          * For more information, please consult the following:
@@ -1539,7 +1541,8 @@ cahute_seven_receive_data_into_buf(
     }
 
     /* If the conditions are met, start packet shifting! */
-    if (packet_count >= 3 && (~link->flags & CAHUTE_LINK_FLAG_SERIAL)
+    if (packet_count >= 3
+        && link->protocol != CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN
         && (~flags & RECEIVE_DATA_FLAG_DISABLE_SHIFTING)) {
         /* We are about to start packet shifting.
          * For more information, please consult the following:

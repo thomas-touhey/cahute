@@ -147,11 +147,9 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_LINK_FLAG_TERMINATE      0x00000004 /* Should terminate. */
 #define CAHUTE_LINK_FLAG_RECEIVER       0x00000008 /* Act as a receiver. */
 
-#define CAHUTE_LINK_FLAG_SCSI   0x00000010 /* Using SCSI. */
-#define CAHUTE_LINK_FLAG_SERIAL 0x00000020 /* Using serial. */
-
-#define CAHUTE_LINK_FLAG_TERMINATED    0x00000100 /* Was terminated! */
-#define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000200 /* Cannot recover. */
+#define CAHUTE_LINK_FLAG_GONE          0x00000100 /* Underlying medium gone. */
+#define CAHUTE_LINK_FLAG_TERMINATED    0x00000200 /* Was terminated! */
+#define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000400 /* Cannot recover. */
 
 /* Stream types allowed. */
 #if UNIX_ENABLED
@@ -165,10 +163,14 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #endif
 
 /* Protocol selection for 'initialize_link_protocol()'. */
-#define CAHUTE_LINK_PROTOCOL_AUTO      0
-#define CAHUTE_LINK_PROTOCOL_CASIOLINK 1
-#define CAHUTE_LINK_PROTOCOL_SEVEN     2
-#define CAHUTE_LINK_PROTOCOL_SEVEN_OHP 3
+#define CAHUTE_LINK_PROTOCOL_SERIAL_AUTO      0
+#define CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK 1
+#define CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN     2
+#define CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP 3
+#define CAHUTE_LINK_PROTOCOL_USB_SEVEN        4
+#define CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP    5
+#define CAHUTE_LINK_PROTOCOL_UMS              6
+#define CAHUTE_LINK_PROTOCOL_UMS_OHP          7
 
 /* CASIOLINK variant selection for the same function. */
 #define CAHUTE_CASIOLINK_VARIANT_AUTO   0
