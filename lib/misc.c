@@ -41,7 +41,8 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
     return CAHUTE_OK;
 }
 
-#elif defined(__unix__) || defined(__unix)
+#elif defined(__unix__) || defined(__unix) \
+    || (defined(__APPLE__) && defined(__MACH__))
 # include <unistd.h>
 # include <time.h>
 
