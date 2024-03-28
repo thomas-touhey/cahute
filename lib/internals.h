@@ -44,7 +44,8 @@
 
 #if WINDOWS_ENABLED
 # define UNIX_ENABLED 0
-#elif defined(__unix__) && __unix__
+#elif defined(__unix__) && __unix__ \
+    || (defined(__APPLE__) || defined(__MACH__))
 # define UNIX_ENABLED 1
 #else
 # define UNIX_ENABLED 0
