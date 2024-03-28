@@ -67,12 +67,11 @@ cahute_convert_picture(
     cahute_u8 const *src3;
     int x, y, mask;
 
-    if (dest_format != CAHUTE_PICTURE_FORMAT_32BIT_ARGB_HOST) {
-        msg(ll_error,
+    if (dest_format != CAHUTE_PICTURE_FORMAT_32BIT_ARGB_HOST)
+        CAHUTE_RETURN_IMPL(
             "This function does not support converting to anything other "
-            "than 32-bit ARGB in host endianness for now.");
-        return CAHUTE_ERROR_IMPL;
-    }
+            "than 32-bit ARGB in host endianness for now."
+        );
 
     dest = (cahute_u32 *)dest_uncasted;
     src = (cahute_u8 *)src_uncasted;
@@ -235,9 +234,8 @@ cahute_convert_picture(
         break;
 
     default:
-        msg(ll_error, "Unhandled picture format for conversion: %d", src_format
-        );
-        return CAHUTE_ERROR_IMPL;
+        msg(ll_info, "Picture format identifier was: %d", src_format);
+        CAHUTE_RETURN_IMPL("Unhandled picture format for conversion.");
     }
 
     return CAHUTE_OK;

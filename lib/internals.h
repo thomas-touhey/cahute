@@ -101,6 +101,16 @@ cahute_log_memory(
 #define msg cahute_log_message
 #define mem cahute_log_memory
 
+/* Macro to print a message and return CAHUTE_ERROR_IMPL.
+ * This is necessary to avoid having to track down exactly what was not
+ * implemented in the chain using the message.
+ * Usage of this macro is enforced with pre-commit. */
+#define CAHUTE_RETURN_IMPL(MESSAGE) \
+    { \
+        msg(ll_error, MESSAGE); \
+        return CAHUTE_ERROR_IMPL /* Comment to prevent match by hook. */; \
+    }
+
 #if WINDOWS_ENABLED
 /**
  * Log a Windows API error.

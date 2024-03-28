@@ -242,7 +242,7 @@ end:
     return err;
 #endif
 
-    return CAHUTE_ERROR_IMPL;
+    CAHUTE_RETURN_IMPL("No serial device detection method available.");
 }
 
 /**
@@ -324,7 +324,6 @@ cahute_detect_usb(
     libusb_exit(context);
     return err;
 #else
-    msg(ll_fatal, "No USB detection method enabled.");
-    return CAHUTE_ERROR_IMPL;
+    CAHUTE_RETURN_IMPL("No USB device detection method available.");
 #endif
 }

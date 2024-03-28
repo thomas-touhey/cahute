@@ -354,16 +354,15 @@ cahute_casiolink_receive_data(cahute_link *link, unsigned long timeout) {
          * a found type. */
         cahute_u8 send_buf[1] = {PACKET_TYPE_INVALID_DATA};
 
-        msg(ll_error,
-            "Could not determine the data length out of the header.");
-
         /* The type has not been recognized, therefore we cannot determine
          * the size of the data to read (or the number of data parts). */
         err = cahute_write_to_link(link, send_buf, 1);
         if (err)
             return err;
 
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL(
+            "Could not determine the data length out of the header."
+        );
     }
 
     if (part_count) {
@@ -530,7 +529,9 @@ cahute_casiolink_receive_data(cahute_link *link, unsigned long timeout) {
 
         default:
             /* TODO */
-            return CAHUTE_ERROR_IMPL;
+            CAHUTE_RETURN_IMPL(
+                "CASIOLINK data exchange was not implemented for CAS50."
+            );
         }
     }
 

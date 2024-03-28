@@ -89,7 +89,7 @@ cahute_receive_screen(
         return cahute_seven_ohp_receive_screen(link, frame, timeout);
     }
 
-    return CAHUTE_ERROR_IMPL;
+    CAHUTE_RETURN_IMPL("No screen receiving method available.");
 }
 
 /* ---
@@ -131,8 +131,8 @@ cahute_negotiate_serial_params(
         break;
 
     default:
-        msg(ll_error, "Unsupported baud rate %lu for serial link.", speed);
-        return CAHUTE_ERROR_IMPL;
+        msg(ll_info, "Provided speed is %lu bauds.", speed);
+        CAHUTE_RETURN_IMPL("Unsupported baud rate for the serial link.");
     }
 
     /* We want to check if there are unsupported flags, that is:
@@ -157,12 +157,8 @@ cahute_negotiate_serial_params(
         flags |= link->serial_flags & CAHUTE_SERIAL_PARITY_MASK;
     } /* No possible invalid value, 3+1 value in 2 bits. */
 
-    if (unsupported_flags) {
-        msg(ll_error,
-            "Unsupported serial parameters %lu for serial param negotiation.",
-            unsupported_flags);
-        return CAHUTE_ERROR_IMPL;
-    }
+    if (unsupported_flags)
+        CAHUTE_RETURN_IMPL("At least one unsupported flag was present.");
 
     err = cahute_check_link(link, CHECK_SENDER);
     if (err)
@@ -188,7 +184,7 @@ cahute_negotiate_serial_params(
         break;
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 
     link->serial_flags = new_serial_flags;
@@ -254,7 +250,8 @@ cahute_get_device_info(cahute_link *link, cahute_device_info **infop) {
         default:
             /* With other protocols, we don't have a way to get device
              * information as of today. */
-            return CAHUTE_ERROR_IMPL;
+            CAHUTE_RETURN_IMPL("Operation not supported by the link protocol."
+            );
         }
     }
 
@@ -288,7 +285,7 @@ cahute_request_storage_capacity(
         return cahute_seven_request_storage_capacity(link, storage, capacityp);
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -367,7 +364,7 @@ cahute_send_file_to_storage(
         );
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -413,7 +410,7 @@ cahute_request_file_from_storage(
         );
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -456,7 +453,7 @@ cahute_copy_file_on_storage(
         );
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -493,7 +490,7 @@ cahute_delete_file_from_storage(
         );
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -530,7 +527,7 @@ cahute_list_storage_entries(
         );
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -555,7 +552,7 @@ cahute_reset_storage(cahute_link *link, char const *storage) {
         return cahute_seven_reset_storage(link, storage);
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -580,7 +577,7 @@ cahute_optimize_storage(cahute_link *link, char const *storage) {
         return cahute_seven_optimize_storage(link, storage);
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -620,7 +617,7 @@ cahute_backup_rom(
         );
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -666,7 +663,7 @@ cahute_upload_and_run_program(
         );
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }
 
@@ -702,6 +699,6 @@ cahute_flash_system_using_fxremote_method(
         );
 
     default:
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 }

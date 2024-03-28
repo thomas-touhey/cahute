@@ -354,8 +354,7 @@ initialize_link_protocol(
         break;
 
     default:
-        msg(ll_error, "Protocol did not have an initialization routine!.");
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("No initialization routine for the protocol.");
     }
 
     return CAHUTE_OK;
@@ -421,12 +420,8 @@ cahute_open_serial_link(
             | CAHUTE_SERIAL_NOCHECK | CAHUTE_SERIAL_NODISC
             | CAHUTE_SERIAL_NOTERM);
 
-    if (unsupported_flags) {
-        msg(ll_error,
-            "Unsupported flags %lu for serial link.",
-            unsupported_flags);
-        return CAHUTE_ERROR_IMPL;
-    }
+    if (unsupported_flags)
+        CAHUTE_RETURN_IMPL("At least one unsupported flag was present.");
 
     switch (flags & CAHUTE_SERIAL_PROTOCOL_MASK) {
     case CAHUTE_SERIAL_PROTOCOL_AUTO:
@@ -435,9 +430,8 @@ cahute_open_serial_link(
          * therefore this cannot be used with ``CAHUTE_SERIAL_NOCHECK``. */
         if ((~flags & CAHUTE_SERIAL_RECEIVER)
             && (flags & CAHUTE_SERIAL_NOCHECK)) {
-            msg(ll_error,
-                "We need the check flow to try and determine the protocol.");
-            return CAHUTE_ERROR_IMPL;
+            msg(ll_error, "We need the check flow to determine the protocol.");
+            return CAHUTE_ERROR_UNKNOWN;
         }
 
         protocol = CAHUTE_LINK_PROTOCOL_SERIAL_AUTO;
@@ -448,31 +442,27 @@ cahute_open_serial_link(
         break;
 
     case CAHUTE_SERIAL_PROTOCOL_SEVEN:
-        if (flags & CAHUTE_SERIAL_RECEIVER) {
-            /* TODO */
-            msg(ll_error,
-                "Protocol 7.00 passive side is not supported for now.");
-            return CAHUTE_ERROR_IMPL;
-        }
+        /* TODO */
+        if (flags & CAHUTE_SERIAL_RECEIVER)
+            CAHUTE_RETURN_IMPL(
+                "Protocol 7.00 passive side is not supported for now."
+            );
 
         protocol = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
         break;
 
     case CAHUTE_SERIAL_PROTOCOL_SEVEN_OHP:
-        if (~flags & CAHUTE_SERIAL_RECEIVER) {
-            /* TODO */
-            msg(ll_error, "Only receiver is supported for screenstreaming.");
-            return CAHUTE_ERROR_IMPL;
-        }
+        /* TODO */
+        if (~flags & CAHUTE_SERIAL_RECEIVER)
+            CAHUTE_RETURN_IMPL(
+                "Only receiver is supported for screenstreaming."
+            );
 
         protocol = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP;
         break;
 
     default:
-        msg(ll_error,
-            "Invalid value for protocol: 0x%08lX!",
-            flags & CAHUTE_SERIAL_PROTOCOL_MASK);
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Unsupported serial protocol.");
     }
 
     if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_AUTO
@@ -493,7 +483,7 @@ cahute_open_serial_link(
                 msg(ll_error,
                     "Automatic data payload format detection is impossible "
                     "without receiver mode.");
-                return CAHUTE_ERROR_IMPL;
+                return CAHUTE_ERROR_UNKNOWN;
             }
             break;
 
@@ -510,10 +500,7 @@ cahute_open_serial_link(
             break;
 
         default:
-            msg(ll_error,
-                "Invalid value for CASIOLINK variant: 0x%08lX!",
-                flags & CAHUTE_SERIAL_CASIOLINK_VARIANT_MASK);
-            return CAHUTE_ERROR_IMPL;
+            CAHUTE_RETURN_IMPL("Unsupported CASIOLINK variant.");
         }
     }
 
@@ -536,10 +523,7 @@ cahute_open_serial_link(
         break;
 
     default:
-        msg(ll_error,
-            "Invalid value for stop bits: 0x%08lX!",
-            flags & CAHUTE_SERIAL_STOP_MASK);
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Unsupported value for stop bits.");
     }
 
     if ((flags & CAHUTE_SERIAL_PARITY_MASK) == 0) {
@@ -560,10 +544,7 @@ cahute_open_serial_link(
         break;
 
     default:
-        msg(ll_error,
-            "Invalid value for XON/XOFF flags: 0x%08lX!",
-            flags & CAHUTE_SERIAL_XONXOFF_MASK);
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Unsupported XON/XOFF mode.");
     }
 
     if ((flags & CAHUTE_SERIAL_DTR_MASK) == 0) {
@@ -603,8 +584,7 @@ cahute_open_serial_link(
         break;
 
     default:
-        msg(ll_error, "Unsupported baud rate %lu for serial link.", speed);
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("Unsupported serial speed.");
     }
 
 #if defined(CAHUTE_LINK_STREAM_UNIX)
@@ -655,8 +635,7 @@ cahute_open_serial_link(
             return CAHUTE_ERROR_UNKNOWN;
         }
 #else
-    msg(ll_error, "No method for opening a serial stream available.");
-    return CAHUTE_ERROR_IMPL;
+    CAHUTE_RETURN_IMPL("No serial device opening method available.");
 #endif
 
     if (!(link = malloc(sizeof(cahute_link) + DEFAULT_PROTOCOL_BUFFER_SIZE)))
@@ -746,19 +725,14 @@ cahute_open_usb_link(
     int err = CAHUTE_ERROR_UNKNOWN;
 
     if (flags & CAHUTE_USB_OHP) {
-        if (~flags & CAHUTE_USB_RECEIVER) {
-            msg(ll_error,
-                "Cahute does not support acting as a sender for OHP yet.");
-            return CAHUTE_ERROR_IMPL;
-        }
+        /* TODO */
+        if (~flags & CAHUTE_USB_RECEIVER)
+            CAHUTE_RETURN_IMPL("Sender mode not available for screenstreaming."
+            );
 
         protocol_flags |= PROTOCOL_FLAG_RECEIVER;
-    } else if (flags & CAHUTE_USB_RECEIVER) {
-        msg(ll_error,
-            "Cahute does not supporting acting as a receiver for control yet."
-        );
-        return CAHUTE_ERROR_IMPL;
-    }
+    } else if (flags & CAHUTE_USB_RECEIVER)
+        CAHUTE_RETURN_IMPL("Receiver mode not available for data protocols.");
 
 #if defined(CAHUTE_LINK_STREAM_LIBUSB)
     libusb_context *context = NULL;

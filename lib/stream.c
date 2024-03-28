@@ -424,11 +424,7 @@ cahute_read_from_link(
 #endif
 
             default:
-                msg(ll_fatal,
-                    "Unimplemented stream type 0x%08lX for read.",
-                    link->stream);
-
-                return CAHUTE_ERROR_IMPL;
+                CAHUTE_RETURN_IMPL("No method available for reading.");
             }
         }
 
@@ -647,11 +643,7 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
 #endif
 
             default:
-                msg(ll_fatal,
-                    "Unimplemented stream type 0x%08lX for write.",
-                    link->stream);
-
-                return CAHUTE_ERROR_IMPL;
+                CAHUTE_RETURN_IMPL("No method available for writing.");
             }
         }
 
@@ -948,10 +940,7 @@ cahute_set_serial_params_to_link(
 #endif
 
     default:
-        msg(ll_error,
-            "Setting serial parameters is not implemented for stream type %d.",
-            link->stream);
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("No method available for setting serial params.");
     }
 
     return CAHUTE_OK;
@@ -1162,11 +1151,7 @@ cahute_scsi_request(
 #endif
 
     default:
-        msg(ll_fatal,
-            "Unimplemented stream type 0x%08lX for SCSI requests.",
-            link->stream);
-
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("No method available for making an SCSI request.");
     }
 
     if (statusp)

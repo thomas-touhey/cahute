@@ -370,10 +370,8 @@ sequence_found:
         else {
             /* This may be an implementation oversight, it's targeted towards
              * contributors to this function / protocol :-) */
-            msg(ll_error,
-                "Oops! Forgot to add size estimation for picture type %d!",
-                format);
-            return CAHUTE_ERROR_IMPL;
+            msg(ll_info, "Picture type is: %d", format);
+            CAHUTE_RETURN_IMPL("No size estimation method for found format.");
         }
 
         if (expected_size != frame_length) {

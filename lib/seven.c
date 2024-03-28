@@ -1891,7 +1891,7 @@ cahute_seven_make_device_info(cahute_link *link, cahute_device_info **infop) {
     if (~link->protocol_state.seven.flags & SEVEN_FLAG_DEVICE_INFO_REQUESTED) {
         /* We don't have a 'generic device information' if discovery has
          * been disabled. */
-        return CAHUTE_ERROR_IMPL;
+        CAHUTE_RETURN_IMPL("No generic device with Protocol 7.00.");
     }
 
     info = malloc(sizeof(cahute_device_info) + 200);
@@ -2751,8 +2751,11 @@ cahute_seven_upload_and_run_program(
     int err;
 
     if (program_size > 0xFFFFFFFF || load_address > 0xFFFFFFFF
-        || start_address > 0xFFFFFFFF)
-        return CAHUTE_ERROR_IMPL;
+        || start_address > 0xFFFFFFFF) {
+        msg(ll_error,
+            "One of the addresses or sizes does not fit in 32 bits.");
+        return CAHUTE_ERROR_UNKNOWN;
+    }
 
     /* Prepare the command payload. */
     cahute_seven_set_ascii_hex(&command_payload[0], program_size >> 24);

@@ -19,3 +19,15 @@ repos:
       rev: v17.0.6
       hooks:
           - id: clang-format
+
+    - repo: local
+      hooks:
+          - id: no-return-error-impl
+            name: Check for manual IMPL errors
+            description: >
+              Check that CAHUTE_ERROR_IMPL is always returned using
+              CAHUTE_RETURN_IMPL, and not manually, to ensure that we
+              always have a message.
+            entry: 'return CAHUTE_ERROR_IMPL\;'
+            language: pygrep
+            types: [file]

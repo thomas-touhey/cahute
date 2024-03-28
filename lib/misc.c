@@ -67,8 +67,13 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
         &res
     );
 
-    if (ret)
-        return CAHUTE_ERROR_IMPL;
+    if (ret) {
+        msg(ll_error,
+            "An error occurred while calling clock_gettime(): %s (%d)",
+            strerror(errno),
+            errno);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
 
     *msp = res.tv_sec * 1000 + res.tv_nsec / 1000000;
     return CAHUTE_OK;
@@ -77,13 +82,11 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
 #else
 
 CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms) {
-    msg(ll_error, "No sleep implementation found!");
-    return CAHUTE_ERROR_IMPL;
+    CAHUTE_RETURN_IMPL("No method available for sleeping.");
 }
 
 CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
-    msg(ll_error, "No monotonic implementation found!");
-    return CAHUTE_ERROR_IMPL;
+    CAHUTE_RETURN_IMPL("No method available for getting monotonic time.");
 }
 
 #endif
