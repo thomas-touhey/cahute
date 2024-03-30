@@ -675,6 +675,34 @@ cahute_open_serial_link(
             log_windows_error("CreateFile", werr);
             return CAHUTE_ERROR_UNKNOWN;
         }
+
+    /* Read timeouts will be managed by using WaitForMultipleObjects().
+     * Here we only need to configure the timeouts to return immediately. */
+    {
+        COMMTIMEOUTS timeouts;
+
+        timeouts.ReadIntervalTimeout = MAXDWORD;
+        timeouts.ReadTotalTimeoutMultiplier = 0;
+        timeouts.ReadTotalTimeoutConstant = 0;
+        timeouts.WriteTotalTimeoutMultiplier = 0;
+        timeouts.WriteTotalTimeoutConstant = 0;
+
+        if (!SetCommTimeouts(handle, &timeouts)) {
+            log_windows_error("SetCommTimeouts", GetLastError());
+            CloseHandle(handle);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+    }
+
+    /* We only want events to be set if we are receiving a byte. */
+    if (!SetCommMask(handle, EV_RXCHAR)) {
+        log_windows_error("SetCommMask", GetLastError());
+        CloseHandle(handle);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    /* TODO: Implement timeouts with Windows streams. */
+    msg(ll_warn, "Streams using the Windows API do not support timeouts.");
 #else
     CAHUTE_RETURN_IMPL("No serial device opening method available.");
 #endif
@@ -703,8 +731,10 @@ cahute_open_serial_link(
     link->stream_state.windows.is_cesg = 0;
 #endif
 
-    link->serial_flags =
-        flags & (CAHUTE_SERIAL_STOP_MASK | CAHUTE_SERIAL_PARITY_MASK);
+    link->serial_flags = flags
+                         & (CAHUTE_SERIAL_STOP_MASK | CAHUTE_SERIAL_PARITY_MASK
+                            | CAHUTE_SERIAL_XONXOFF_MASK
+                            | CAHUTE_SERIAL_DTR_MASK | CAHUTE_SERIAL_RTS_MASK);
     link->serial_speed = speed;
     link->protocol = protocol;
     link->protocol_buffer = (cahute_u8 *)link + sizeof(cahute_link);
@@ -1006,6 +1036,8 @@ cahute_open_usb_link(
                 goto fail;
             }
 
+        /* TODO: Implement timeouts with Windows streams. */
+        msg(ll_warn, "Streams using the Windows API do not support timeouts.");
         goto ready;
     }
 

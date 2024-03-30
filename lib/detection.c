@@ -184,8 +184,11 @@ cahute_detect_serial(
     HKEY hkey;
     int err = CAHUTE_OK;
 
-    msg(ll_info, "Opening HKEY_LOCAL_MACHINE\\" SERIAL_COMM_HKEY);
-    if ((werr = RegOpenKey(HKEY_LOCAL_MACHINE, SERIAL_COMM_HKEY, &hkey))) {
+    werr = RegOpenKey(HKEY_LOCAL_MACHINE, SERIAL_COMM_HKEY, &hkey);
+    if (werr == ERROR_FILE_NOT_FOUND) {
+        /* No serial devices available. */
+        goto end;
+    } else if (werr) {
         log_windows_error("RegOpenKey", werr);
         return CAHUTE_ERROR_UNKNOWN;
     }

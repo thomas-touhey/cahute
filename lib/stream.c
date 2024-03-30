@@ -339,29 +339,20 @@ cahute_read_from_link(
 
 #ifdef CAHUTE_LINK_STREAM_WINDOWS
             case CAHUTE_LINK_STREAM_WINDOWS: {
-                COMMTIMEOUTS timeouts;
-                DWORD received;
+                DWORD received = 0, event_mask;
                 BOOL ret;
 
                 if (!link->stream_state.windows.is_cesg) {
-                    timeouts.ReadIntervalTimeout = timeout;
-                    timeouts.ReadTotalTimeoutMultiplier = 0;
-                    timeouts.ReadTotalTimeoutConstant = 0;
-                    timeouts.WriteTotalTimeoutMultiplier = 0;
-                    timeouts.WriteTotalTimeoutConstant = 0;
-
-                    ret = SetCommTimeouts(
+                    ret = WaitCommEvent(
                         link->stream_state.windows.handle,
-                        &timeouts
+                        &event_mask,
+                        NULL
                     );
                     if (!ret) {
-                        DWORD werr = GetLastError();
-                        log_windows_error("SetCommTimeouts", werr);
+                        log_windows_error("WaitCommEvent", GetLastError());
                         return CAHUTE_ERROR_UNKNOWN;
                     }
-                } else if (timeout > 0)
-                    msg(ll_info,
-                        "Underlying handle does not support timeouts.");
+                }
 
                 ret = ReadFile(
                     link->stream_state.windows.handle,
@@ -371,8 +362,7 @@ cahute_read_from_link(
                     NULL
                 );
                 if (!ret) {
-                    DWORD werr = GetLastError();
-                    log_windows_error("ReadFile", werr);
+                    log_windows_error("ReadFile", GetLastError());
                     return CAHUTE_ERROR_UNKNOWN;
                 }
 
@@ -443,6 +433,12 @@ cahute_read_from_link(
 
         if (!first_time) {
             err = cahute_monotonic(&first_time);
+            if (err)
+                return err;
+
+            last_time = first_time;
+        } else {
+            err = cahute_monotonic(&last_time);
             if (err)
                 return err;
         }
@@ -868,6 +864,10 @@ cahute_set_serial_params_to_link(
 
         dcb.BaudRate = dcb_speed;
         dcb.ByteSize = 8;
+        dcb.fOutxCtsFlow = 0;
+        dcb.fOutxDsrFlow = 0;
+        dcb.fDsrSensitivity = 0;
+        dcb.fNull = 0;
 
         switch (flags & CAHUTE_SERIAL_PARITY_MASK) {
         case CAHUTE_SERIAL_PARITY_EVEN:
@@ -895,14 +895,16 @@ cahute_set_serial_params_to_link(
             break;
         }
 
+        dcb.fTXContinueOnXoff = 0;
+        dcb.XonChar = 0x13;
+        dcb.XoffChar = 0x11;
+        dcb.XonLim = 0;
+        dcb.XoffLim = 0;
+
         switch (flags & CAHUTE_SERIAL_XONXOFF_MASK) {
         case CAHUTE_SERIAL_XONXOFF_ENABLE:
             dcb.fInX = 1;
             dcb.fOutX = 1;
-            dcb.XonChar = 0x13;
-            dcb.XoffChar = 0x11;
-            dcb.XonLim = 0;
-            dcb.XoffLim = 0;
             break;
 
         default:

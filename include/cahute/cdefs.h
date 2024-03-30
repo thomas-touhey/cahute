@@ -203,19 +203,9 @@ typedef unsigned long cahute_u32;
 
 /* printf definition for `size_t`. */
 
-#if defined(_WIN64)
-# define CAHUTE_PRIuSIZE "l64u"
-# define CAHUTE_PRIxSIZE "l64x"
-# define CAHUTE_PRIXSIZE "l64X"
-#elif defined(_WIN32)
-# define CAHUTE_PRIuSIZE "u"
-# define CAHUTE_PRIxSIZE "x"
-# define CAHUTE_PRIXSIZE "X"
-#else
-# define CAHUTE_PRIuSIZE "zu"
-# define CAHUTE_PRIxSIZE "zx"
-# define CAHUTE_PRIXSIZE "zX"
-#endif
+#define CAHUTE_PRIuSIZE "zu"
+#define CAHUTE_PRIxSIZE "zx"
+#define CAHUTE_PRIXSIZE "zX"
 
 /* ---
  * Endianess management.
