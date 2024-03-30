@@ -343,21 +343,25 @@ cahute_read_from_link(
                 DWORD received;
                 BOOL ret;
 
-                timeouts.ReadIntervalTimeout = timeout;
-                timeouts.ReadTotalTimeoutMultiplier = 0;
-                timeouts.ReadTotalTimeoutConstant = 0;
-                timeouts.WriteTotalTimeoutMultiplier = 0;
-                timeouts.WriteTotalTimeoutConstant = 0;
+                if (!link->stream_state.windows.is_cesg) {
+                    timeouts.ReadIntervalTimeout = timeout;
+                    timeouts.ReadTotalTimeoutMultiplier = 0;
+                    timeouts.ReadTotalTimeoutConstant = 0;
+                    timeouts.WriteTotalTimeoutMultiplier = 0;
+                    timeouts.WriteTotalTimeoutConstant = 0;
 
-                ret = SetCommTimeouts(
-                    link->stream_state.windows.handle,
-                    &timeouts
-                );
-                if (!ret) {
-                    DWORD werr = GetLastError();
-                    log_windows_error("SetCommTimeouts", werr);
-                    return CAHUTE_ERROR_UNKNOWN;
-                }
+                    ret = SetCommTimeouts(
+                        link->stream_state.windows.handle,
+                        &timeouts
+                    );
+                    if (!ret) {
+                        DWORD werr = GetLastError();
+                        log_windows_error("SetCommTimeouts", werr);
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
+                } else if (timeout > 0)
+                    msg(ll_info,
+                        "Underlying handle does not support timeouts.");
 
                 ret = ReadFile(
                     link->stream_state.windows.handle,

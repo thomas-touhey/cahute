@@ -205,9 +205,11 @@ struct cahute_link_posix {
  * Windows API stream state.
  *
  * @property handle File handle.
+ * @property is_cesg Whether the handle is for the CESG502 driver or not.
  */
 struct cahute_link_windows {
     HANDLE handle;
+    int is_cesg;
 };
 #endif
 

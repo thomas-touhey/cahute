@@ -5,5 +5,5 @@ Name: cahute
 Description: Communication and file format handling tools for CASIO calculators
 Version: @PROJECT_VERSION_MAJOR@.@PROJECT_VERSION_MINOR@
 Requires: libusb-1.0
-Libs: -L${libdir} -lcahute
+Libs: -L${libdir} -lcahute @PLATFORM_LINK_FLAGS@
 Cflags: -I${includedir}

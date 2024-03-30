@@ -389,6 +389,47 @@ CAHUTE_LOCAL(int) deinitialize_link_protocol(cahute_link *link) {
     return CAHUTE_OK;
 }
 
+#if WINDOWS_ENABLED
+# include <initguid.h>
+# include <cfgmgr32.h>
+# include <usbiodef.h>
+# include <devpkey.h>
+# define ASCII_HEX_TO_NIBBLE(C) ((C) >= 'A' ? (C) - 'A' + 10 : (C) - '0')
+
+/**
+ * Parse device location for a Windows USB device.
+ *
+ * The expected device location format is something like
+ * "Port_#0002.Hub_#000D".
+ *
+ * @param raw Raw device location for the Windows USB device.
+ * @param busp Pointer to the bus to define.
+ * @param addressp Pointer to the address to define.
+ * @return 0 if no error, other otherwise.
+ */
+CAHUTE_LOCAL(int)
+parse_winusb_device_location(WCHAR const *raw, int *busp, int *addressp) {
+    if (raw[0] != 'P' || raw[1] != 'o' || raw[2] != 'r' || raw[3] != 't'
+        || raw[4] != '_' || raw[5] != '#' || !isxdigit(raw[6])
+        || !isxdigit(raw[7]) || !isxdigit(raw[8]) || !isxdigit(raw[9])
+        || raw[10] != '.' || raw[11] != 'H' || raw[12] != 'u' || raw[13] != 'b'
+        || raw[14] != '_' || raw[15] != '#' || !isxdigit(raw[16])
+        || !isxdigit(raw[17]) || !isxdigit(raw[18]) || !isxdigit(raw[19])
+        || raw[20])
+        return CAHUTE_ERROR_UNKNOWN;
+
+    *addressp = (ASCII_HEX_TO_NIBBLE(raw[6]) << 24)
+                | (ASCII_HEX_TO_NIBBLE(raw[7]) << 16)
+                | (ASCII_HEX_TO_NIBBLE(raw[8]) << 8)
+                | ASCII_HEX_TO_NIBBLE(raw[9]);
+    *busp = (ASCII_HEX_TO_NIBBLE(raw[16]) << 24)
+            | (ASCII_HEX_TO_NIBBLE(raw[17]) << 16)
+            | (ASCII_HEX_TO_NIBBLE(raw[18]) << 8)
+            | ASCII_HEX_TO_NIBBLE(raw[19]);
+    return 0;
+}
+#endif
+
 /**
  * Open a link over a serial medium.
  *
@@ -659,6 +700,7 @@ cahute_open_serial_link(
     link->flags = CAHUTE_LINK_FLAG_CLOSE_STREAM;
     link->stream = CAHUTE_LINK_STREAM_WINDOWS;
     link->stream_state.windows.handle = handle;
+    link->stream_state.windows.is_cesg = 0;
 #endif
 
     link->serial_flags =
@@ -722,7 +764,23 @@ cahute_open_usb_link(
     cahute_link *link = NULL;
     int protocol;
     unsigned long protocol_flags = 0;
-    int err = CAHUTE_ERROR_UNKNOWN;
+    int i, err = CAHUTE_ERROR_UNKNOWN;
+
+#if WINDOWS_ENABLED
+    HANDLE cesg_handle = INVALID_HANDLE_VALUE;
+    PWSTR device_interface_list = NULL, device_interface;
+    ULONG device_interface_list_size;
+    CONFIGRET cret;
+    DWORD werr;
+#endif
+
+#if defined(CAHUTE_LINK_STREAM_LIBUSB)
+    libusb_context *context = NULL;
+    libusb_device **device_list = NULL;
+    struct libusb_config_descriptor *config_descriptor = NULL;
+    libusb_device_handle *device_handle = NULL;
+    int device_count, libusberr, bulk_in = -1, bulk_out = -1;
+#endif
 
     if (flags & CAHUTE_USB_OHP) {
         /* TODO */
@@ -734,13 +792,232 @@ cahute_open_usb_link(
     } else if (flags & CAHUTE_USB_RECEIVER)
         CAHUTE_RETURN_IMPL("Receiver mode not available for data protocols.");
 
-#if defined(CAHUTE_LINK_STREAM_LIBUSB)
-    libusb_context *context = NULL;
-    libusb_device **device_list = NULL;
-    struct libusb_config_descriptor *config_descriptor = NULL;
-    libusb_device_handle *device_handle = NULL;
-    int device_count, id, libusberr, bulk_in = -1, bulk_out = -1;
+#if WINDOWS_ENABLED
+# define DEV_INTERFACE_DETAIL_DATA_SIZE 1024
+    /* The device may actuallydevice_interface_list be managed by the CESG502
+     * driver. We need to explore USB devices manually to find out.
+     *
+     * This uses the more portable CfgMgr32 API rather than SetupApi,
+     * more specifically the "Get a list of interfaces, get the device exposing
+     * each interface, and get a property from the device" use case, as
+     * described here:
+     *
+     * https://learn.microsoft.com/en-us/windows-hardware/drivers/install/
+     * porting-from-setupapi-to-cfgmgr32 */
+    cret = CM_Get_Device_Interface_List_SizeW(
+        &device_interface_list_size,
+        (LPGUID)&GUID_DEVINTERFACE_USB_DEVICE,
+        NULL,
+        CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES
+    );
+    if (cret != CR_SUCCESS) {
+        msg(ll_error,
+            "CM_Get_Device_Interface_List_SizeW returned error 0x%08lX.",
+            cret);
+        goto fail;
+    }
 
+    device_interface_list = (PWSTR)HeapAlloc(
+        GetProcessHeap(),
+        HEAP_ZERO_MEMORY,
+        device_interface_list_size * sizeof(WCHAR)
+    );
+    if (!device_interface_list) {
+        log_windows_error("HeapAlloc", GetLastError());
+        err = CAHUTE_ERROR_ALLOC;
+        goto fail;
+    }
+
+    cret = CM_Get_Device_Interface_ListW(
+        (LPGUID)&GUID_DEVINTERFACE_USB_DEVICE,
+        NULL,
+        device_interface_list,
+        device_interface_list_size,
+        CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES
+    );
+    if (cret != CR_SUCCESS) {
+        msg(ll_error,
+            "CM_Get_Device_Interface_ListW returned error 0x%08lX.",
+            cret);
+        goto fail;
+    }
+
+    for (device_interface = device_interface_list; *device_interface;
+         device_interface += wcslen(device_interface) + 1) {
+        WCHAR device_id[64];
+        BYTE property_buffer[2048];
+        DEVPROPTYPE property_type;
+        DEVINST device_instance;
+        ULONG property_size;
+
+        /* Get the device identifier, as an interface property. */
+        property_size = sizeof(device_id);
+        cret = CM_Get_Device_Interface_PropertyW(
+            device_interface,
+            &DEVPKEY_Device_InstanceId,
+            &property_type,
+            (BYTE *)device_id,
+            &property_size,
+            0
+        );
+        if (cret != CR_SUCCESS) {
+            msg(ll_error,
+                "CM_Get_Device_Interface_PropertyW returned error 0x%08lX.",
+                cret);
+            goto fail;
+        }
+
+        if (property_type != DEVPROP_TYPE_STRING) {
+            msg(ll_error, "Expected a string for the device identifier.");
+            goto fail;
+        }
+
+        /* Get the device behind the interface. */
+        cret = CM_Locate_DevNodeW(
+            &device_instance,
+            device_id,
+            CM_LOCATE_DEVNODE_NORMAL
+        );
+        if (cret == CR_NO_SUCH_DEVNODE)
+            continue;
+
+        if (cret != CR_SUCCESS) {
+            msg(ll_error, "CM_Locate_DevNodeW returned error 0x%08lX.", cret);
+            goto fail;
+        }
+
+        /* Get location information in the form of a string.
+         * This returns a string of the form "Port_#0002.Hub_#0001", from
+         * which we can actually extract the same bus and address numbers
+         * as from libusb. */
+        property_size = sizeof(property_buffer);
+        cret = CM_Get_DevNode_PropertyW(
+            device_instance,
+            &DEVPKEY_Device_LocationInfo,
+            &property_type,
+            (PBYTE)property_buffer,
+            &property_size,
+            0
+        );
+        if (cret != CR_SUCCESS) {
+            msg(ll_error,
+                "CM_Get_DevNode_PropertyW returned error 0x%08lX.",
+                cret);
+            goto fail;
+        }
+
+        if (property_type != DEVPROP_TYPE_STRING) {
+            msg(ll_warn,
+                "Unexpected type 0x%08lX for location info, skipping the "
+                "entry.",
+                property_type);
+            continue;
+        }
+
+        {
+            int detected_bus, detected_address, ret;
+
+            ret = parse_winusb_device_location(
+                (WCHAR *)property_buffer,
+                &detected_bus,
+                &detected_address
+            );
+            if (ret) {
+                msg(ll_warn,
+                    "Unable to gather location info, skipping the entry.");
+                msg(ll_warn, "Location info was: %ls", property_buffer);
+                continue;
+            }
+
+            if (detected_bus != bus || detected_address != address)
+                continue;
+        }
+
+        /* Get the device driver, to check if we have a device managed by
+         * CESG502 instead of a libusb-compatible driver. */
+        property_size = sizeof(property_buffer);
+        cret = CM_Get_DevNode_PropertyW(
+            device_instance,
+            &DEVPKEY_Device_Driver,
+            &property_type,
+            (PBYTE)property_buffer,
+            &property_size,
+            0
+        );
+        if (cret != CR_SUCCESS) {
+            msg(ll_error,
+                "CM_Get_DevNode_PropertyW returned error 0x%08lX.",
+                cret);
+            goto fail;
+        }
+
+        if (property_type != DEVPROP_TYPE_STRING) {
+            msg(ll_warn,
+                "Unexpected type 0x%08lX for driver key, skipping the "
+                "entry.",
+                property_type);
+            break;
+        }
+
+        /* Check that the driver is the CESG502 driver.
+         * This value has been found experimentally, although the real value
+         * actually ends with "\0002", which may be the version. */
+        if (memcmp(
+                property_buffer,
+                L"{36fc9e60-c465-11cf-8056-444553540000}",
+                38 * sizeof(WCHAR)
+            )) {
+            msg(ll_warn, "Not an known CESG502 driver: %.38ls", property_buffer
+            );
+            break;
+        }
+
+        /* The device has been found and is running the CESG502 driver! */
+        protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
+
+        msg(ll_info, "Opening the following CESG502 interface:");
+        msg(ll_info, "%ls", device_interface);
+
+        cesg_handle = CreateFileW(
+            device_interface,
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            NULL,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL
+        );
+        werr = GetLastError();
+
+        /* In any case, we want to free the device interface list now, as we
+         * no longer have a use for it. */
+        HeapFree(GetProcessHeap(), 0, device_interface_list);
+        device_interface_list = NULL;
+
+        /* We can now process any error that occurred with CreateFile(). */
+        if (cesg_handle == INVALID_HANDLE_VALUE)
+            switch (werr) {
+            case ERROR_ACCESS_DENIED:
+                err = CAHUTE_ERROR_PRIV;
+                goto fail;
+
+            default:
+                log_windows_error("CreateFile", werr);
+                goto fail;
+            }
+
+        goto ready;
+    }
+
+    msg(ll_info,
+        "Device was either not found or found but not running the CESG502 "
+        "driver; falling back on libusb.");
+
+    HeapFree(GetProcessHeap(), 0, device_interface_list);
+    device_interface_list = NULL;
+#endif
+
+#if defined(CAHUTE_LINK_STREAM_LIBUSB)
     if (libusb_init(&context)) {
         msg(ll_fatal, "Could not create a libusb context.");
         goto fail;
@@ -752,18 +1029,18 @@ cahute_open_usb_link(
         goto fail;
     }
 
-    for (id = 0; id < device_count; id++) {
+    for (i = 0; i < device_count; i++) {
         struct libusb_device_descriptor device_descriptor;
         struct libusb_interface_descriptor const *interface_descriptor;
         struct libusb_endpoint_descriptor const *endpoint_descriptor;
-        int interface_class = 0, i;
+        int interface_class = 0, j;
 
-        if (libusb_get_bus_number(device_list[id]) != bus
-            || libusb_get_device_address(device_list[id]) != address)
+        if (libusb_get_bus_number(device_list[i]) != bus
+            || libusb_get_device_address(device_list[i]) != address)
             continue;
 
         err = CAHUTE_ERROR_INCOMPAT;
-        if (libusb_get_device_descriptor(device_list[id], &device_descriptor))
+        if (libusb_get_device_descriptor(device_list[i], &device_descriptor))
             goto fail;
 
         if (device_descriptor.idVendor != 0x07cf)
@@ -777,7 +1054,7 @@ cahute_open_usb_link(
          * - If it's 8 (Mass Storage), then we are facing an SCSI device.
          * - If it's 255 (Vendor-Specific), then we are facing a P7 device. */
         if (libusb_get_active_config_descriptor(
-                device_list[id],
+                device_list[i],
                 &config_descriptor
             ))
             goto fail;
@@ -805,9 +1082,9 @@ cahute_open_usb_link(
         /* Find bulk in and out endpoints.
          * This search is in case they vary between host platforms. */
         for (endpoint_descriptor = interface_descriptor->endpoint,
-            i = interface_descriptor->bNumEndpoints;
-             i;
-             endpoint_descriptor++, i--) {
+            j = interface_descriptor->bNumEndpoints;
+             j;
+             endpoint_descriptor++, j--) {
             if ((endpoint_descriptor->bmAttributes & 3)
                 != LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK)
                 continue;
@@ -832,7 +1109,7 @@ cahute_open_usb_link(
             goto fail;
         }
 
-        libusberr = libusb_open(device_list[id], &device_handle);
+        libusberr = libusb_open(device_list[i], &device_handle);
         switch (libusberr) {
         case 0:
             break;
@@ -922,16 +1199,34 @@ cahute_open_usb_link(
             libusb_error_name(libusberr));
         goto fail;
     }
-#else
-    err = CAHUTE_ERROR_IMPL;
-    goto fail;
+
+    goto ready;
 #endif
 
+    msg(ll_error, "No method available for opening an USB device.");
+    err = CAHUTE_ERROR_IMPL;
+    goto fail;
+
+ready:
     link = malloc(sizeof(cahute_link) + DEFAULT_PROTOCOL_BUFFER_SIZE);
     if (!link) {
         err = CAHUTE_ERROR_ALLOC;
         goto fail;
     }
+
+#if WINDOWS_ENABLED
+    if (cesg_handle != INVALID_HANDLE_VALUE) {
+        link->flags = CAHUTE_LINK_FLAG_CLOSE_STREAM;
+        link->stream = CAHUTE_LINK_STREAM_WINDOWS;
+        link->stream_state.windows.handle = cesg_handle;
+        link->stream_state.windows.is_cesg = 1;
+
+        /* The link takes control of the handle. */
+        cesg_handle = INVALID_HANDLE_VALUE;
+
+        goto prepared;
+    }
+#endif
 
 #if defined(CAHUTE_LINK_STREAM_LIBUSB)
     link->flags = CAHUTE_LINK_FLAG_CLOSE_STREAM;
@@ -948,10 +1243,13 @@ cahute_open_usb_link(
 
     msg(ll_info, "Bulk in endpoint address is: 0x%02X", bulk_in);
     msg(ll_info, "Bulk out endpoint address is: 0x%02X", bulk_out);
-#else
-    err = CAHUTE_ERROR_IMPL;
+    goto prepared;
 #endif
 
+    err = CAHUTE_ERROR_IMPL;
+    goto fail;
+
+prepared:
     link->serial_flags = 0;
     link->serial_speed = 0;
     link->protocol = protocol;
@@ -978,6 +1276,13 @@ cahute_open_usb_link(
     return CAHUTE_OK;
 
 fail:
+#if WINDOWS_ENABLED
+    if (cesg_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(cesg_handle);
+    if (device_interface_list)
+        HeapFree(GetProcessHeap(), 0, device_interface_list);
+#endif
+
 #if defined(CAHUTE_LINK_STREAM_LIBUSB)
     if (link)
         cahute_close_link(link);
@@ -990,6 +1295,7 @@ fail:
     if (context)
         libusb_exit(context);
 #endif
+
     return err;
 }
 
