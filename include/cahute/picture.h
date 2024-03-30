@@ -51,19 +51,21 @@ struct cahute_frame {
 CAHUTE_BEGIN_DECLS
 
 CAHUTE_EXTERN(int)
-cahute_convert_picture
-    OF((void *cahute__dest,
-        int cahute__dest_format,
-        void const *cahute__src,
-        int cahute__src_format,
-        int cahute__width,
-        int cahute__height));
+cahute_convert_picture(
+    void *cahute__dest,
+    int cahute__dest_format,
+    void const *cahute__src,
+    int cahute__src_format,
+    int cahute__width,
+    int cahute__height
+);
 
 CAHUTE_EXTERN(int)
-cahute_convert_picture_from_frame
-    OF((void *cahute__dest,
-        int cahute__dest_format,
-        cahute_frame const *cahute__frame));
+cahute_convert_picture_from_frame(
+    void *cahute__dest,
+    int cahute__dest_format,
+    cahute_frame const *cahute__frame
+);
 
 CAHUTE_END_DECLS
 CAHUTE_END_NAMESPACE

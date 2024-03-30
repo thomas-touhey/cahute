@@ -33,8 +33,8 @@
 CAHUTE_BEGIN_NAMESPACE
 CAHUTE_BEGIN_DECLS
 
-CAHUTE_EXTERN(int) cahute_get_log_level OF((void));
-CAHUTE_EXTERN(void) cahute_set_log_level OF((int cahute__level));
+CAHUTE_EXTERN(int) cahute_get_log_level(void);
+CAHUTE_EXTERN(void) cahute_set_log_level(int cahute__level);
 
 CAHUTE_END_DECLS
 CAHUTE_END_NAMESPACE

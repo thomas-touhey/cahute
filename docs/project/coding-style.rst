@@ -84,10 +84,8 @@ As such, you must use the relevant compatibility macros for your case:
     of the public headers.
   - :c:macro:`CAHUTE_NNPTR` and :c:macro:`CAHUTE_NONNULL` together, where
     relevant.
-* Function declarations only must use the following:
-
-  - :c:macro:`OF`\ ``((int arg1, char const *arg2, ...))`` for parameters.
-  - :c:macro:`CAHUTE_DEPRECATED` and :c:macro:`CAHUTE_WUR` where relevant.
+* Function declarations only must use :c:macro:`CAHUTE_DEPRECATED` and
+  :c:macro:`CAHUTE_WUR` where relevant.
 
 **Only utilities available in C89 / C90 must be used.**
 

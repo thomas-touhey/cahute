@@ -14,19 +14,6 @@ Macro definitions
     For example, ``CAHUTE_PREREQ(2, 4)`` checks if the current version of
     Cahute is compatible with version 2.4.
 
-.. c:macro:: OF(...)
-
-    Macro for defining parameter definitions in a function declaration.
-    For example::
-
-        int my_function OF((int arg1, char const *arg2));
-
-    This is present because in K&R C (pre-C89), function declarations did
-    not include parameters, i.e. the function declaration above would need
-    to render as the following::
-
-        int my_function();
-
 .. c:macro:: CAHUTE_EXTERN(TYPE)
 
     Macro to use in Cahute function declarations, surrounding the return type,

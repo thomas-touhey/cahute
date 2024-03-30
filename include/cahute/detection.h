@@ -64,14 +64,16 @@ typedef int(cahute_detect_usb_entry_func)(
 CAHUTE_BEGIN_DECLS
 
 CAHUTE_EXTERN(int)
-cahute_detect_serial
-    OF((cahute_detect_serial_entry_func CAHUTE_NNPTR(cahute__func),
-        void *cahute__cookie)) CAHUTE_NONNULL(1);
+cahute_detect_serial(
+    cahute_detect_serial_entry_func CAHUTE_NNPTR(cahute__func),
+    void *cahute__cookie
+) CAHUTE_NONNULL(1);
 
 CAHUTE_EXTERN(int)
-cahute_detect_usb
-    OF((cahute_detect_usb_entry_func CAHUTE_NNPTR(cahute__func),
-        void *cahute__cookie)) CAHUTE_NONNULL(1);
+cahute_detect_usb(
+    cahute_detect_usb_entry_func CAHUTE_NNPTR(cahute__func),
+    void *cahute__cookie
+) CAHUTE_NONNULL(1);
 
 CAHUTE_END_DECLS
 

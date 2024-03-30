@@ -161,26 +161,32 @@ typedef void(cahute_progress_func)(
 
 CAHUTE_BEGIN_DECLS
 
-CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_serial_link
-    OF((cahute_link * *cahute__linkp,
-        unsigned long cahute__flags,
-        char const *cahute__name,
-        unsigned long cahute__speed));
+CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_serial_link(
+    cahute_link **cahute__linkp,
+    unsigned long cahute__flags,
+    char const *cahute__name,
+    unsigned long cahute__speed
+);
 
-CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_usb_link
-    OF((cahute_link * *cahute__linkp,
-        unsigned long cahute__flags,
-        int cahute__bus,
-        int cahute__address));
+CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_usb_link(
+    cahute_link **cahute__linkp,
+    unsigned long cahute__flags,
+    int cahute__bus,
+    int cahute__address
+);
 
-CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_simple_usb_link
-    OF((cahute_link * *cahute__linkp, unsigned long cahute__flags));
+CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_simple_usb_link(
+    cahute_link **cahute__linkp,
+    unsigned long cahute__flags
+);
 
 CAHUTE_EXTERN(int)
-cahute_get_device_info
-    OF((cahute_link * cahute__link, cahute_device_info **cahute__infop));
+cahute_get_device_info(
+    cahute_link *cahute__link,
+    cahute_device_info **cahute__infop
+);
 
-CAHUTE_EXTERN(void) cahute_close_link OF((cahute_link * cahute__link));
+CAHUTE_EXTERN(void) cahute_close_link(cahute_link *cahute__link);
 
 CAHUTE_END_DECLS
 
@@ -189,108 +195,122 @@ CAHUTE_END_DECLS
  * --- */
 
 CAHUTE_EXTERN(int)
-cahute_receive_screen
-    OF((cahute_link * cahute__link,
-        cahute_frame **cahute__framep,
-        unsigned long cahute__timeout));
+cahute_receive_screen(
+    cahute_link *cahute__link,
+    cahute_frame **cahute__framep,
+    unsigned long cahute__timeout
+);
 
 /* ---
  * Control operations.
  * --- */
 
 CAHUTE_EXTERN(int)
-cahute_negotiate_serial_params
-    OF((cahute_link * cahute__link,
-        unsigned long cahute__flags,
-        unsigned long cahute__speed));
+cahute_negotiate_serial_params(
+    cahute_link *cahute__link,
+    unsigned long cahute__flags,
+    unsigned long cahute__speed
+);
 
 CAHUTE_EXTERN(int)
-cahute_request_storage_capacity
-    OF((cahute_link * link, char const *storage, unsigned long *capacityp));
+cahute_request_storage_capacity(
+    cahute_link *link,
+    char const *storage,
+    unsigned long *capacityp
+);
 
 #define CAHUTE_SEND_FILE_FLAG_FORCE    0x00000001 /* Force overwrite. */
 #define CAHUTE_SEND_FILE_FLAG_OPTIMIZE 0x00000002 /* Automatically optimize. */
 
 CAHUTE_EXTERN(int)
-cahute_send_file_to_storage
-    OF((cahute_link * cahute__link,
-        unsigned long cahute__flags,
-        char const *cahute__directory,
-        char const *cahute__name,
-        char const *cahute__storage,
-        FILE *cahute__filep,
-        cahute_confirm_overwrite_func *cahute__overwrite_func,
-        void *cahute__overwrite_cookie,
-        cahute_progress_func *cahute__progress_func,
-        void *cahute__progress_cookie));
+cahute_send_file_to_storage(
+    cahute_link *cahute__link,
+    unsigned long cahute__flags,
+    char const *cahute__directory,
+    char const *cahute__name,
+    char const *cahute__storage,
+    FILE *cahute__filep,
+    cahute_confirm_overwrite_func *cahute__overwrite_func,
+    void *cahute__overwrite_cookie,
+    cahute_progress_func *cahute__progress_func,
+    void *cahute__progress_cookie
+);
 
 CAHUTE_EXTERN(int)
-cahute_request_file_from_storage
-    OF((cahute_link * cahute__link,
-        char const *cahute__directory,
-        char const *cahute__name,
-        char const *cahute__storage,
-        FILE *cahute__filep,
-        cahute_progress_func *cahute__progress_func,
-        void *cahute__progress_cookie));
+cahute_request_file_from_storage(
+    cahute_link *cahute__link,
+    char const *cahute__directory,
+    char const *cahute__name,
+    char const *cahute__storage,
+    FILE *cahute__filep,
+    cahute_progress_func *cahute__progress_func,
+    void *cahute__progress_cookie
+);
 
 CAHUTE_EXTERN(int)
-cahute_copy_file_on_storage
-    OF((cahute_link * link,
-        char const *source_directory,
-        char const *source_name,
-        char const *target_directory,
-        char const *target_name,
-        char const *storage));
+cahute_copy_file_on_storage(
+    cahute_link *link,
+    char const *source_directory,
+    char const *source_name,
+    char const *target_directory,
+    char const *target_name,
+    char const *storage
+);
 
 CAHUTE_EXTERN(int)
-cahute_delete_file_from_storage
-    OF((cahute_link * cahute__link,
-        char const *cahute__directory,
-        char const *cahute__name,
-        char const *cahute__storage));
+cahute_delete_file_from_storage(
+    cahute_link *cahute__link,
+    char const *cahute__directory,
+    char const *cahute__name,
+    char const *cahute__storage
+);
 
 CAHUTE_EXTERN(int)
-cahute_list_storage_entries
-    OF((cahute_link * cahute__link,
-        char const *cahute__storage,
-        cahute_list_storage_entry_func *cahute__callback,
-        void *cahute__cookie));
+cahute_list_storage_entries(
+    cahute_link *cahute__link,
+    char const *cahute__storage,
+    cahute_list_storage_entry_func *cahute__callback,
+    void *cahute__cookie
+);
 
 CAHUTE_EXTERN(int)
-cahute_reset_storage
-    OF((cahute_link * cahute__link, char const *cahute__storage));
+cahute_reset_storage(cahute_link *cahute__link, char const *cahute__storage);
 
 CAHUTE_EXTERN(int)
-cahute_optimize_storage
-    OF((cahute_link * cahute__link, char const *cahute__storage));
+cahute_optimize_storage(
+    cahute_link *cahute__link,
+    char const *cahute__storage
+);
 
 CAHUTE_EXTERN(int)
-cahute_backup_rom
-    OF((cahute_link * cahute__link,
-        cahute_u8 **cahute__romp,
-        size_t *cahute__sizep,
-        cahute_progress_func *cahute__progress_func,
-        void *cahute__progress_cookie));
+cahute_backup_rom(
+    cahute_link *cahute__link,
+    cahute_u8 **cahute__romp,
+    size_t *cahute__sizep,
+    cahute_progress_func *cahute__progress_func,
+    void *cahute__progress_cookie
+);
 
 CAHUTE_EXTERN(int)
-cahute_upload_and_run_program
-    OF((cahute_link * cahute__link,
-        cahute_u8 const *cahute__program,
-        size_t cahute__program_size,
-        unsigned long cahute__load_address,
-        unsigned long cahute__start_address,
-        cahute_progress_func *cahute__progress_func,
-        void *cahute__progress_cookie));
+cahute_upload_and_run_program(
+    cahute_link *cahute__link,
+    cahute_u8 const *cahute__program,
+    size_t cahute__program_size,
+    unsigned long cahute__load_address,
+    unsigned long cahute__start_address,
+    cahute_progress_func *cahute__progress_func,
+    void *cahute__progress_cookie
+);
 
 #define CAHUTE_FLASH_FLAG_RESET_SMEM 0x00000001 /* Also erase the SMEM. */
 
 CAHUTE_EXTERN(int)
-cahute_flash_system_using_fxremote_method
-    OF((cahute_link * cahute__link,
-        unsigned long cahute__flags,
-        cahute_u8 const *cahute__system,
-        size_t cahute__system_size));
+cahute_flash_system_using_fxremote_method(
+    cahute_link *cahute__link,
+    unsigned long cahute__flags,
+    cahute_u8 const *cahute__system,
+    size_t cahute__system_size
+);
 
 CAHUTE_END_DECLS
 
