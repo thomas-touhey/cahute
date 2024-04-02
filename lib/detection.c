@@ -28,7 +28,7 @@
 
 #include "internals.h"
 
-#if UNIX_ENABLED
+#if POSIX_ENABLED
 # include <dirent.h>
 
 /**
@@ -76,7 +76,7 @@ cahute_detect_serial(
     cahute_detect_serial_entry_func CAHUTE_NNPTR(func),
     void *cookie
 ) CAHUTE_NONNULL(1) {
-#if UNIX_ENABLED
+#if POSIX_ENABLED
     DIR *dp;
     struct dirent *dr;
     struct stat st;

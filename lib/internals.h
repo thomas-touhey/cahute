@@ -43,15 +43,15 @@
 #endif
 
 #if WINDOWS_ENABLED
-# define UNIX_ENABLED 0
+# define POSIX_ENABLED 0
 #elif defined(__unix__) && __unix__ \
     || (defined(__APPLE__) || defined(__MACH__))
-# define UNIX_ENABLED 1
+# define POSIX_ENABLED 1
 #else
-# define UNIX_ENABLED 0
+# define POSIX_ENABLED 0
 #endif
 
-#if UNIX_ENABLED
+#if POSIX_ENABLED
 # include <fcntl.h>
 # include <sys/ioctl.h>
 # include <sys/stat.h>
@@ -163,7 +163,7 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000400 /* Cannot recover. */
 
 /* Medium types allowed. */
-#if UNIX_ENABLED
+#if POSIX_ENABLED
 # define CAHUTE_LINK_MEDIUM_POSIX_SERIAL 1
 #endif
 #if WINDOWS_ENABLED
@@ -190,7 +190,7 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_CASIOLINK_VARIANT_CAS50  2
 #define CAHUTE_CASIOLINK_VARIANT_CAS100 3
 
-#if UNIX_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
 /**
  * POSIX medium state.
  *
@@ -201,7 +201,8 @@ struct cahute_link_posix_medium_state {
 };
 #endif
 
-#if WINDOWS_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL) \
+    || defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
 /**
  * Windows API medium state.
  *
@@ -212,7 +213,7 @@ struct cahute_link_windows_medium_state {
 };
 #endif
 
-#if LIBUSB_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
 /**
  * libusb device medium state.
  *
@@ -238,13 +239,14 @@ struct cahute_link_libusb_medium_state {
  * @property libusb Medium state if the selected medium type is LIBUSB.
  */
 union cahute_link_medium_state {
-#if UNIX_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
     struct cahute_link_posix_medium_state posix;
 #endif
-#if WINDOWS_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL) \
+    || defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
     struct cahute_link_windows_medium_state windows;
 #endif
-#if LIBUSB_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
     struct cahute_link_libusb_medium_state libusb;
 #endif
 };

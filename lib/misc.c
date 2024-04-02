@@ -41,7 +41,7 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
     return CAHUTE_OK;
 }
 
-#elif UNIX_ENABLED
+#elif POSIX_ENABLED
 # include <unistd.h>
 # include <time.h>
 
