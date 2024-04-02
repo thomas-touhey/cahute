@@ -26,13 +26,15 @@
  * knowledge of the CeCILL 2.1 license and that you accept its terms.
  * ************************************************************************* */
 
-#ifndef CAHUTE_H
-#define CAHUTE_H 1
-#include <cahute/cdefs.h>
-#include <cahute/detection.h>
-#include <cahute/error.h>
-#include <cahute/link.h>
-#include <cahute/logging.h>
-#include <cahute/picture.h>
-#include <cahute/text.h>
-#endif
+#ifndef CAHUTE_TEXT_H
+#define CAHUTE_TEXT_H 1
+#include "cdefs.h"
+
+CAHUTE_BEGIN_NAMESPACE
+
+#define CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE 1
+#define CAHUTE_TEXT_ENCODING_FONTCHARACTER_FIXED    2
+
+CAHUTE_END_NAMESPACE
+
+#endif /* CAHUTE_TEXT_H */

@@ -10,3 +10,4 @@
     cahute/link
     cahute/logging
     cahute/picture
+    cahute/text
