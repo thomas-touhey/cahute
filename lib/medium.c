@@ -348,31 +348,58 @@ cahute_read_from_link(
 #ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
             case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
             case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
-                DWORD received = 0, event_mask;
+                DWORD received = 0;
                 BOOL ret;
-
-                if (link->medium != CAHUTE_LINK_MEDIUM_WIN32_CESG) {
-                    ret = WaitCommEvent(
-                        link->medium_state.windows.handle,
-                        &event_mask,
-                        NULL
-                    );
-                    if (!ret) {
-                        log_windows_error("WaitCommEvent", GetLastError());
-                        return CAHUTE_ERROR_UNKNOWN;
-                    }
-                }
 
                 ret = ReadFile(
                     link->medium_state.windows.handle,
                     dest,
                     target_size,
                     &received,
-                    NULL
+                    &link->medium_state.windows.overlapped
                 );
                 if (!ret) {
-                    log_windows_error("ReadFile", GetLastError());
-                    return CAHUTE_ERROR_UNKNOWN;
+                    DWORD werr = GetLastError();
+
+                    if (werr == ERROR_IO_PENDING) {
+                        ret = WaitForSingleObject(
+                            link->medium_state.windows.overlapped.hEvent,
+                            timeout ? timeout : INFINITE
+                        );
+                        switch (ret) {
+                        case WAIT_OBJECT_0:
+                            ret = GetOverlappedResult(
+                                link->medium_state.windows.handle,
+                                &link->medium_state.windows.overlapped,
+                                &received,
+                                FALSE
+                            );
+
+                            if (!ret) {
+                                log_windows_error(
+                                    "GetOverlappedResult",
+                                    GetLastError()
+                                );
+                                return CAHUTE_ERROR_UNKNOWN;
+                            }
+                            break;
+
+                        case WAIT_TIMEOUT:
+                            CancelIo(link->medium_state.windows.handle);
+                            goto time_out;
+
+                        default:
+                            log_windows_error(
+                                "WaitForSingleObject",
+                                GetLastError()
+                            );
+                            CancelIo(link->medium_state.windows.handle);
+                            return CAHUTE_ERROR_UNKNOWN;
+                        }
+                    } else {
+                        log_windows_error("ReadFile", GetLastError());
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
                 }
 
                 bytes_read = (size_t)received;
@@ -601,12 +628,44 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
                     buf,
                     size,
                     &sent,
-                    NULL
+                    &link->medium_state.windows.overlapped
                 );
                 if (!ret) {
                     DWORD werr = GetLastError();
-                    log_windows_error("WriteFile", werr);
-                    return CAHUTE_ERROR_UNKNOWN;
+
+                    if (werr == ERROR_IO_PENDING) {
+                        ret = WaitForSingleObject(
+                            link->medium_state.windows.overlapped.hEvent,
+                            INFINITE
+                        );
+                        switch (ret) {
+                        case WAIT_OBJECT_0:
+                            ret = GetOverlappedResult(
+                                link->medium_state.windows.handle,
+                                &link->medium_state.windows.overlapped,
+                                &sent,
+                                FALSE
+                            );
+                            if (!ret) {
+                                log_windows_error(
+                                    "GetOverlappedResult",
+                                    GetLastError()
+                                );
+                                return CAHUTE_ERROR_UNKNOWN;
+                            }
+                            break;
+
+                        default:
+                            log_windows_error(
+                                "WaitForSingleObject",
+                                GetLastError()
+                            );
+                            return CAHUTE_ERROR_UNKNOWN;
+                        }
+                    } else {
+                        log_windows_error("WriteFile", werr);
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
                 }
 
                 bytes_written = (size_t)sent;

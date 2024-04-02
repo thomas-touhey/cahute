@@ -651,6 +651,7 @@ cahute_open_serial_link(
         }
 #elif defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
     HANDLE handle = INVALID_HANDLE_VALUE;
+    HANDLE overlapped_event_handle = INVALID_HANDLE_VALUE;
     DWORD werr;
 
     handle = CreateFile(
@@ -659,7 +660,7 @@ cahute_open_serial_link(
         0,
         NULL,
         OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL,
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
         NULL
     );
     if (handle == INVALID_HANDLE_VALUE)
@@ -701,8 +702,13 @@ cahute_open_serial_link(
         return CAHUTE_ERROR_UNKNOWN;
     }
 
-    /* TODO: Implement timeouts with Windows API. */
-    msg(ll_warn, "Windows API device handles do not support timeouts.");
+    /* Create the overlapped event. */
+    overlapped_event_handle = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (overlapped_event_handle == INVALID_HANDLE_VALUE) {
+        log_windows_error("CreateEvent", GetLastError());
+        CloseHandle(handle);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
 #else
     CAHUTE_RETURN_IMPL("No serial device opening method available.");
 #endif
@@ -728,6 +734,12 @@ cahute_open_serial_link(
     link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
     link->medium = CAHUTE_LINK_MEDIUM_WIN32_SERIAL;
     link->medium_state.windows.handle = handle;
+
+    SecureZeroMemory(
+        &link->medium_state.windows.overlapped,
+        sizeof(OVERLAPPED)
+    );
+    link->medium_state.windows.overlapped.hEvent = overlapped_event_handle;
 #endif
 
     link->serial_flags = flags
@@ -797,6 +809,7 @@ cahute_open_usb_link(
 
 #if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
     HANDLE cesg_handle = INVALID_HANDLE_VALUE;
+    HANDLE overlapped_event_handle = INVALID_HANDLE_VALUE;
     PWSTR device_interface_list = NULL, device_interface;
     ULONG device_interface_list_size;
     CONFIGRET cret;
@@ -823,7 +836,7 @@ cahute_open_usb_link(
 
 #if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
 # define DEV_INTERFACE_DETAIL_DATA_SIZE 1024
-    /* The device may actuallydevice_interface_list be managed by the CESG502
+    /* The device may actually be managed by the CESG502
      * driver. We need to explore USB devices manually to find out.
      *
      * This uses the more portable CfgMgr32 API rather than SetupApi,
@@ -1013,7 +1026,7 @@ cahute_open_usb_link(
             0,
             NULL,
             OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
             NULL
         );
         werr = GetLastError();
@@ -1035,8 +1048,13 @@ cahute_open_usb_link(
                 goto fail;
             }
 
-        /* TODO: Implement timeouts with Windows API. */
-        msg(ll_warn, "Windows API device handles do not support timeouts.");
+        /* Create the overlapped event. */
+        overlapped_event_handle = CreateEvent(NULL, TRUE, FALSE, NULL);
+        if (overlapped_event_handle == INVALID_HANDLE_VALUE) {
+            log_windows_error("CreateEvent", GetLastError());
+            goto fail;
+        }
+
         goto ready;
     }
 
@@ -1250,6 +1268,12 @@ ready:
         link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
         link->medium = CAHUTE_LINK_MEDIUM_WIN32_CESG;
         link->medium_state.windows.handle = cesg_handle;
+
+        SecureZeroMemory(
+            &link->medium_state.windows.overlapped,
+            sizeof(OVERLAPPED)
+        );
+        link->medium_state.windows.overlapped.hEvent = overlapped_event_handle;
 
         /* The link takes control of the handle. */
         cesg_handle = INVALID_HANDLE_VALUE;
@@ -1466,6 +1490,8 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
 #ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
         case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
         case CAHUTE_LINK_MEDIUM_WIN32_CESG:
+            CancelIo(link->medium_state.windows.handle);
+            CloseHandle(link->medium_state.windows.overlapped.hEvent);
             CloseHandle(link->medium_state.windows.handle);
             break;
 #endif

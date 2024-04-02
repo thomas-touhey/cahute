@@ -209,6 +209,7 @@ struct cahute_link_posix_medium_state {
  */
 struct cahute_link_windows_medium_state {
     HANDLE handle;
+    OVERLAPPED overlapped;
 };
 #endif
 
