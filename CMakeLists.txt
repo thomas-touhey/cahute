@@ -11,6 +11,13 @@ set(PROJECT_ISSUES_URL "https://cahuteproject.org/guides/report.html")
 
 add_custom_target(lint COMMAND pre-commit run --all-files)
 
+if(WIN32 OR MINGW)
+    set(SDL2_NO_MWINDOWS 1)
+    set(PLATFORM_LIBS
+        cfgmgr32
+        uuid)
+endif()
+
 include(GNUInstallDirs)
 find_package(PkgConfig REQUIRED)
 find_package(SDL2 REQUIRED)
@@ -113,13 +120,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${libusb_INCLUDE_DIRS}"
 )
-target_include_directories(p7screen PRIVATE ${SDL2_INCLUDE_DIR})
-
-if(WIN32 OR MINGW)
-    set(PLATFORM_LIBS
-        cfgmgr32
-        uuid)
-endif()
+target_include_directories(p7screen PRIVATE ${SDL2_INCLUDE_DIRS})
 
 target_link_libraries(p7 PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
 target_link_libraries(p7os PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
