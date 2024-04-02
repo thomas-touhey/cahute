@@ -175,7 +175,7 @@ cahute_detect_serial(
     free(fullbuf);
 #endif
 
-#if WINDOWS_ENABLED
+#if WIN32_ENABLED
 # define SERIAL_COMM_HKEY "HARDWARE\\DEVICEMAP\\SERIALCOMM"
     cahute_serial_detection_entry entry;
     char value[1024];

@@ -28,7 +28,7 @@
 
 #include "internals.h"
 
-#if WINDOWS_ENABLED
+#if WIN32_ENABLED
 # include <windows.h>
 
 CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms) {

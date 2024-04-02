@@ -389,7 +389,7 @@ CAHUTE_LOCAL(int) deinitialize_link_protocol(cahute_link *link) {
     return CAHUTE_OK;
 }
 
-#if WINDOWS_ENABLED
+#if WIN32_ENABLED
 # include <initguid.h>
 # include <cfgmgr32.h>
 # include <usbiodef.h>

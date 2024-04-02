@@ -35,14 +35,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN16) || defined(_WIN32) || defined(_WIN64) \
-    || defined(__WINDOWS__)
-# define WINDOWS_ENABLED 1
+#if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)
+# define WIN32_ENABLED 1
 #else
-# define WINDOWS_ENABLED 0
+# define WIN32_ENABLED 0
 #endif
 
-#if WINDOWS_ENABLED
+#if WIN32_ENABLED
 # define POSIX_ENABLED 0
 #elif defined(__unix__) && __unix__ \
     || (defined(__APPLE__) || defined(__MACH__))
@@ -111,7 +110,7 @@ cahute_log_memory(
         return CAHUTE_ERROR_IMPL /* Comment to prevent match by hook. */; \
     }
 
-#if WINDOWS_ENABLED
+#if WIN32_ENABLED
 /**
  * Log a Windows API error.
  *
@@ -166,7 +165,7 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #if POSIX_ENABLED
 # define CAHUTE_LINK_MEDIUM_POSIX_SERIAL 1
 #endif
-#if WINDOWS_ENABLED
+#if WIN32_ENABLED
 # define CAHUTE_LINK_MEDIUM_WIN32_SERIAL 2
 # define CAHUTE_LINK_MEDIUM_WIN32_CESG   3
 #endif
