@@ -346,7 +346,7 @@ usual solution applied for this case:
 Updating serial parameters
 --------------------------
 
-If the link is established on a serial stream, it is possible to negotiate
+If the link is established on a serial medium, it is possible to negotiate
 different serial parameters with the calculator dynamically using
 :ref:`seven-command-02`, using the following flow:
 

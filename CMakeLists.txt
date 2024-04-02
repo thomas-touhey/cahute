@@ -72,11 +72,11 @@ add_library(${PROJECT_NAME} STATIC
     lib/link.c
     lib/linkopen.c
     lib/logging.c
+    lib/medium.c
     lib/misc.c
     lib/picture.c
     lib/seven.c
     lib/seven_ohp.c
-    lib/stream.c
 )
 
 add_executable(p7

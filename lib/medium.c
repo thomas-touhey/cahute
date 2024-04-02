@@ -29,12 +29,12 @@
 #include "internals.h"
 
 /**
- * Skip data synchronously from the stream associated with the link.
+ * Skip data synchronously from the medium associated with the link.
  *
  * This function is guaranteed to skip exactly N bytes, or return an
  * error.
  *
- * @param link Link in which the stream data is defined.
+ * @param link Link in which the medium data is defined.
  * @param size Size of the area to skip.
  * @param first_timeout Timeout before the first byte is received,
  *        in milliseconds.
@@ -50,23 +50,23 @@ cahute_skip_from_link(
     unsigned long next_timeout
 ) {
     if (size) {
-        cahute_u8 buf[CAHUTE_LINK_STREAM_BUFFER_SIZE];
+        cahute_u8 buf[CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE];
         int err;
 
-        if (size >= CAHUTE_LINK_STREAM_BUFFER_SIZE) {
+        if (size >= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE) {
             do {
                 err = cahute_read_from_link(
                     link,
                     buf,
-                    CAHUTE_LINK_STREAM_BUFFER_SIZE,
+                    CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE,
                     first_timeout,
                     next_timeout
                 );
                 if (err)
                     return err;
 
-                size -= CAHUTE_LINK_STREAM_BUFFER_SIZE;
-            } while (size >= CAHUTE_LINK_STREAM_BUFFER_SIZE);
+                size -= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
+            } while (size >= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE);
         }
 
         if (size) {
@@ -86,7 +86,7 @@ cahute_skip_from_link(
 }
 
 /**
- * Read data synchronously from the stream associated with the link.
+ * Read data synchronously from the medium associated with the link.
  *
  * This function is guaranteed to fill the buffer completely, or return
  * an error.
@@ -94,7 +94,7 @@ cahute_skip_from_link(
  * If any timeout is provided as 0, the corresponding timeout will be
  * unlimited, i.e. the function will wait indefinitely.
  *
- * @param link Link in which the stream data is defined.
+ * @param link Link in which the medium data is defined.
  * @param buf Buffer in which to write the read data.
  * @param size Size to read into the buffer.
  * @param first_timeout Timeout before the first byte is received,
@@ -122,26 +122,34 @@ cahute_read_from_link(
     if (!size)
         return CAHUTE_OK;
 
-    /* We first need to empty the link's stream buffer.
+    /* We first need to empty the link's read buffer.
      * Note that this may fully satisfy the need presented by the caller. */
     {
-        size_t left = link->stream_size - link->stream_start;
+        size_t left = link->medium_read_size - link->medium_read_start;
 
         if (size <= left) {
-            memcpy(buf, &link->stream_buffer[link->stream_start], size);
-            link->stream_start += size;
+            memcpy(
+                buf,
+                &link->medium_read_buffer[link->medium_read_start],
+                size
+            );
+            link->medium_read_start += size;
             return CAHUTE_OK;
         }
 
         if (left) {
-            memcpy(buf, &link->stream_buffer[link->stream_start], left);
+            memcpy(
+                buf,
+                &link->medium_read_buffer[link->medium_read_start],
+                left
+            );
             buf += left;
             size -= left;
         }
 
         /* The link buffer is empty! We need to reset it. */
-        link->stream_start = 0;
-        link->stream_size = 0;
+        link->medium_read_start = 0;
+        link->medium_read_size = 0;
     }
 
     /* Set ``bytes_read`` to 1 so the first round of the loop actually
@@ -155,16 +163,16 @@ cahute_read_from_link(
     last_time = start_time;
 
     /* We need to complete the buffer here, by doing multiple passes on the
-     * stream implementation specific read code until the caller's need is
+     * medium implementation specific read code until the caller's need is
      * fully satisfied.
      *
      * At each pass, we actually want to ensure that we always have
-     * ``CAHUTE_LINK_STREAM_BUFFER_SIZE`` bytes available in the target
+     * ``CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE`` bytes available in the target
      * buffer.
      *
      * In order to accomplish this, for each pass, we actually determine
      * whether we want to write in the caller's buffer directly or in
-     * the link's stream read buffer. */
+     * the link's medium read buffer. */
     while (size) {
         cahute_u8 *dest;
         size_t target_size; /* Size to ask for, optimistically. */
@@ -187,14 +195,14 @@ cahute_read_from_link(
         }
 
         bytes_read = 0;
-        if (size >= CAHUTE_LINK_STREAM_BUFFER_SIZE) {
+        if (size >= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE) {
             is_link_buffer = 0;
             dest = buf;
             target_size = size;
         } else {
             is_link_buffer = 1;
-            dest = &link->stream_buffer[0];
-            target_size = CAHUTE_LINK_STREAM_BUFFER_SIZE;
+            dest = &link->medium_read_buffer[0];
+            target_size = CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
         }
 
         /* The implementation must read data in ``dest``, for up to
@@ -267,9 +275,9 @@ cahute_read_from_link(
 
             bytes_read = avail;
         } else {
-            switch (link->stream) {
-#ifdef CAHUTE_LINK_STREAM_UNIX
-            case CAHUTE_LINK_STREAM_UNIX: {
+            switch (link->medium) {
+#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
+            case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
                 ssize_t ret;
 
                 if (timeout > 0) {
@@ -281,13 +289,13 @@ cahute_read_from_link(
                     FD_ZERO(&read_fds);
                     FD_ZERO(&write_fds);
                     FD_ZERO(&except_fds);
-                    FD_SET(link->stream_state.posix.fd, &read_fds);
+                    FD_SET(link->medium_state.posix.fd, &read_fds);
 
                     timeout_tv.tv_sec = timeout / 1000;
                     timeout_tv.tv_usec = (timeout % 1000) * 1000;
 
                     select_ret = select(
-                        link->stream_state.posix.fd + 1,
+                        link->medium_state.posix.fd + 1,
                         &read_fds,
                         &write_fds,
                         &except_fds,
@@ -311,7 +319,7 @@ cahute_read_from_link(
                     }
                 }
 
-                ret = read(link->stream_state.posix.fd, dest, target_size);
+                ret = read(link->medium_state.posix.fd, dest, target_size);
 
                 if (ret < 0)
                     switch (errno) {
@@ -337,14 +345,15 @@ cahute_read_from_link(
             break;
 #endif
 
-#ifdef CAHUTE_LINK_STREAM_WINDOWS
-            case CAHUTE_LINK_STREAM_WINDOWS: {
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+            case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
+            case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
                 DWORD received = 0, event_mask;
                 BOOL ret;
 
-                if (!link->stream_state.windows.is_cesg) {
+                if (link->medium != CAHUTE_LINK_MEDIUM_WIN32_CESG) {
                     ret = WaitCommEvent(
-                        link->stream_state.windows.handle,
+                        link->medium_state.windows.handle,
                         &event_mask,
                         NULL
                     );
@@ -355,7 +364,7 @@ cahute_read_from_link(
                 }
 
                 ret = ReadFile(
-                    link->stream_state.windows.handle,
+                    link->medium_state.windows.handle,
                     dest,
                     target_size,
                     &received,
@@ -372,14 +381,14 @@ cahute_read_from_link(
             break;
 #endif
 
-#ifdef CAHUTE_LINK_STREAM_LIBUSB
-            case CAHUTE_LINK_STREAM_LIBUSB: {
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
+            case CAHUTE_LINK_MEDIUM_LIBUSB: {
                 int libusberr;
                 int received;
 
                 libusberr = libusb_bulk_transfer(
-                    link->stream_state.libusb.handle,
-                    link->stream_state.libusb.bulk_in,
+                    link->medium_state.libusb.handle,
+                    link->medium_state.libusb.bulk_in,
                     dest,
                     target_size,
                     &received,
@@ -445,16 +454,16 @@ cahute_read_from_link(
 
         if (bytes_read >= size) {
             if (is_link_buffer) {
-                memcpy(buf, link->stream_buffer, size);
-                link->stream_start = size;
-                link->stream_size = bytes_read;
+                memcpy(buf, link->medium_read_buffer, size);
+                link->medium_read_start = size;
+                link->medium_read_size = bytes_read;
             }
 
             break;
         }
 
         if (is_link_buffer)
-            memcpy(buf, &link->stream_buffer[0], bytes_read);
+            memcpy(buf, &link->medium_read_buffer[0], bytes_read);
 
         buf += bytes_read;
         size -= bytes_read;
@@ -465,13 +474,15 @@ cahute_read_from_link(
             msg(ll_info,
                 "Read %" CAHUTE_PRIuSIZE
                 " bytes in %lums (after waiting %lums).",
-                original_size + link->stream_size - link->stream_start,
+                original_size + link->medium_read_size
+                    - link->medium_read_start,
                 last_time - first_time,
                 first_time - start_time);
         } else {
             msg(ll_info,
                 "Read %" CAHUTE_PRIuSIZE " bytes in %lums.",
-                original_size + link->stream_size - link->stream_start,
+                original_size + link->medium_read_size
+                    - link->medium_read_start,
                 last_time - start_time);
         }
     }
@@ -489,12 +500,12 @@ time_out:
 }
 
 /**
- * Write data synchronously to the stream associated with the given link.
+ * Write data synchronously to the medium associated with the given link.
  *
  * There is no write buffering specific to Cahute: the buffer is directly
- * written to the underlying stream.
+ * written to the underlying medium.
  *
- * @param link Link from which to get the stream data.
+ * @param link Link to the device.
  * @param buf Buffer to write to the link.
  * @param size Size of the buffer to write.
  * @return Error, or CAHUTE_OK if no error has occurred.
@@ -555,12 +566,12 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
 
             bytes_written = to_send;
         } else {
-            switch (link->stream) {
-#ifdef CAHUTE_LINK_STREAM_UNIX
-            case CAHUTE_LINK_STREAM_UNIX: {
+            switch (link->medium) {
+#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
+            case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
                 ssize_t ret;
 
-                ret = write(link->stream_state.posix.fd, buf, size);
+                ret = write(link->medium_state.posix.fd, buf, size);
                 if (ret < 0)
                     switch (errno) {
                     case ENODEV:
@@ -579,13 +590,14 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
             } break;
 #endif
 
-#ifdef CAHUTE_LINK_STREAM_WINDOWS
-            case CAHUTE_LINK_STREAM_WINDOWS: {
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+            case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
+            case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
                 DWORD sent;
                 BOOL ret;
 
                 ret = WriteFile(
-                    link->stream_state.windows.handle,
+                    link->medium_state.windows.handle,
                     buf,
                     size,
                     &sent,
@@ -603,14 +615,14 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
             break;
 #endif
 
-#ifdef CAHUTE_LINK_STREAM_LIBUSB
-            case CAHUTE_LINK_STREAM_LIBUSB: {
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
+            case CAHUTE_LINK_MEDIUM_LIBUSB: {
                 int libusberr;
                 int sent;
 
                 libusberr = libusb_bulk_transfer(
-                    link->stream_state.libusb.handle,
-                    link->stream_state.libusb.bulk_out,
+                    link->medium_state.libusb.handle,
+                    link->medium_state.libusb.bulk_out,
                     (cahute_u8 *)buf,
                     size,
                     &sent,
@@ -671,21 +683,9 @@ cahute_set_serial_params_to_link(
     unsigned long flags,
     unsigned long speed
 ) {
-    switch (link->protocol) {
-    case CAHUTE_LINK_PROTOCOL_SERIAL_AUTO:
-    case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
-    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
-    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
-        break;
-
-    default:
-        msg(ll_error, "Cannot set serial parameters on a non-serial link.");
-        return CAHUTE_ERROR_UNKNOWN;
-    }
-
-    switch (link->stream) {
-#ifdef CAHUTE_LINK_STREAM_UNIX
-    case CAHUTE_LINK_STREAM_UNIX: {
+    switch (link->medium) {
+#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
+    case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
         struct termios term;
         speed_t termios_speed;
         unsigned int status, original_status;
@@ -726,7 +726,7 @@ cahute_set_serial_params_to_link(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        if (tcgetattr(link->stream_state.posix.fd, &term) < 0) {
+        if (tcgetattr(link->medium_state.posix.fd, &term) < 0) {
             msg(ll_error,
                 "Could not get serial attributes: %s (%d)",
                 strerror(errno),
@@ -769,7 +769,7 @@ cahute_set_serial_params_to_link(
         if ((flags & CAHUTE_SERIAL_STOP_MASK) == CAHUTE_SERIAL_STOP_TWO)
             term.c_cflag |= CSTOPB;
 
-        if (tcsetattr(link->stream_state.posix.fd, TCSANOW, &term)) {
+        if (tcsetattr(link->medium_state.posix.fd, TCSANOW, &term)) {
             msg(ll_error,
                 "Could not get serial attributes: %s (%d)",
                 strerror(errno),
@@ -778,7 +778,7 @@ cahute_set_serial_params_to_link(
         }
 
         /* Also set the DTR/RTS mode. */
-        if (ioctl(link->stream_state.posix.fd, TIOCMGET, &status) >= 0)
+        if (ioctl(link->medium_state.posix.fd, TIOCMGET, &status) >= 0)
             status = 0;
 
         original_status = status;
@@ -806,15 +806,15 @@ cahute_set_serial_params_to_link(
         }
 
         if (status != original_status
-            && ioctl(link->stream_state.posix.fd, TIOCMSET, &status) < 0) {
+            && ioctl(link->medium_state.posix.fd, TIOCMSET, &status) < 0) {
             msg(ll_error, "Could not set DTR/RTS mode.");
             return CAHUTE_ERROR_UNKNOWN;
         }
     } break;
 #endif
 
-#ifdef CAHUTE_LINK_STREAM_WINDOWS
-    case CAHUTE_LINK_STREAM_WINDOWS: {
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+    case CAHUTE_LINK_MEDIUM_WIN32_SERIAL: {
         DCB dcb;
         DWORD dcb_speed;
 
@@ -857,7 +857,7 @@ cahute_set_serial_params_to_link(
 
         SecureZeroMemory(&dcb, sizeof(DCB));
         dcb.DCBlength = sizeof(DCB);
-        if (!GetCommState(link->stream_state.windows.handle, &dcb)) {
+        if (!GetCommState(link->medium_state.windows.handle, &dcb)) {
             log_windows_error("GetCommState", GetLastError());
             return CAHUTE_ERROR_UNKNOWN;
         }
@@ -938,7 +938,7 @@ cahute_set_serial_params_to_link(
             dcb.fRtsControl = RTS_CONTROL_DISABLE;
         }
 
-        if (!SetCommState(link->stream_state.windows.handle, &dcb)) {
+        if (!SetCommState(link->medium_state.windows.handle, &dcb)) {
             log_windows_error("SetCommState", GetLastError());
             return CAHUTE_ERROR_UNKNOWN;
         }
@@ -985,11 +985,11 @@ cahute_scsi_request(
         return CAHUTE_ERROR_UNKNOWN;
     }
 
-    /* The stream-specific implementation must store the status in the
+    /* The medium-specific implementation must store the status in the
      * ``status`` variable (NOT ``*statusp``). */
-    switch (link->stream) {
-#ifdef CAHUTE_LINK_STREAM_LIBUSB
-    case CAHUTE_LINK_STREAM_LIBUSB: {
+    switch (link->medium) {
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
+    case CAHUTE_LINK_MEDIUM_LIBUSB: {
         cahute_u8 cbw_buf[32];
         int libusberr, sent = 0;
 
@@ -1008,8 +1008,8 @@ cahute_scsi_request(
             cbw_buf[12] |= 128;
 
         libusberr = libusb_bulk_transfer(
-            link->stream_state.libusb.handle,
-            link->stream_state.libusb.bulk_out,
+            link->medium_state.libusb.handle,
+            link->medium_state.libusb.bulk_out,
             (cahute_u8 *)cbw_buf,
             31,
             &sent,
@@ -1042,8 +1042,8 @@ cahute_scsi_request(
             int libusberr, sent = 0;
 
             libusberr = libusb_bulk_transfer(
-                link->stream_state.libusb.handle,
-                link->stream_state.libusb.bulk_out,
+                link->medium_state.libusb.handle,
+                link->medium_state.libusb.bulk_out,
                 buf,
                 (int)buf_size,
                 &sent,
@@ -1073,8 +1073,8 @@ cahute_scsi_request(
                 int libusberr, recv = 0;
 
                 libusberr = libusb_bulk_transfer(
-                    link->stream_state.libusb.handle,
-                    link->stream_state.libusb.bulk_in,
+                    link->medium_state.libusb.handle,
+                    link->medium_state.libusb.bulk_in,
                     buf,
                     (int)buf_size,
                     &recv,
@@ -1115,8 +1115,8 @@ cahute_scsi_request(
 
             do {
                 libusberr = libusb_bulk_transfer(
-                    link->stream_state.libusb.handle,
-                    link->stream_state.libusb.bulk_in,
+                    link->medium_state.libusb.handle,
+                    link->medium_state.libusb.bulk_in,
                     csw,
                     (int)csw_size,
                     &recv,

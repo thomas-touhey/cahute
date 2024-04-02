@@ -628,7 +628,7 @@ cahute_open_serial_link(
         CAHUTE_RETURN_IMPL("Unsupported serial speed.");
     }
 
-#if defined(CAHUTE_LINK_STREAM_UNIX)
+#if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
     int fd;
 
     fd = open(name_or_path, O_NOCTTY | O_RDWR);
@@ -649,7 +649,7 @@ cahute_open_serial_link(
             msg(ll_error, "Unknown error: %s (%d)", strerror(errno), errno);
             return CAHUTE_ERROR_UNKNOWN;
         }
-#elif defined(CAHUTE_LINK_STREAM_WINDOWS)
+#elif defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
     HANDLE handle = INVALID_HANDLE_VALUE;
     DWORD werr;
 
@@ -701,8 +701,8 @@ cahute_open_serial_link(
         return CAHUTE_ERROR_UNKNOWN;
     }
 
-    /* TODO: Implement timeouts with Windows streams. */
-    msg(ll_warn, "Streams using the Windows API do not support timeouts.");
+    /* TODO: Implement timeouts with Windows API. */
+    msg(ll_warn, "Windows API device handles do not support timeouts.");
 #else
     CAHUTE_RETURN_IMPL("No serial device opening method available.");
 #endif
@@ -710,25 +710,24 @@ cahute_open_serial_link(
     if (!(link = malloc(sizeof(cahute_link) + DEFAULT_PROTOCOL_BUFFER_SIZE)))
         err = CAHUTE_ERROR_ALLOC;
 
-#if defined(CAHUTE_LINK_STREAM_UNIX)
+#if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
     if (err) {
         close(fd);
         return err;
     }
 
-    link->flags = CAHUTE_LINK_FLAG_CLOSE_STREAM;
-    link->stream = CAHUTE_LINK_STREAM_UNIX;
-    link->stream_state.posix.fd = fd;
-#elif defined(CAHUTE_LINK_STREAM_WINDOWS)
+    link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
+    link->medium = CAHUTE_LINK_MEDIUM_POSIX_SERIAL;
+    link->medium_state.posix.fd = fd;
+#elif defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
     if (err) {
         CloseHandle(handle);
         return err;
     }
 
-    link->flags = CAHUTE_LINK_FLAG_CLOSE_STREAM;
-    link->stream = CAHUTE_LINK_STREAM_WINDOWS;
-    link->stream_state.windows.handle = handle;
-    link->stream_state.windows.is_cesg = 0;
+    link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
+    link->medium = CAHUTE_LINK_MEDIUM_WIN32_SERIAL;
+    link->medium_state.windows.handle = handle;
 #endif
 
     link->serial_flags = flags
@@ -740,12 +739,12 @@ cahute_open_serial_link(
     link->protocol_buffer = (cahute_u8 *)link + sizeof(cahute_link);
     link->protocol_buffer_size = 0;
     link->protocol_buffer_capacity = DEFAULT_PROTOCOL_BUFFER_SIZE;
-    link->stream_start = 0;
-    link->stream_size = 0;
+    link->medium_read_start = 0;
+    link->medium_read_size = 0;
     link->cached_device_info = NULL;
 
     /* The link is now considered opened, with protocol uninitialized.
-     * We want to set the serial parameters to the stream now. */
+     * We want to set the serial parameters to the medium now. */
     err = cahute_set_serial_params_to_link(link, link->serial_flags, speed);
     if (err) {
         cahute_close_link(link);
@@ -796,7 +795,7 @@ cahute_open_usb_link(
     unsigned long protocol_flags = 0;
     int i, err = CAHUTE_ERROR_UNKNOWN;
 
-#if WINDOWS_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
     HANDLE cesg_handle = INVALID_HANDLE_VALUE;
     PWSTR device_interface_list = NULL, device_interface;
     ULONG device_interface_list_size;
@@ -804,7 +803,7 @@ cahute_open_usb_link(
     DWORD werr;
 #endif
 
-#if defined(CAHUTE_LINK_STREAM_LIBUSB)
+#if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
     libusb_context *context = NULL;
     libusb_device **device_list = NULL;
     struct libusb_config_descriptor *config_descriptor = NULL;
@@ -822,7 +821,7 @@ cahute_open_usb_link(
     } else if (flags & CAHUTE_USB_RECEIVER)
         CAHUTE_RETURN_IMPL("Receiver mode not available for data protocols.");
 
-#if WINDOWS_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
 # define DEV_INTERFACE_DETAIL_DATA_SIZE 1024
     /* The device may actuallydevice_interface_list be managed by the CESG502
      * driver. We need to explore USB devices manually to find out.
@@ -1036,8 +1035,8 @@ cahute_open_usb_link(
                 goto fail;
             }
 
-        /* TODO: Implement timeouts with Windows streams. */
-        msg(ll_warn, "Streams using the Windows API do not support timeouts.");
+        /* TODO: Implement timeouts with Windows API. */
+        msg(ll_warn, "Windows API device handles do not support timeouts.");
         goto ready;
     }
 
@@ -1049,7 +1048,7 @@ cahute_open_usb_link(
     device_interface_list = NULL;
 #endif
 
-#if defined(CAHUTE_LINK_STREAM_LIBUSB)
+#if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
     if (libusb_init(&context)) {
         msg(ll_fatal, "Could not create a libusb context.");
         goto fail;
@@ -1246,12 +1245,11 @@ ready:
         goto fail;
     }
 
-#if WINDOWS_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
     if (cesg_handle != INVALID_HANDLE_VALUE) {
-        link->flags = CAHUTE_LINK_FLAG_CLOSE_STREAM;
-        link->stream = CAHUTE_LINK_STREAM_WINDOWS;
-        link->stream_state.windows.handle = cesg_handle;
-        link->stream_state.windows.is_cesg = 1;
+        link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
+        link->medium = CAHUTE_LINK_MEDIUM_WIN32_CESG;
+        link->medium_state.windows.handle = cesg_handle;
 
         /* The link takes control of the handle. */
         cesg_handle = INVALID_HANDLE_VALUE;
@@ -1260,13 +1258,13 @@ ready:
     }
 #endif
 
-#if defined(CAHUTE_LINK_STREAM_LIBUSB)
-    link->flags = CAHUTE_LINK_FLAG_CLOSE_STREAM;
-    link->stream = CAHUTE_LINK_STREAM_LIBUSB;
-    link->stream_state.libusb.context = context;
-    link->stream_state.libusb.handle = device_handle;
-    link->stream_state.libusb.bulk_in = bulk_in;
-    link->stream_state.libusb.bulk_out = bulk_out;
+#if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
+    link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
+    link->medium = CAHUTE_LINK_MEDIUM_LIBUSB;
+    link->medium_state.libusb.context = context;
+    link->medium_state.libusb.handle = device_handle;
+    link->medium_state.libusb.bulk_in = bulk_in;
+    link->medium_state.libusb.bulk_out = bulk_out;
 
     /* Since the link now takes control over the context and device handle,
      * in case of failure, we must not free them here. */
@@ -1288,8 +1286,8 @@ prepared:
     link->protocol_buffer = (cahute_u8 *)link + sizeof(cahute_link);
     link->protocol_buffer_size = 0;
     link->protocol_buffer_capacity = DEFAULT_PROTOCOL_BUFFER_SIZE;
-    link->stream_start = 0;
-    link->stream_size = 0;
+    link->medium_read_start = 0;
+    link->medium_read_size = 0;
     link->cached_device_info = NULL;
 
     if (flags & CAHUTE_USB_NOCHECK)
@@ -1308,14 +1306,14 @@ prepared:
     return CAHUTE_OK;
 
 fail:
-#if WINDOWS_ENABLED
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
     if (cesg_handle != INVALID_HANDLE_VALUE)
         CloseHandle(cesg_handle);
     if (device_interface_list)
         HeapFree(GetProcessHeap(), 0, device_interface_list);
 #endif
 
-#if defined(CAHUTE_LINK_STREAM_LIBUSB)
+#if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
     if (link)
         cahute_close_link(link);
     if (config_descriptor)
@@ -1457,25 +1455,26 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
     if (link->flags & CAHUTE_LINK_FLAG_CLOSE_PROTOCOL)
         deinitialize_link_protocol(link);
 
-    if (link->flags & CAHUTE_LINK_FLAG_CLOSE_STREAM) {
-        switch (link->stream) {
-#ifdef CAHUTE_LINK_STREAM_UNIX
-        case CAHUTE_LINK_STREAM_UNIX:
-            close(link->stream_state.posix.fd);
+    if (link->flags & CAHUTE_LINK_FLAG_CLOSE_MEDIUM) {
+        switch (link->medium) {
+#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
+        case CAHUTE_LINK_MEDIUM_POSIX_SERIAL:
+            close(link->medium_state.posix.fd);
             break;
 #endif
 
-#ifdef CAHUTE_LINK_STREAM_WINDOWS
-        case CAHUTE_LINK_STREAM_WINDOWS:
-            CloseHandle(link->stream_state.windows.handle);
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+        case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
+        case CAHUTE_LINK_MEDIUM_WIN32_CESG:
+            CloseHandle(link->medium_state.windows.handle);
             break;
 #endif
 
-#ifdef CAHUTE_LINK_STREAM_LIBUSB
-        case CAHUTE_LINK_STREAM_LIBUSB:
-            libusb_close(link->stream_state.libusb.handle);
-            if (link->stream_state.libusb.context)
-                libusb_exit(link->stream_state.libusb.context);
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
+        case CAHUTE_LINK_MEDIUM_LIBUSB:
+            libusb_close(link->medium_state.libusb.handle);
+            if (link->medium_state.libusb.context)
+                libusb_exit(link->medium_state.libusb.context);
             break;
 #endif
         }

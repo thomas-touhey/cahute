@@ -150,10 +150,10 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
  * Link internals.
  * --- */
 
-#define CAHUTE_LINK_STREAM_BUFFER_SIZE 32768
+#define CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE 32768
 
 /* Flags that can be present on a link at runtime. */
-#define CAHUTE_LINK_FLAG_CLOSE_STREAM   0x00000001
+#define CAHUTE_LINK_FLAG_CLOSE_MEDIUM   0x00000001
 #define CAHUTE_LINK_FLAG_CLOSE_PROTOCOL 0x00000002
 #define CAHUTE_LINK_FLAG_TERMINATE      0x00000004 /* Should terminate. */
 #define CAHUTE_LINK_FLAG_RECEIVER       0x00000008 /* Act as a receiver. */
@@ -162,15 +162,16 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_LINK_FLAG_TERMINATED    0x00000200 /* Was terminated! */
 #define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000400 /* Cannot recover. */
 
-/* Stream types allowed. */
+/* Medium types allowed. */
 #if UNIX_ENABLED
-# define CAHUTE_LINK_STREAM_UNIX 0x00000002
+# define CAHUTE_LINK_MEDIUM_POSIX_SERIAL 1
 #endif
 #if WINDOWS_ENABLED
-# define CAHUTE_LINK_STREAM_WINDOWS 0x00000003
+# define CAHUTE_LINK_MEDIUM_WIN32_SERIAL 2
+# define CAHUTE_LINK_MEDIUM_WIN32_CESG   3
 #endif
 #if LIBUSB_ENABLED
-# define CAHUTE_LINK_STREAM_LIBUSB 0x00000004
+# define CAHUTE_LINK_MEDIUM_LIBUSB 4
 #endif
 
 /* Protocol selection for 'initialize_link_protocol()'. */
@@ -191,38 +192,36 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 
 #if UNIX_ENABLED
 /**
- * POSIX unistd stream state.
+ * POSIX medium state.
  *
- * @property fd File descriptor on the opened stream.
+ * @property fd File descriptor on the opened medium.
  */
-struct cahute_link_posix {
+struct cahute_link_posix_medium_state {
     int fd;
 };
 #endif
 
 #if WINDOWS_ENABLED
 /**
- * Windows API stream state.
+ * Windows API medium state.
  *
- * @property handle File handle.
- * @property is_cesg Whether the handle is for the CESG502 driver or not.
+ * @property handle Device handle.
  */
-struct cahute_link_windows {
+struct cahute_link_windows_medium_state {
     HANDLE handle;
-    int is_cesg;
 };
 #endif
 
 #if LIBUSB_ENABLED
 /**
- * libusb device stream state.
+ * libusb device medium state.
  *
  * @property context libusb context to close once the link is closed.
  * @property handle libusb device handle which to use to make USB requests.
  * @property bulk_in Bulk IN endpoint address to use for reading.
  * @property bulk_out Bulk OUT endpoint address to use for writing.
  */
-struct cahute_link_libusb {
+struct cahute_link_libusb_medium_state {
     libusb_context *context;
     libusb_device_handle *handle;
     int bulk_in;
@@ -231,21 +230,22 @@ struct cahute_link_libusb {
 #endif
 
 /**
- * Stream state, to be used depending on the link flags regarding the stream.
+ * Medium state, to be used depending on the link flags regarding the medium.
  *
- * @property posix Stream state if the selected stream type is POSIX.
- * @property windows Stream state if the selected stream type is Windows.
- * @property libusb Stream state if the selected stream type is libusb.
+ * @property posix Medium state if the selected medium type is POSIX_SERIAL.
+ * @property windows Medium state if the selected medium type is WIN32_SERIAL
+ *           or WIN32_CESG.
+ * @property libusb Medium state if the selected medium type is LIBUSB.
  */
-union cahute_link_stream_state {
+union cahute_link_medium_state {
 #if UNIX_ENABLED
-    struct cahute_link_posix posix;
+    struct cahute_link_posix_medium_state posix;
 #endif
 #if WINDOWS_ENABLED
-    struct cahute_link_windows windows;
+    struct cahute_link_windows_medium_state windows;
 #endif
 #if LIBUSB_ENABLED
-    struct cahute_link_libusb libusb;
+    struct cahute_link_libusb_medium_state libusb;
 #endif
 };
 
@@ -351,14 +351,14 @@ union cahute_link_protocol_state {
  * Internal link representation.
  *
  * @property flags Link flags, as OR'd ``CAHUTE_LINK_FLAG_*`` constants.
- * @property stream Stream type, as any ``CAHUTE_LINK_STREAM_*`` constant
- *           representing the stream state to use.
+ * @property medium Medium type, as any ``CAHUTE_LINK_MEDIUM_*`` constant
+ *           representing the medium state to use and how to use it.
  * @property protocol Protocol type, as any ``CAHUTE_LINK_PROTOCOL_*`` constant
  *           representing the protocol state to use.
  * @property serial_flags Current serial flags, as or'd
  *           ``CAHUTE_SERIAL_FLAG_*`` constants.
  * @property serial_speed Current serial speed.
- * @property stream_state State of the specific stream to use, e.g. opened
+ * @property medium_state State of the specific medium to use, e.g. opened
  *           handles and contexts to close at link closing.
  *           The read buffer is not included within this property.
  * @property protocol_state State of the specific protocol to use, e.g.
@@ -372,22 +372,23 @@ union cahute_link_protocol_state {
  *           the protocol buffer, in bytes.
  * @property protocol_buffer_capacity Total amount of data the protocol buffer
  *           can contain, in bytes.
- * @property stream_buffer Read buffer for the stream utilities to use.
- *           See ``cahute_read`` definition for more information.
- * @property stream_start Offset at which the unread data starts within
- *           the stream buffer.
- * @property stream_size Number of unread bytes in the stream buffer, starting
- *           at the offset stored in ``stream_start``.
+ * @property medium_read_buffer Buffer for reading from the medium in a
+ *           stream-like interface. See ``cahute_read_from_link`` definition
+ *           for more information.
+ * @property medium_read_start Offset at which the unread data starts within
+ *           the read buffer for the medium.
+ * @property medium_read_size Number of unread bytes in the read buffer for the
+ *           medium, starting at the offset stored in ``medium_read_start``.
  * @property cached_device_info Device information, if it has been requested
- *           at least once, so it can be free'd when the stream is closed.
+ *           at least once, so it can be free'd when the link is closed.
  */
 struct cahute_link {
     unsigned long flags;
-    int stream, protocol;
+    int medium, protocol;
     unsigned long serial_flags;
     unsigned long serial_speed;
 
-    union cahute_link_stream_state stream_state;
+    union cahute_link_medium_state medium_state;
     union cahute_link_protocol_state protocol_state;
 
     cahute_device_info *cached_device_info;
@@ -403,8 +404,8 @@ struct cahute_link {
     cahute_frame stored_frame;
 
     /* Read buffer. See ``cahute_read`` definition for more information. */
-    size_t stream_start, stream_size;
-    cahute_u8 stream_buffer[CAHUTE_LINK_STREAM_BUFFER_SIZE];
+    size_t medium_read_start, medium_read_size;
+    cahute_u8 medium_read_buffer[CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE];
 };
 
 /* ---
@@ -415,7 +416,7 @@ CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms);
 CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp);
 
 /* ---
- * Link stream functions, defined in stream.c
+ * Link medium functions, defined in medium.c
  * --- */
 
 CAHUTE_EXTERN(int)

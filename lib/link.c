@@ -216,7 +216,7 @@ cahute_negotiate_serial_params(
  * Get the device information regarding a given link.
  *
  * NOTE: This function does not execute any operations on the underlying
- *       stream, but instead relies on data obtained through initial
+ *       medium, but instead relies on data obtained through initial
  *       discovery.
  *
  * @param link Link for which to get the information.
@@ -337,8 +337,8 @@ cahute_send_file_to_storage(
     /* Compute the file size. */
     if (fseek(filep, 0L, SEEK_END) < 0) {
         msg(ll_fatal,
-            "Cannot seek on the provided file pointer; is it a standard "
-            "stream?");
+            "Cannot seek on the provided file pointer; is it a seekable "
+            "standard stream?");
         return CAHUTE_ERROR_UNKNOWN;
     }
 
