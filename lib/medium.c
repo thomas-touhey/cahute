@@ -376,10 +376,11 @@ cahute_read_from_link(
                             );
 
                             if (!ret) {
-                                log_windows_error(
-                                    "GetOverlappedResult",
-                                    GetLastError()
-                                );
+                                werr = GetLastError();
+                                if (werr == ERROR_GEN_FAILURE)
+                                    return CAHUTE_ERROR_GONE;
+
+                                log_windows_error("GetOverlappedResult", werr);
                                 return CAHUTE_ERROR_UNKNOWN;
                             }
                             break;
@@ -647,10 +648,11 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
                                 FALSE
                             );
                             if (!ret) {
-                                log_windows_error(
-                                    "GetOverlappedResult",
-                                    GetLastError()
-                                );
+                                werr = GetLastError();
+                                if (werr == ERROR_GEN_FAILURE)
+                                    return CAHUTE_ERROR_GONE;
+
+                                log_windows_error("GetOverlappedResult", werr);
                                 return CAHUTE_ERROR_UNKNOWN;
                             }
                             break;

@@ -1015,7 +1015,10 @@ cahute_open_usb_link(
         }
 
         /* The device has been found and is running the CESG502 driver! */
-        protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
+        if (flags & CAHUTE_USB_OHP)
+            protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
+        else
+            protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
 
         msg(ll_info, "Opening the following CESG502 interface:");
         msg(ll_info, "%ls", device_interface);
