@@ -253,8 +253,13 @@ union cahute_link_medium_state {
 /* Absolute minimum buffer size for CASIOLINK. */
 #define CASIOLINK_MINIMUM_BUFFER_SIZE 50
 
-/* Absolute minimum buffer size for Protocol 7.00. */
-#define SEVEN_MINIMUM_BUFFER_SIZE 1024
+/* Maximum size of raw data that can come from an extended packet.
+ * Calculators support data packets with up to 256 raw bytes (512 encoded
+ * bytes), but fxRemote uses payloads that go up to 1028 raw bytes
+ * (2056 encoded bytes). */
+#define SEVEN_MAX_PACKET_DATA_SIZE         1028
+#define SEVEN_MAX_ENCODED_PACKET_DATA_SIZE 2056 /* Max data size x 2. */
+#define SEVEN_MAX_PACKET_SIZE              2066 /* Enc. data size + 10. */
 
 /* Size of the raw device information buffer for Protocol 7.00.
  * This actually varies between devices: the fx-9860G use 164 bytes,
@@ -278,12 +283,6 @@ struct cahute_casiolink_state {
 /**
  * Protocol 7.00 peer state.
  *
- * The protocol buffer will contain the unpadded raw data accompanying
- * the packet.
- *
- * With usual packets, the packet's content will need to be decoded after
- * the receiving.
- *
  * @property flags Flags for the Protocol 7.00 peer state.
  * @property last_command Code of the last executed command. Protocol 7.00
  *           requires the code of the corresponding command to be placed as
@@ -292,9 +291,11 @@ struct cahute_casiolink_state {
  *           available.
  * @property last_packet_subtype Subtype of the last received packet, or -1
  *           if not available.
+ * @property last_packet_data Buffer to the last packet data.
+ * @property last_packet_data_size Size of the last packet data.
  * @property raw_device_info Raw device information buffer, so that data can
  *           be extracted later if actual device information is requested.
- * @property raw_device_info Raw device information size (not capacity).
+ * @property raw_device_info_size Raw device information size (not capacity).
  */
 struct cahute_seven_state {
     unsigned long flags;
@@ -304,14 +305,17 @@ struct cahute_seven_state {
     int last_packet_type;
     int last_packet_subtype;
 
-    cahute_u8 raw_device_info[SEVEN_RAW_DEVICE_INFO_BUFFER_SIZE];
+    size_t last_packet_data_size;
     size_t raw_device_info_size;
+
+    cahute_u8 last_packet_data[SEVEN_MAX_PACKET_DATA_SIZE];
+    cahute_u8 raw_device_info[SEVEN_RAW_DEVICE_INFO_BUFFER_SIZE];
 };
 
 /**
  * Protocol 7.00 screenstreaming receiver state.
  *
- * If reception of a frame packet has been successful, the protocol buffer
+ * If reception of a frame packet has been successful, the data buffer
  * will contain the frame data.
  *
  * @property last_packet_type Type of the last received packet, or -1 if not
@@ -366,12 +370,12 @@ union cahute_link_protocol_state {
  *           current role in the protocol and details regarding the last
  *           received packet.
  *           The protocol data buffer is not included within this property.
- * @property protocol_buffer General-purpose buffer for the protocol
+ * @property data_buffer General-purpose buffer for the protocol
  *           implementation to use. This can contain payloads, frame data,
  *           etc.
- * @property protocol_buffer_size Size of the data currently present within
- *           the protocol buffer, in bytes.
- * @property protocol_buffer_capacity Total amount of data the protocol buffer
+ * @property data_buffer_size Size of the data currently present within
+ *           the data buffer, in bytes.
+ * @property data_buffer_capacity Total amount of data the data buffer
  *           can contain, in bytes.
  * @property medium_read_buffer Buffer for reading from the medium in a
  *           stream-like interface. See ``cahute_read_from_link`` definition
@@ -394,11 +398,11 @@ struct cahute_link {
 
     cahute_device_info *cached_device_info;
 
-    /* Protocol buffer, used by the protocol implementation.
+    /* Raw data buffer, used by the protocol implementation to store raw data.
      * This can be of varying length depending on the protocol in use.
      * The buffer is allocated in the same block as the link. */
-    cahute_u8 *protocol_buffer;
-    size_t protocol_buffer_size, protocol_buffer_capacity;
+    cahute_u8 *data_buffer;
+    size_t data_buffer_size, data_buffer_capacity;
 
     /* Stored frame, so that screen reception does not use dynamic
      * memory allocation for every frame. */
@@ -476,6 +480,13 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link);
 CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link);
 
 CAHUTE_EXTERN(int)
+cahute_casiolink_receive_data(
+    cahute_link *link,
+    cahute_data **datap,
+    unsigned long timeout
+);
+
+CAHUTE_EXTERN(int)
 cahute_casiolink_receive_screen(
     cahute_link *link,
     cahute_frame *frame,
@@ -491,6 +502,13 @@ CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link);
 CAHUTE_EXTERN(int) cahute_seven_terminate(cahute_link *link);
 
 CAHUTE_EXTERN(int) cahute_seven_discover(cahute_link *link);
+
+CAHUTE_EXTERN(int)
+cahute_seven_receive_data(
+    cahute_link *link,
+    cahute_data **datap,
+    unsigned long timeout
+);
 
 CAHUTE_EXTERN(int)
 cahute_seven_negotiate_serial_params(
@@ -604,6 +622,24 @@ cahute_seven_ohp_receive_screen(
     cahute_link *link,
     cahute_frame *frame,
     unsigned long timeout
+);
+
+/* ---
+ * MCS encoding and decoding functions, defined in mcs.c
+ * --- */
+
+CAHUTE_EXTERN(int)
+cahute_mcs_decode_data(
+    cahute_data **datap,
+    cahute_u8 const *group,
+    size_t group_size,
+    cahute_u8 const *directory,
+    size_t directory_size,
+    cahute_u8 const *name,
+    size_t name_size,
+    cahute_u8 const *content,
+    size_t content_size,
+    int data_type
 );
 
 #endif /* INTERNALS_H */

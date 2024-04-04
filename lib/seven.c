@@ -59,6 +59,7 @@
 #define PACKET_SUBTYPE_NAK_RESEND           1 /* '01' */
 #define PACKET_SUBTYPE_NAK_OVERWRITE        2 /* '02' */
 #define PACKET_SUBTYPE_NAK_REJECT_OVERWRITE 3 /* '03' */
+#define PACKET_SUBTYPE_NAK_OTHER            4 /* '04' */
 
 #define PACKET_SUBTYPE_TERM_BASIC 0 /* '00' */
 
@@ -93,6 +94,22 @@
     EXPECT_PACKET(PACKET_TYPE_ACK, PACKET_SUBTYPE_ACK_BASIC)
 #define EXPECT_BASIC_ACK_OR_FAIL \
     EXPECT_PACKET_OR_FAIL(PACKET_TYPE_ACK, PACKET_SUBTYPE_ACK_BASIC)
+
+/* Raw device info to present for command '01' on receiver mode. */
+CAHUTE_LOCAL_DATA(cahute_u8 const)
+fake_device_info[164] = {
+    'G', 'y', '3', '6', '3', '0', '0', 'F', 'R', 'E', 'N', 'E', 'S', 'A', 'S',
+    ' ', 'S', 'H', '7', '3', '5', '5', '0', '1', '0', '0', '0', '0', '0', '0',
+    '0', '0', '0', '0', '0', '0', '4', '0', '9', '6', '0', '0', '0', '0', '0',
+    '5', '1', '2', 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, '0', '2', '.', '0', '9', '.', '2', '2', '0',
+    '1', 255, 255, 255, 255, 255, 255, '0', '0', '0', '1', '0', '0', '0', '0',
+    '0', '0', '0', '0', '2', '4', '3', '2', '7', '.', '0', '0', 'A', 'A', 'A',
+    'A', 'A', 'A', 'A', 'A', 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+};
 
 /**
  * Copy a string from a payload to a buffer, while null-terminating it
@@ -244,26 +261,33 @@ cahute_seven_pad(cahute_u8 *buf, cahute_u8 const *data, size_t data_size) {
 /**
  * Apply reverse 0x5C padding to source data and write to a destination buffer.
  *
- * SECURITY: The destination buffer is assumed to have at least data_size
- * bytes available (worst case scenario in which no padding is present).
- * Assertions regarding the data size must be done in the caller.
+ * This functions reads the original buffer size by using ``*buf_sizep``, and
+ * sets ``*buf_sizep`` to the number of actual bytes at the end.
  *
  * @param buf Destination buffer.
+ * @param buf_size Maximum capacity in the destination buffer.
  * @param data Source data to apply reverse padding to.
  * @param data_size Size of the source data to apply padding to.
- * @return Size of the padded data.
+ * @return Error code, or 0 if ok.
  */
 CAHUTE_INLINE(int)
-cahute_seven_unpad(cahute_u8 *buf, cahute_u8 const *data, size_t data_size) {
+cahute_seven_unpad(
+    cahute_u8 *buf,
+    size_t *buf_sizep,
+    cahute_u8 const *data,
+    size_t data_size
+) {
     cahute_u8 *orig = buf;
     cahute_u8 const *p;
+    size_t buf_size = *buf_sizep;
+    size_t orig_data_size = data_size;
 
-    for (p = data; data_size--; p++) {
+    for (p = data; buf_size && data_size; p++, data_size--, buf_size--) {
         int byte = *p;
 
         if (byte == '\\') {
             /* If we've arrived at the end, we ignore the char. */
-            if (!data_size)
+            if (data_size <= 1)
                 break;
 
             byte = *++p;
@@ -274,7 +298,24 @@ cahute_seven_unpad(cahute_u8 *buf, cahute_u8 const *data, size_t data_size) {
             *buf++ = byte;
     }
 
-    return (size_t)(buf - orig);
+    if (data_size) {
+        /* ``data_size`` characters could not be converted because the
+         * destination buffer was full.
+         * Note that ``*buf_sizep`` does not need to be changed here, because
+         * it actually represents both the capacity and the actual used
+         * space in the destination buffer, since it's full. */
+        msg(ll_error,
+            "%" CAHUTE_PRIuSIZE "o/%" CAHUTE_PRIuSIZE
+            "o to unpad after "
+            "filling a buffer of %" CAHUTE_PRIuSIZE "o!",
+            data_size,
+            orig_data_size,
+            *buf_sizep);
+        return CAHUTE_ERROR_SIZE;
+    }
+
+    *buf_sizep = (size_t)(buf - orig);
+    return CAHUTE_OK;
 }
 
 /**
@@ -319,31 +360,49 @@ cahute_seven_checksum(cahute_u8 const *data, size_t size) {
  * This function should not be used directly, but with
  * ``cahute_seven_send_and_receive``.
  *
- * SECURITY: This method expects the protocol buffer to be at least 1030
- * bytes long, as represented by the ``SEVEN_MINIMUM_BUFFER_SIZE``
- * constant. This should be guaranteed when initializing the link protocol
- * in ``link.c``.
- *
  * @param link Link to use to receive the Protocol 7.00 packet.
+ * @param timeout Timeout of the packet start.
  * @return Cahute error.
  */
-CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
+CAHUTE_LOCAL(int)
+cahute_seven_receive(cahute_link *link, unsigned long timeout) {
     struct cahute_seven_state *state = &link->protocol_state.seven;
-    cahute_u8 buf[540], *state_data = link->protocol_buffer;
+    cahute_u8 buf[SEVEN_MAX_PACKET_SIZE];
     size_t packet_size, data_size = 0;
+    size_t to_complete = 6;
     int err;
 
-    /* The packet is at least 6 bytes long: type (1 B)
-     * + subtype (2 B) + ex (1 B) + checksum (2 B). */
-    err = cahute_read_from_link(
-        link,
-        buf,
-        6,
-        TIMEOUT_PACKET_START,
-        TIMEOUT_PACKET_CONTENTS
-    );
-    if (err)
-        return err;
+    do {
+        /* The packet is at least 6 bytes long: type (1 B)
+         * + subtype (2 B) + ex (1 B) + checksum (2 B).
+         *
+         * In TRANSMIT mode, the calculator may start sending a bunch of
+         * 0x10 bytes; in this case, we want to ignore them until we have
+         * at least the base of a packet.
+         *
+         * If we have 4 bytes to complete, we are to read 4 bytes starting
+         * at &buf[2], since the first 2 bytes are already present. */
+        err = cahute_read_from_link(
+            link,
+            &buf[6 - to_complete],
+            to_complete,
+            timeout,
+            TIMEOUT_PACKET_CONTENTS
+        );
+        if (err)
+            return err;
+
+        for (to_complete = 0; to_complete < 6 && buf[to_complete] == 0x10;
+             to_complete++)
+            ;
+
+        if (!to_complete)
+            break;
+
+        /* In case we have 4 bytes to complete, we are to copy the 2 bytes
+         * at the end of the buffer to the beginning. */
+        memmove(buf, &buf[5 - to_complete], 6 - to_complete);
+    } while (1);
 
     /* We assume the packet is of basic or extended format from here.
      * We want to check the basic format of the packet, complete the raw
@@ -388,8 +447,7 @@ CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
              | (ASCII_HEX_TO_NIBBLE(buf[6]) << 4)
              | ASCII_HEX_TO_NIBBLE(buf[7]));
 
-        if (data_size == 0 || data_size > 528
-            || data_size > SEVEN_MINIMUM_BUFFER_SIZE) {
+        if (data_size == 0 || data_size > SEVEN_MAX_ENCODED_PACKET_DATA_SIZE) {
             msg(ll_error,
                 "Invalid data size %" CAHUTE_PRIuSIZE
                 " for the extended packet.",
@@ -459,11 +517,16 @@ CAHUTE_LOCAL(int) cahute_seven_receive(cahute_link *link) {
         ((ASCII_HEX_TO_NIBBLE(buf[1]) << 4) | ASCII_HEX_TO_NIBBLE(buf[2]));
 
     if (data_size) {
-        link->protocol_buffer_size =
-            cahute_seven_unpad(state_data, &buf[8], data_size);
-    } else
-        link->protocol_buffer_size = 0;
+        state->last_packet_data_size = SEVEN_MAX_PACKET_DATA_SIZE;
+        return cahute_seven_unpad(
+            state->last_packet_data,
+            &state->last_packet_data_size,
+            &buf[8],
+            data_size
+        );
+    }
 
+    state->last_packet_data_size = 0;
     return CAHUTE_OK;
 }
 
@@ -517,7 +580,7 @@ cahute_seven_send_and_receive(
         }
 
         msg(ll_info, "Packet sent successfully, now waiting for response.");
-        if ((err = cahute_seven_receive(link)))
+        if ((err = cahute_seven_receive(link, TIMEOUT_PACKET_START)))
             return err;
 
         if (link->protocol_state.seven.last_packet_type == PACKET_TYPE_NAK
@@ -593,15 +656,16 @@ cahute_seven_send_extended(
     unsigned long flags,
     int type,
     int subtype,
-    cahute_u8 *data,
+    cahute_u8 const *data,
     size_t data_size
 ) {
-    cahute_u8 packet[2066];
+    cahute_u8 packet[SEVEN_MAX_PACKET_SIZE];
 
-    if (data_size > 1028) {
+    if (data_size > SEVEN_MAX_PACKET_DATA_SIZE) {
         msg(ll_error,
-            "Tried to send an extended Protocol 7.00 packet with more than "
-            "1028o: %" CAHUTE_PRIuSIZE "o!",
+            "Tried to send an extended Protocol 7.00 packet with more "
+            "than " CAHUTE_PRIuSIZE "o: %" CAHUTE_PRIuSIZE "o!",
+            SEVEN_MAX_PACKET_DATA_SIZE,
             data_size);
         return CAHUTE_ERROR_UNKNOWN;
     }
@@ -770,18 +834,21 @@ cahute_seven_decode_command(
     cahute_u8 const **param6p,
     size_t *param6_sizep
 ) {
-    cahute_u8 const *buf = link->protocol_buffer;
+    cahute_u8 const *buf = link->protocol_state.seven.last_packet_data;
     cahute_u8 const *param1 = NULL, *param2 = NULL, *param3 = NULL,
                     *param4 = NULL, *param5 = NULL, *param6 = NULL;
     size_t param1_size = 0, param2_size = 0, param3_size = 0, param4_size = 0,
            param5_size = 0, param6_size = 0;
-    unsigned long filesize;
-    int overwrite, datatype;
+    unsigned long filesize = 0;
+    int overwrite = 0, datatype = 0;
 
-    if (link->protocol_buffer_size < 24) {
+    if (!link->protocol_state.seven.last_packet_data_size)
+        goto end;
+
+    if (link->protocol_state.seven.last_packet_data_size < 24) {
         msg(ll_error,
-            "Protocol buffer too small (%" CAHUTE_PRIuSIZE " < 24).",
-            link->protocol_buffer_size);
+            "Data buffer too small (%" CAHUTE_PRIuSIZE " < 24).",
+            link->protocol_state.seven.last_packet_data_size);
         return CAHUTE_ERROR_UNKNOWN;
     }
 
@@ -813,7 +880,7 @@ cahute_seven_decode_command(
     param6_size =
         (ASCII_HEX_TO_NIBBLE(buf[22]) << 4) | ASCII_HEX_TO_NIBBLE(buf[23]);
 
-    if (link->protocol_buffer_size
+    if (link->protocol_state.seven.last_packet_data_size
         != 24 + param1_size + param2_size + param3_size + param4_size
                + param5_size + param6_size)
         return CAHUTE_ERROR_UNKNOWN;
@@ -838,6 +905,7 @@ cahute_seven_decode_command(
     param5 = param4 + param4_size;
     param6 = param5 + param5_size;
 
+end:
     if (overwritep)
         *overwritep = overwrite;
     if (datatypep)
@@ -887,7 +955,7 @@ CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link) {
     int err;
 
     if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
-        err = cahute_seven_receive(link);
+        err = cahute_seven_receive(link, TIMEOUT_PACKET_START);
         if (err)
             return err;
 
@@ -937,16 +1005,19 @@ CAHUTE_EXTERN(int) cahute_seven_terminate(cahute_link *link) {
     if (link->flags & CAHUTE_LINK_FLAG_TERMINATED)
         return CAHUTE_OK;
 
-    err = cahute_seven_send_basic(
-        link,
-        0,
-        PACKET_TYPE_TERM,
-        PACKET_SUBTYPE_TERM_BASIC
-    );
-    if (err)
-        return err;
+    if (~link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
+        err = cahute_seven_send_basic(
+            link,
+            0,
+            PACKET_TYPE_TERM,
+            PACKET_SUBTYPE_TERM_BASIC
+        );
+        if (err)
+            return err;
 
-    EXPECT_BASIC_ACK;
+        EXPECT_BASIC_ACK;
+    }
+
     return CAHUTE_OK;
 }
 
@@ -1079,7 +1150,7 @@ cahute_seven_send_data(
     /* If we have been using packet shifting, we want to normalize the
      * exchange before the last packet. */
     if (shifted) {
-        if ((err = cahute_seven_receive(link)))
+        if ((err = cahute_seven_receive(link, TIMEOUT_PACKET_START)))
             return err;
 
         EXPECT_BASIC_ACK;
@@ -1252,7 +1323,7 @@ cahute_seven_send_data_from_buf(
     /* If we have been using packet shifting, we want to normalize the
      * exchange before the last packet. */
     if (shifted) {
-        if ((err = cahute_seven_receive(link)))
+        if ((err = cahute_seven_receive(link, TIMEOUT_PACKET_START)))
             return err;
 
         EXPECT_BASIC_ACK;
@@ -1331,7 +1402,7 @@ cahute_seven_send_data_from_buf(
  * @return Cahute error, or 0 if successful.
  */
 CAHUTE_LOCAL(int)
-cahute_seven_receive_data(
+cahute_seven_receive_raw_data(
     cahute_link *link,
     unsigned long flags,
     FILE *filep,
@@ -1340,7 +1411,7 @@ cahute_seven_receive_data(
     cahute_progress_func *progress_func,
     void *progress_cookie
 ) {
-    cahute_u8 const *buf = link->protocol_buffer;
+    cahute_u8 const *buf = link->protocol_state.seven.last_packet_data;
     unsigned long packet_count = 0;
     unsigned int i;
     int err;
@@ -1360,7 +1431,7 @@ cahute_seven_receive_data(
             return err;
 
         EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
-        if (link->protocol_buffer_size < 9) {
+        if (link->protocol_state.seven.last_packet_data_size < 9) {
             msg(ll_error,
                 "Data packet doesn't contain metadata and at least one byte.");
             return CAHUTE_ERROR_UNKNOWN;
@@ -1404,8 +1475,9 @@ cahute_seven_receive_data(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        size_t current_size = link->protocol_buffer_size - 8;
-        if (i < read_packet_count) {
+        size_t current_size =
+            link->protocol_state.seven.last_packet_data_size - 8;
+        if (i < packet_count) {
             if (current_size >= size) {
                 msg(ll_error,
                     "Packet too much data for the expected total size of "
@@ -1470,7 +1542,7 @@ cahute_seven_receive_data(
  * @return Cahute error, or 0 if successful.
  */
 CAHUTE_LOCAL(int)
-cahute_seven_receive_data_into_buf(
+cahute_seven_receive_raw_data_into_buf(
     cahute_link *link,
     unsigned long flags,
     cahute_u8 *buf,
@@ -1479,7 +1551,7 @@ cahute_seven_receive_data_into_buf(
     cahute_progress_func *progress_func,
     void *progress_cookie
 ) {
-    cahute_u8 const *p_buf = link->protocol_buffer;
+    cahute_u8 const *p_buf = link->protocol_state.seven.last_packet_data;
     unsigned long packet_count = 0;
     unsigned long read_packet_count, read_packet_i;
     unsigned long i, loop_send_flags = 0;
@@ -1502,7 +1574,7 @@ cahute_seven_receive_data_into_buf(
             return err;
 
         EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
-        if (link->protocol_buffer_size < 9) {
+        if (link->protocol_state.seven.last_packet_data_size < 9) {
             msg(ll_error,
                 "Data packet doesn't contain metadata and at least one byte.");
             return CAHUTE_ERROR_UNKNOWN;
@@ -1541,8 +1613,18 @@ cahute_seven_receive_data_into_buf(
 
         packet_count = read_packet_count;
 
-        current_size = link->protocol_buffer_size - 8;
-        if (current_size >= size) {
+        current_size = link->protocol_state.seven.last_packet_data_size - 8;
+        if (packet_count == 1) {
+            if (current_size < size) {
+                msg(ll_error,
+                    "Last packet did not contain enough bytes to finish the "
+                    "data flow (expected: %" CAHUTE_PRIuSIZE
+                    ", got: %" CAHUTE_PRIuSIZE ").",
+                    size,
+                    current_size);
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+        } else if (current_size >= size) {
             msg(ll_error,
                 "Packet too much data for the expected total size of "
                 "the data flow (expected: %" CAHUTE_PRIuSIZE
@@ -1596,7 +1678,7 @@ cahute_seven_receive_data_into_buf(
             return err;
 
         EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
-        if (link->protocol_buffer_size < 9) {
+        if (link->protocol_state.seven.last_packet_data_size < 9) {
             msg(ll_error,
                 "Data packet doesn't contain metadata and at least one byte.");
             return CAHUTE_ERROR_UNKNOWN;
@@ -1639,7 +1721,7 @@ cahute_seven_receive_data_into_buf(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        current_size = link->protocol_buffer_size - 8;
+        current_size = link->protocol_state.seven.last_packet_data_size - 8;
         if (current_size >= size) {
             msg(ll_error,
                 "Packet too much data for the expected total size of "
@@ -1665,11 +1747,11 @@ cahute_seven_receive_data_into_buf(
         msg(ll_info, "Requesting packet %u/%u.", packet_count - 1, packet_count
         );
 
-        if ((err = cahute_seven_receive(link)))
+        if ((err = cahute_seven_receive(link, TIMEOUT_PACKET_START)))
             return err;
 
         EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
-        if (link->protocol_buffer_size < 9) {
+        if (link->protocol_state.seven.last_packet_data_size < 9) {
             msg(ll_error,
                 "Data packet doesn't contain metadata and at least one byte.");
             return CAHUTE_ERROR_UNKNOWN;
@@ -1712,7 +1794,7 @@ cahute_seven_receive_data_into_buf(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        current_size = link->protocol_buffer_size - 8;
+        current_size = link->protocol_state.seven.last_packet_data_size - 8;
         if (current_size >= size) {
             msg(ll_error,
                 "Packet too much data for the expected total size of "
@@ -1746,7 +1828,7 @@ cahute_seven_receive_data_into_buf(
             return err;
 
         EXPECT_PACKET(PACKET_TYPE_DATA, command_code);
-        if (link->protocol_buffer_size < 9) {
+        if (link->protocol_state.seven.last_packet_data_size < 9) {
             msg(ll_error,
                 "Data packet doesn't contain metadata and at least one byte.");
             return CAHUTE_ERROR_UNKNOWN;
@@ -1789,7 +1871,7 @@ cahute_seven_receive_data_into_buf(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        current_size = link->protocol_buffer_size - 8;
+        current_size = link->protocol_state.seven.last_packet_data_size - 8;
         if (current_size < size) {
             msg(ll_error,
                 "Last packet did not contain enough bytes to finish the "
@@ -1850,24 +1932,396 @@ CAHUTE_EXTERN(int) cahute_seven_discover(cahute_link *link) {
 
     EXPECT_PACKET(PACKET_TYPE_ACK, PACKET_SUBTYPE_ACK_EXTENDED);
 
-    if (link->protocol_buffer_size > SEVEN_RAW_DEVICE_INFO_BUFFER_SIZE) {
+    if (link->protocol_state.seven.last_packet_data_size
+        > SEVEN_RAW_DEVICE_INFO_BUFFER_SIZE) {
         msg(ll_error,
             "Could not store obtained device information (got "
             "%" CAHUTE_PRIuSIZE "/%" CAHUTE_PRIuSIZE " bytes)",
-            link->protocol_buffer_size,
+            link->protocol_state.seven.last_packet_data_size,
             SEVEN_RAW_DEVICE_INFO_BUFFER_SIZE);
         return CAHUTE_ERROR_SIZE;
     }
 
     memcpy(
         link->protocol_state.seven.raw_device_info,
-        link->protocol_buffer,
-        link->protocol_buffer_size
+        link->protocol_state.seven.last_packet_data,
+        link->protocol_state.seven.last_packet_data_size
     );
     link->protocol_state.seven.raw_device_info_size =
-        link->protocol_buffer_size;
+        link->protocol_state.seven.last_packet_data_size;
     link->protocol_state.seven.flags |= SEVEN_FLAG_DEVICE_INFO_REQUESTED;
 
+    return CAHUTE_OK;
+}
+
+/**
+ * Receive data using Protocol 7.00.
+ *
+ * This function must only be run while the device is in passive mode.
+ *
+ * @param link Link to the device.
+ * @param datap Pointer to the data to create.
+ * @param timeout Timeout in milliseconds.
+ * @return Cahute error, or 0 if no error has occurred.
+ */
+CAHUTE_EXTERN(int)
+cahute_seven_receive_data(
+    cahute_link *link,
+    cahute_data **datap,
+    unsigned long timeout
+) {
+    int err, data_type, invalid_command;
+    unsigned long data_size;
+    cahute_u8 const *param1, *param2, *param3;
+    size_t param1_size, param2_size, param3_size;
+    unsigned long new_serial_flags, new_serial_speed = 0;
+
+    do {
+        err = cahute_seven_receive(link, timeout);
+        if (err)
+            return err;
+
+        switch (link->protocol_state.seven.last_packet_type) {
+        case PACKET_TYPE_COMMAND:
+            /* Commands are the main packet type we want to support. */
+            break;
+
+        case PACKET_TYPE_CHECK:
+            /* Checks can either be the initial check or a regular check;
+             * anyway, we want to answer with an ack. */
+            err = cahute_seven_send_basic(
+                link,
+                SEND_FLAG_DISABLE_RECEIVE,
+                PACKET_TYPE_ACK,
+                PACKET_SUBTYPE_ACK_BASIC
+            );
+            if (err)
+                return err;
+
+            continue;
+
+        case PACKET_TYPE_TERM:
+            /* The sender wants to terminate the link. */
+            err = cahute_seven_send_basic(
+                link,
+                SEND_FLAG_DISABLE_RECEIVE,
+                PACKET_TYPE_ACK,
+                PACKET_SUBTYPE_ACK_BASIC
+            );
+            if (err)
+                return err;
+
+            link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
+            return CAHUTE_ERROR_TERMINATED;
+
+        default: /* Unknown types of packets. */
+            err = cahute_seven_send_basic(
+                link,
+                SEND_FLAG_DISABLE_RECEIVE,
+                PACKET_TYPE_NAK,
+                PACKET_SUBTYPE_NAK_OTHER
+            );
+            if (err)
+                return err;
+
+            continue;
+        }
+
+        err = cahute_seven_decode_command(
+            link,
+            NULL,
+            &data_type,
+            &data_size,
+            &param1,
+            &param1_size,
+            &param2,
+            &param2_size,
+            &param3,
+            &param3_size,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL
+        );
+        if (err)
+            return err;
+
+        switch (link->protocol_state.seven.last_packet_subtype) {
+        case 0x01: /* Command 01 "Get device information" */
+            /* We are not sure what section the device reads, so we
+             * present a full fake data inspired from the Graph 75+E. */
+            err = cahute_seven_send_extended(
+                link,
+                SEND_FLAG_DISABLE_RECEIVE,
+                PACKET_TYPE_ACK,
+                PACKET_SUBTYPE_ACK_EXTENDED,
+                fake_device_info,
+                sizeof(fake_device_info)
+            );
+            if (err)
+                return err;
+
+            continue;
+
+        case 0x02: /* Command 02 "Set link settings" */
+            /* Experimentally, the fx-9860G sets the serial link parameters
+             * to 115200E1 when the TRANSMIT mode is selected. */
+            new_serial_flags = 0;
+            invalid_command = 0;
+
+            if (param1_size == 3 && !memcmp(param1, "300", 3))
+                new_serial_speed = 300;
+            else if (param1_size == 3 && !memcmp(param1, "600", 3))
+                new_serial_speed = 600;
+            else if (param1_size == 4 && !memcmp(param1, "1200", 4))
+                new_serial_speed = 1200;
+            else if (param1_size == 4 && !memcmp(param1, "2400", 4))
+                new_serial_speed = 2400;
+            else if (param1_size == 4 && !memcmp(param1, "4800", 4))
+                new_serial_speed = 4800;
+            else if (param1_size == 4 && !memcmp(param1, "9600", 4))
+                new_serial_speed = 9600;
+            else if (param1_size == 5 && !memcmp(param1, "19200", 5))
+                new_serial_speed = 19200;
+            else if (param1_size == 5 && !memcmp(param1, "38400", 5))
+                new_serial_speed = 38400;
+            else if (param1_size == 5 && !memcmp(param1, "57600", 5))
+                new_serial_speed = 57600;
+            else if (param1_size == 6 && !memcmp(param1, "115200", 6))
+                new_serial_speed = 115200;
+            else {
+                msg(ll_warn,
+                    "Unknown setting \"%.*s\" for speed.",
+                    param1_size,
+                    param1);
+                invalid_command = 1;
+            }
+
+            if (param2_size == 4 && !memcmp(param2, "EVEN", 4))
+                new_serial_flags |= CAHUTE_SERIAL_PARITY_EVEN;
+            else if (param2_size == 3 && !memcmp(param2, "ODD", 3))
+                new_serial_flags |= CAHUTE_SERIAL_PARITY_ODD;
+            else if (param2_size == 4 && !memcmp(param2, "NONE", 4))
+                new_serial_flags |= CAHUTE_SERIAL_PARITY_OFF;
+            else {
+                msg(ll_warn,
+                    "Unknown setting \"%.*s\" for parity.",
+                    param2_size,
+                    param2);
+                invalid_command = 1;
+            }
+
+            if (param3_size == 1 && param3[0] == '1')
+                new_serial_flags |= CAHUTE_SERIAL_STOP_ONE;
+            else if (param3_size == 1 && param3[0] == '2')
+                new_serial_flags |= CAHUTE_SERIAL_STOP_TWO;
+            else {
+                msg(ll_warn,
+                    "Unknown setting \"%.*s\" for stop bits.",
+                    param3_size,
+                    param3);
+                invalid_command = 1;
+            }
+
+            if (invalid_command) {
+                err = cahute_seven_send_basic(
+                    link,
+                    SEND_FLAG_DISABLE_RECEIVE,
+                    PACKET_TYPE_NAK,
+                    PACKET_SUBTYPE_NAK_OTHER
+                );
+                if (err)
+                    return err;
+
+                continue;
+            }
+
+            err = cahute_seven_send_basic(
+                link,
+                SEND_FLAG_DISABLE_RECEIVE,
+                PACKET_TYPE_ACK,
+                PACKET_SUBTYPE_ACK_BASIC
+            );
+            if (err)
+                return err;
+
+            link->serial_flags = new_serial_flags;
+            link->serial_speed = new_serial_speed;
+
+            /* We introduce an artificial sleep to make the device believe
+             * that we may be slow. Otherwise, the transfer may crash right
+             * after we have changed the properties of our link. */
+            err = cahute_sleep(50);
+            if (err)
+                return err;
+
+            err = cahute_set_serial_params_to_link(
+                link,
+                new_serial_flags,
+                new_serial_speed
+            );
+            if (err) {
+                /* We have successfully negociated with the device to switch
+                * serial settings but have not managed to change settings
+                * ourselves. We can no longer communicate with the device,
+                * hence can no longer negotiate the serial settings back.
+                * Therefore, we consider the link to be irrecoverable. */
+                msg(ll_error,
+                    "Could not set the serial params; that makes our "
+                    "connection "
+                    "irrecoverable!");
+                link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+                return err;
+            }
+
+            msg(ll_info, "New serial settings have been set!");
+            continue;
+
+        case 0x09: /* Command 09 "OS Verification 3" */
+            /* We want to imitate the Graph 75+E on this command,
+             * and only return an ACK. */
+            err = cahute_seven_send_basic(
+                link,
+                SEND_FLAG_DISABLE_RECEIVE,
+                PACKET_TYPE_ACK,
+                PACKET_SUBTYPE_ACK_BASIC
+            );
+            if (err)
+                return err;
+
+            continue;
+
+        case 0x25: /* Command 25 "Transfer file" (main memory) */
+            if (data_size > link->data_buffer_capacity) {
+                msg(ll_error,
+                    "File too big for our data buffer capacity "
+                    "(%" CAHUTE_PRIuSIZE "o/%" CAHUTE_PRIuSIZE "o).",
+                    data_size,
+                    link->data_buffer_capacity);
+
+                err = cahute_seven_send_basic(
+                    link,
+                    SEND_FLAG_DISABLE_RECEIVE,
+                    PACKET_TYPE_NAK,
+                    PACKET_SUBTYPE_NAK_OTHER
+                );
+                if (err)
+                    return err;
+
+                continue;
+            }
+
+            {
+                cahute_u8 parambuf[40];
+
+                if (sizeof(parambuf)
+                    < param1_size + param2_size + param3_size) {
+                    msg(ll_error,
+                        "Parameters are bigger than expected for file "
+                        "transfer (%" CAHUTE_PRIuSIZE "o > %" CAHUTE_PRIuSIZE
+                        "o)!",
+                        param1_size + param2_size + param3_size,
+                        sizeof(parambuf));
+
+                    err = cahute_seven_send_basic(
+                        link,
+                        SEND_FLAG_DISABLE_RECEIVE,
+                        PACKET_TYPE_NAK,
+                        PACKET_SUBTYPE_NAK_OTHER
+                    );
+                    if (err)
+                        return err;
+
+                    continue;
+                }
+
+                /* NOTE: The last_packet_data will be replaced by the
+                 * following, so we actually need to copy our parameters
+                 * now! */
+                {
+                    cahute_u8 *parambufp = parambuf;
+
+                    if (param1_size)
+                        memcpy(parambufp, param1, param1_size);
+
+                    param1 = parambufp;
+                    parambufp += param1_size;
+
+                    if (param2_size)
+                        memcpy(parambufp, param2, param2_size);
+
+                    param2 = parambufp;
+                    parambufp += param2_size;
+
+                    if (param3_size)
+                        memcpy(parambufp, param3, param3_size);
+
+                    param3 = parambufp;
+                }
+
+                /* Now the parameters are copied, we can now receive our
+                 * raw data! */
+
+                link->data_buffer_size = 0;
+                err = cahute_seven_receive_raw_data_into_buf(
+                    link,
+                    RECEIVE_DATA_FLAG_DISABLE_SHIFTING,
+                    link->data_buffer,
+                    data_size,
+                    0x25,
+                    NULL,
+                    NULL
+                );
+                if (err)
+                    return err;
+
+                link->data_buffer_size = data_size;
+                err = cahute_seven_send_basic(
+                    link,
+                    SEND_FLAG_DISABLE_RECEIVE,
+                    PACKET_TYPE_ACK,
+                    PACKET_SUBTYPE_ACK_BASIC
+                );
+                if (err)
+                    return err;
+
+                err = cahute_mcs_decode_data(
+                    datap,
+                    param1,
+                    param1_size,
+                    param3,
+                    param3_size,
+                    param2,
+                    param2_size,
+                    link->data_buffer,
+                    link->data_buffer_size,
+                    data_type
+                );
+                if (!err)
+                    goto end;
+                if (err != CAHUTE_ERROR_IMPL)
+                    return err;
+            }
+
+            /* By default, we want to continue reading data until we find
+             * one that we can read. */
+            continue;
+
+        default: /* Unsupported command. */
+            err = cahute_seven_send_basic(
+                link,
+                SEND_FLAG_DISABLE_RECEIVE,
+                PACKET_TYPE_NAK,
+                PACKET_SUBTYPE_NAK_OTHER
+            );
+            if (err)
+                return err;
+        }
+    } while (1);
+
+end:
     return CAHUTE_OK;
 }
 
@@ -2322,7 +2776,7 @@ cahute_seven_request_file_from_storage(
     /* Active sends ACK.
      * Data flow occurs from passive to active.
      * Last ACK is not yet sent. */
-    err = cahute_seven_receive_data(
+    err = cahute_seven_receive_raw_data(
         link,
         0,
         filep,
@@ -2687,7 +3141,7 @@ cahute_seven_backup_rom(
             return CAHUTE_ERROR_ALLOC;
         }
 
-        err = cahute_seven_receive_data_into_buf(
+        err = cahute_seven_receive_raw_data_into_buf(
             link,
             RECEIVE_DATA_FLAG_DISABLE_SHIFTING,
             rom,
@@ -2814,7 +3268,7 @@ cahute_seven_upload_and_run_program(
  * Flash a sector using the fxRemote method.
  *
  * This method sends the data using 0x70 commands, by buffers of 0x3FC bytes
- * (size of the protocol buffer to fxRemote), and once the whole buffer is
+ * (size of the buffer with fxRemote), and once the whole buffer is
  * copied at address 0x88030000, request a copy to the real flash location
  * using command 0x71.
  *
@@ -2959,7 +3413,7 @@ cahute_seven_flash_system_using_fxremote_method(
     EXPECT_BASIC_ACK;
 
     /* The previous packet sends both an ACK and a data packet. */
-    err = cahute_seven_receive(link);
+    err = cahute_seven_receive(link, TIMEOUT_PACKET_START);
     if (err)
         return err;
 

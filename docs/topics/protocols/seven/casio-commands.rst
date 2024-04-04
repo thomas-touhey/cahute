@@ -88,7 +88,11 @@ implementations. Some may no longer be implemented on newer models.
 ``09`` Verification 3 (OS Update)
 ---------------------------------
 
-.. todo:: Describe this command.
+.. todo::
+
+    Describe this command.
+
+    This command with a Graph 75+E just returns a simple ACK.
 
 .. _seven-command-0A:
 

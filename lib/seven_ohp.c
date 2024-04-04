@@ -86,7 +86,7 @@ cahute_seven_set_ascii_hex(cahute_u8 *buf, unsigned int number) {
  * into the link.
  *
  * Note that if we receive a frame packet, we store its content directly
- * into the protocol buffer if we have enough capacity in it.
+ * into the data buffer if we have enough capacity in it.
  *
  * @param link Link to use to receive the Protocol 7.00 packet.
  * @param align Whether we should align ourselves. to the beginning of the next
@@ -97,7 +97,7 @@ cahute_seven_set_ascii_hex(cahute_u8 *buf, unsigned int number) {
 CAHUTE_LOCAL(int)
 cahute_seven_ohp_receive(cahute_link *link, int align, unsigned long timeout) {
     struct cahute_seven_ohp_state *state = &link->protocol_state.seven_ohp;
-    cahute_u8 buf[50], *state_data = link->protocol_buffer;
+    cahute_u8 buf[50], *state_data = link->data_buffer;
     size_t packet_size;
     int err;
 
@@ -163,7 +163,7 @@ sequence_found:
 
     state->last_packet_type = buf[0];
     memcpy(state->last_packet_subtype, &buf[1], 5);
-    link->protocol_buffer_size = 0;
+    link->data_buffer_size = 0;
 
     packet_size = 6;
     if (buf[0] == PACKET_TYPE_CHECK || buf[0] == PACKET_TYPE_ACK) {
@@ -317,11 +317,11 @@ sequence_found:
          * - The size matches one the one we expect from a frame with
          *   the provided format and dimensions. Otherwise, skip the frame
          *   length and the checksum and return a CAHUTE_ERROR_UNKNOWN.
-         * - The frame length fits within our protocol buffer. Otherwise,
+         * - The frame length fits within our data buffer. Otherwise,
          *   skip the frame length and the checksum and return a
          *   CAHUTE_ERROR_UNKNOWN.
          *
-         * We can then read the frame data into the protocol buffer and
+         * We can then read the frame data into the data buffer and
          * compute our checksum. If it does not match the checksum present
          * at the end of the frame, we return a CAHUTE_ERROR_CORRUPT. */
 
@@ -398,12 +398,12 @@ sequence_found:
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        if (frame_length > link->protocol_buffer_capacity) {
+        if (frame_length > link->data_buffer_capacity) {
             msg(ll_info,
-                "Frame length %zuo exceeded protocol buffer capacity "
+                "Frame length %zuo exceeded data buffer capacity "
                 "%zuo.",
                 frame_length,
-                link->protocol_buffer_capacity);
+                link->data_buffer_capacity);
 
             /* We still want to skip the frame length and the
              * checksum in order to fall back on our feet on next
@@ -439,7 +439,7 @@ sequence_found:
         state->picture_width = width;
         state->picture_height = height;
         state->picture_format = format;
-        link->protocol_buffer_size = frame_length;
+        link->data_buffer_size = frame_length;
     } else {
         msg(ll_error, "Unknown packet type %d (0x%02X).", buf[0], buf[0]);
 
@@ -487,9 +487,9 @@ sequence_found:
         unsigned int computed_checksum =
             cahute_seven_checksum(&buf[1], packet_size - 1);
 
-        if (link->protocol_buffer_size) {
+        if (link->data_buffer_size) {
             computed_checksum +=
-                cahute_seven_checksum(state_data, link->protocol_buffer_size);
+                cahute_seven_checksum(state_data, link->data_buffer_size);
             computed_checksum &= 255;
         }
 
@@ -572,7 +572,7 @@ cahute_seven_ohp_receive_screen(
             frame->cahute_frame_width = state->picture_width;
             frame->cahute_frame_height = state->picture_height;
             frame->cahute_frame_format = state->picture_format;
-            frame->cahute_frame_data = link->protocol_buffer;
+            frame->cahute_frame_data = link->data_buffer;
 
             return CAHUTE_OK;
 

@@ -311,20 +311,8 @@ Protocols
 Protocols define what operations and logics are available, and how to
 implement these operations and logics.
 
-All protocols may use the **protocol buffer**, which is in the link directly,
-and for which the use varies depending on the selected protocol:
-
-* CASIOLINK uses the protocol buffer when receiving data, for storing both
-  the headers and raw data.
-* Protocol 7.00 uses the protocol buffer to store unpadded data from
-  data packets.
-* Protocol 7.00 Screenstreaming uses the protocol buffer to store raw
-  picture data.
-
-.. todo::
-
-    The role of the protocol buffer for Protocol 7.00 should actually
-    change to store the received data.
+All protocols may use the **data buffer**, which is in the link directly,
+which serves at storing raw data or screen data received using the protocol.
 
 Available protocols are:
 

@@ -13,5 +13,6 @@ rationales behind those, and some of Cahute's external-facing logics.
     topics/text-encodings
     topics/file-formats
     topics/protocols
+    topics/data
     topics/usb-detection
     topics/logging

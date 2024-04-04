@@ -105,7 +105,27 @@ This is not followed by any data parts.
 ``BU`` CAS40 Backup
 ~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data for such files are the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 7 B
+      - Backup Type (*BUT*)
+      -
+      - Backup type, among:
+
+        * ``TYPEA00``: fx-9700GH style backup (32768 bytes).
+
+There is one data part, for which the size depends on the backup type.
+
+This data type is final.
 
 .. _casiolink-cas40-dc:
 
@@ -257,9 +277,50 @@ Type-specific data for such files are the following:
       - Values
     * - 0 (0x00)
       - 1 B
+      - Reserved
+      -
+      - Set to ``\0``.
+    * - 1 (0x01)
+      - 2 B
+      - Data Length (*DL*)
+      - Length of the program, plus 2 (i.e. you must subtract 2 from this
+        number before transmitting)
+      - Big endian 16-bit unsigned integer.
+    * - 3 (0x03)
+      - 2 B
       - Reserved.
       -
       - Should be set to ``\xFF``.
+    * - 5 (0x05)
+      - 12 B
+      - File name (*FN*)
+      - Name of the file for an editor program.
+      - ``HELLO\xFF\xFF\xFF\xFF\xFF\xFF\xFF``
+
+This is followed by a single program being the program's content.
+
+This data type is final.
+
+.. _casiolink-cas40-ep:
+
+``EP`` CAS40 Single Password Protected Editor Program
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Type-specific data for such files are the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 1 B
+      - Reserved
+      -
+      - Set to ``\0``.
     * - 1 (0x01)
       - 2 B
       - Data Length (*DL*)
@@ -282,30 +343,125 @@ Type-specific data for such files are the following:
       - Password of the file for an editor program.
       - ``WORLD\xFF\xFF\xFF\xFF\xFF\xFF\xFF``
 
-.. todo:: Find out what data parts are sent here!
+This is followed by a single program being the program's content.
+
+This data type is final.
 
 .. _casiolink-cas40-f1:
+
+``F1`` CAS40 Single Function
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 1 B
+      - Reserved
+      -
+      - Set to ``\0``.
+    * - 1 (0x01)
+      - 2 B
+      - Data Length (*DL*)
+      - Length of the program, plus 2 (i.e. you must subtract 2 from this
+        number before transmitting)
+      - Big endian 16-bit unsigned integer.
+    * - 3 (0x03)
+      - 2 B
+      - Reserved.
+      -
+      - Should be set to ``\0``.
+
+This is followed by a single program being the program's content.
+
+This data type is final.
+
 .. _casiolink-cas40-f6:
 
-``F1`` / ``F6`` CAS40 F-Memory
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``F6`` CAS40 Multiple Functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 1 B
+      - Reserved
+      -
+      - Set to ``\0``.
+    * - 1 (0x01)
+      - 2 B
+      - Data Length (*DL*)
+      - Length of the program, plus 2 (i.e. you must subtract 2 from this
+        number before transmitting)
+      - Big endian 16-bit unsigned integer.
+    * - 3 (0x03)
+      - 2 B
+      - Reserved.
+      -
+      - Should be set to ``\0``.
+    * - 5 (0x05)
+      - 2 B
+      - Function 1 Length (*FL1*)
+      -
+      - Big endian 16-bit length of the function 1 definition.
+    * - 7 (0x07)
+      - 2 B
+      - Function 2 Length (*FL2*)
+      -
+      - Big endian 16-bit length of the function 2 definition.
+    * - 9 (0x09)
+      - 2 B
+      - Function 3 Length (*FL3*)
+      -
+      - Big endian 16-bit length of the function 3 definition.
+    * - 11 (0x0B)
+      - 2 B
+      - Function 4 Length (*FL4*)
+      -
+      - Big endian 16-bit length of the function 4 definition.
+    * - 13 (0x0D)
+      - 2 B
+      - Function 5 Length (*FL5*)
+      -
+      - Big endian 16-bit length of the function 5 definition.
+    * - 15 (0x0F)
+      - 2 B
+      - Function 6 Length (*FL6*)
+      -
+      - Big endian 16-bit length of the function 6 definition.
 
 .. _casiolink-cas40-fn:
 
-``FN`` CAS40 Multiple Editor Programs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``FN`` CAS40 Single Editor Program in Bulk
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This file type is actually the same as :ref:`casiolink-cas40-en`, except
-it is in a context where multiple files exist.
+it is in a context where multiple editor programs are being sent, i.e.
+the data is non-final.
 
-.. todo::
+.. _casiolink-cas40-fp:
 
-    CaS also supports ``FP`` as a CAS40 file type in the ``FN`` loop.
-    Maybe this should be placed in another section?
+``FN`` Single Password Protected Editor Program in Bulk
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Find out what data parts are sent here!
+This file type is actually the same as :ref:`casiolink-cas40-ep`, except
+it is in a context where multiple editor programs are being sent, i.e.
+the data is non-final.
 
 .. _casiolink-cas40-ga:
 
@@ -335,12 +491,81 @@ it is in a context where multiple files exist.
 
 .. todo:: Describe this.
 
+.. _casiolink-cas40-m1:
+
+``M1`` CAS40 Single Matrix
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 1 B
+      - Width (*W*)
+      -
+      - Width of the matrix.
+    * - 3 (0x03)
+      - 1 B
+      - Height (*H*)
+      -
+      - Height of the matrix.
+
+There are *W* times *H* + 1 data parts of 14 bytes each, the last one being
+the sentinel, with the following data:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Type
+      - Data part type.
+      - ``\0\0`` for the cells, ``\x17\xFF`` for the sentinel.
+    * - 2 (0x02)
+      - 1 B
+      - X coordinate (*X*)
+      - Horizontal coordinate of the cell, starting at 1.
+      - 8-bit integer.
+    * - 3 (0x03)
+      - 1 B
+      - Y coordinate (*Y*)
+      - Vertical coordinate of the cell, starting at 1.
+      - 8-bit integer.
+    * - 4 (0x04)
+      - 10 B
+      - Value (*V*)
+      - Value contained by the cell.
+      - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
+
 .. _casiolink-cas40-ma:
 
-``MA`` CAS40 Matrix
-~~~~~~~~~~~~~~~~~~~
+``MA`` CAS40 Single Matrix in Bulk
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Equivalent to :ref:`casiolink-cas40-m1`, except:
+
+* There are *W* times *H* data parts instead of *W* times *H* + 1, as the
+  sentinel is not present;
+* The data type is not final.
 
 .. _casiolink-cas40-pd:
 

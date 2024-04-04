@@ -26,14 +26,57 @@
  * knowledge of the CeCILL 2.1 license and that you accept its terms.
  * ************************************************************************* */
 
-#ifndef CAHUTE_H
-#define CAHUTE_H 1
-#include <cahute/cdefs.h>
-#include <cahute/data.h>
-#include <cahute/detection.h>
-#include <cahute/error.h>
-#include <cahute/link.h>
-#include <cahute/logging.h>
-#include <cahute/picture.h>
-#include <cahute/text.h>
-#endif
+#ifndef CAHUTE_DATA_H
+#define CAHUTE_DATA_H 1
+#include "cdefs.h"
+
+CAHUTE_BEGIN_NAMESPACE
+CAHUTE_DECLARE_TYPE(cahute_data)
+
+#define CAHUTE_DATA_TYPE_PROGRAM 1
+
+struct cahute__data_content_program {
+    int cahute_data_content_program_encoding;
+
+    size_t cahute_data_content_program_name_size;
+    void *cahute_data_content_program_name;
+
+    size_t cahute_data_content_program_password_size;
+    void *cahute_data_content_program_password;
+
+    size_t cahute_data_content_program_size;
+    void *cahute_data_content_program_content;
+
+    /* TODO: mode */
+};
+
+union cahute__data_content {
+    struct cahute__data_content_program cahute_data_content_program;
+};
+
+struct cahute_data {
+    struct cahute_data *cahute_data_next;
+    int cahute_data_type;
+    union cahute__data_content cahute_data_content;
+};
+
+CAHUTE_BEGIN_DECLS
+
+CAHUTE_EXTERN(int)
+cahute_create_program(
+    cahute_data **cahute__datap,
+    int cahute__encoding,
+    void const *cahute__name,
+    size_t cahute__name_size,
+    void const *cahute__password,
+    size_t cahute__password_size,
+    void const *cahute__content,
+    size_t cahute__size
+);
+
+CAHUTE_EXTERN(void) cahute_destroy_data(cahute_data *cahute__data);
+
+CAHUTE_END_DECLS
+CAHUTE_END_NAMESPACE
+
+#endif /* CAHUTE_DATA_H */

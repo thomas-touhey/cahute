@@ -513,15 +513,39 @@ Link management related function declarations
 Data transfer related function declarations
 -------------------------------------------
 
+.. c:function:: int cahute_receive_data(cahute_link *link, \
+    cahute_data **datap, unsigned long timeout)
+
+    Receive the next data from the device.
+
+    .. warning::
+
+        If the function returns an error, ``**datap`` **must not** be used.
+
+        If the function returns :c:macro:`CAHUTE_OK` (0), the caller is
+        assumed to take ownership of ``*datap``, which means it is also
+        ultimately responsible for destroying it once the resource is no
+        longer needed using :c:func:`cahute_destroy_data`.
+
+    :param link: Link to the device.
+    :param datap: Pointer to the data to set to the newly allocated one.
+    :param timeout: Timeout in milliseconds in which to receive the data.
+        If this is set to 0, the timeout is considered infinite.
+    :return: Error, or 0 if the operation was successful.
+
 .. c:function:: int cahute_receive_screen(cahute_link *link, \
     cahute_frame const **framep, unsigned long timeout)
 
     Receive the next screen.
 
+    .. warning::
+
+        The frame **must not** be deallocated.
+
     :param link: Link with which to receive the screen frame.
     :param framep: Pointer to the frame to define.
     :param timeout: Timeout in milliseconds in which to receive the screen.
-        If this is set to 0,
+        If this is set to 0, the timeout is considered infinite.
     :return: Error, or 0 if the operation was successful.
 
 Link control related function declarations

@@ -195,6 +195,13 @@ CAHUTE_END_DECLS
  * --- */
 
 CAHUTE_EXTERN(int)
+cahute_receive_data(
+    cahute_link *cahute__link,
+    cahute_data **cahute__datap,
+    unsigned long cahute__timeout
+);
+
+CAHUTE_EXTERN(int)
 cahute_receive_screen(
     cahute_link *cahute__link,
     cahute_frame **cahute__framep,

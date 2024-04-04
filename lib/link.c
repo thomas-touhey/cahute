@@ -57,6 +57,38 @@ CAHUTE_LOCAL(int) cahute_check_link(cahute_link *link, unsigned long flags) {
  * --- */
 
 /**
+ * Receive data.
+ *
+ * @param link Link to the device.
+ * @param datap Pointer to the data to set.
+ * @param timeout Timeout to receive the data in.
+ * @return Cahute error.
+ */
+CAHUTE_EXTERN(int)
+cahute_receive_data(
+    cahute_link *link,
+    cahute_data **datap,
+    unsigned long timeout
+) {
+    int err;
+
+    err = cahute_check_link(link, CHECK_RECEIVER);
+    if (err)
+        return err;
+
+    switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+        return cahute_casiolink_receive_data(link, datap, timeout);
+
+    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
+    case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
+        return cahute_seven_receive_data(link, datap, timeout);
+    }
+
+    CAHUTE_RETURN_IMPL("No data reception method available.");
+}
+
+/**
  * Get a screen through screenstreaming or else.
  *
  * @param link Link to the device.
@@ -88,7 +120,7 @@ cahute_receive_screen(
         return cahute_seven_ohp_receive_screen(link, frame, timeout);
     }
 
-    CAHUTE_RETURN_IMPL("No screen receiving method available.");
+    CAHUTE_RETURN_IMPL("No screen reception method available.");
 }
 
 /* ---

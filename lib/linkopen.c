@@ -27,7 +27,7 @@
  * ************************************************************************* */
 
 #include "internals.h"
-#define DEFAULT_PROTOCOL_BUFFER_SIZE 524288 /* 512 KiB, max. for VRAM */
+#define DEFAULT_DATA_BUFFER_SIZE 524288 /* 512 KiB, max. for VRAM */
 
 /* Other protocol flags for 'initialize_link_protocol()'. */
 #define PROTOCOL_FLAG_NOCHECK  0x00000100 /* Should not send initial check. */
@@ -132,48 +132,57 @@ determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
 
     msg(ll_info, "Waiting for input to determine the protocol.");
 
-    err = cahute_read_from_link(link, buf, 1, 0, 0);
-    if (err)
-        goto fail;
-
-    if (buf[0] == 0x05) {
-        /* This is the beginning of a Protocol 7.00 check packet.
-         * We want to read the rest of the packet to ensure that
-         * everything is correct. */
-        err = cahute_read_from_link(link, &buf[1], 5, 0, 0);
+    do {
+        err = cahute_read_from_link(link, buf, 1, 0, 0);
         if (err)
             goto fail;
 
-        received = 6;
-        if (!memcmp(buf, seven_check_packet, 6)) {
-            /* That's a check packet! We can answer with an ACK, then
-             * set the protocol to Protocol 7.00. */
-            err = cahute_write_to_link(link, seven_ack_packet, 6);
+        if (buf[0] == 0x05) {
+            /* This is the beginning of a Protocol 7.00 check packet.
+            * We want to read the rest of the packet to ensure that
+            * everything is correct. */
+            err = cahute_read_from_link(link, &buf[1], 5, 0, 0);
             if (err)
                 goto fail;
 
-            *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
+            received = 6;
+            if (!memcmp(buf, seven_check_packet, 6)) {
+                /* That's a check packet! We can answer with an ACK, then
+                * set the protocol to Protocol 7.00. */
+                err = cahute_write_to_link(link, seven_ack_packet, 6);
+                if (err)
+                    goto fail;
+
+                *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
+                return CAHUTE_OK;
+            }
+        } else if (buf[0] == 0x0B) {
+            /* This is the beginning of a Protocol 7.00 Screenstreaming packet.
+            * We don't want to read the rest of the packet, the receiving routine
+            * for Protocol 7.00 screenstreaming will realign itself. */
+            *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP;
+            return CAHUTE_OK;
+        } else if (buf[0] == 0x10) {
+            /* This is an unknown protocol that is tried by the calculator
+            * on both USB and serial when transmitting. If we just ignore this,
+            * the calculator will try Protocol 7.00 and CASIOLINK eventually. */
+            continue;
+        } else if (buf[0] == 0x16) {
+            /* This is a CASIOLINK start packet.
+            * We can answer with an 'established' packet and set the protocol
+            * to CASIOLINK. */
+            buf[0] = 0x13;
+
+            err = cahute_write_to_link(link, buf, 1);
+            if (err)
+                goto fail;
+
+            *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
             return CAHUTE_OK;
         }
-    } else if (buf[0] == 0x0B) {
-        /* This is the beginning of a Protocol 7.00 Screenstreaming packet.
-         * We don't want to read the rest of the packet, the receiving routine
-         * for Protocol 7.00 screenstreaming will realign itself. */
-        *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP;
-        return CAHUTE_OK;
-    } else if (buf[0] == 0x16) {
-        /* This is a CASIOLINK start packet.
-         * We can answer with an 'established' packet and set the protocol
-         * to CASIOLINK. */
-        buf[0] = 0x13;
 
-        err = cahute_write_to_link(link, buf, 1);
-        if (err)
-            goto fail;
-
-        *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
-        return CAHUTE_OK;
-    }
+        break;
+    } while (1);
 
     msg(ll_error, "Unable to determine a protocol out of the following:");
     mem(ll_error, buf, received);
@@ -317,13 +326,13 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
         casiolink_state = &link->protocol_state.casiolink;
 
-        if (link->protocol_buffer_capacity < CASIOLINK_MINIMUM_BUFFER_SIZE) {
+        if (link->data_buffer_capacity < CASIOLINK_MINIMUM_BUFFER_SIZE) {
             msg(ll_fatal,
-                "CASIOLINK implementation expected a minimum protocol "
+                "CASIOLINK implementation expected a minimum data "
                 "buffer capacity of %" CAHUTE_PRIuSIZE
                 ", got %" CAHUTE_PRIuSIZE ".",
                 CASIOLINK_MINIMUM_BUFFER_SIZE,
-                link->protocol_buffer_capacity);
+                link->data_buffer_capacity);
             return CAHUTE_ERROR_UNKNOWN;
         }
 
@@ -339,20 +348,11 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
         seven_state = &link->protocol_state.seven;
-
-        if (link->protocol_buffer_capacity < SEVEN_MINIMUM_BUFFER_SIZE) {
-            msg(ll_fatal,
-                "Protocol 7.00 implementation expected a minimum protocol "
-                "buffer capacity of %" CAHUTE_PRIuSIZE
-                ", got %" CAHUTE_PRIuSIZE ".",
-                SEVEN_MINIMUM_BUFFER_SIZE,
-                link->protocol_buffer_capacity);
-            return CAHUTE_ERROR_UNKNOWN;
-        }
-
         seven_state->flags = 0;
         seven_state->last_packet_type = -1;
         seven_state->last_packet_subtype = -1;
+        seven_state->last_packet_data_size = 0;
+        seven_state->raw_device_info_size = 0;
 
         if (~flags & PROTOCOL_FLAG_NOCHECK) {
             err = cahute_seven_initiate(link);
@@ -373,8 +373,8 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
         seven_ohp_state = &link->protocol_state.seven_ohp;
 
-        /* No need to guarantee a minimum protocol buffer size here;
-         * all writes to the protocol buffer will check for its capacity! */
+        /* No need to guarantee a minimum data buffer size here;
+         * all writes to the data buffer will check for its capacity! */
         seven_ohp_state->last_packet_type = -1;
         memset(seven_ohp_state->last_packet_subtype, 0, 5);
         seven_ohp_state->picture_format = -1;
@@ -482,12 +482,6 @@ cahute_open_serial_link(
         break;
 
     case CAHUTE_SERIAL_PROTOCOL_SEVEN:
-        /* TODO */
-        if (flags & CAHUTE_SERIAL_RECEIVER)
-            CAHUTE_RETURN_IMPL(
-                "Protocol 7.00 passive side is not supported for now."
-            );
-
         protocol = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
         break;
 
@@ -712,7 +706,7 @@ cahute_open_serial_link(
     CAHUTE_RETURN_IMPL("No serial device opening method available.");
 #endif
 
-    if (!(link = malloc(sizeof(cahute_link) + DEFAULT_PROTOCOL_BUFFER_SIZE)))
+    if (!(link = malloc(sizeof(cahute_link) + DEFAULT_DATA_BUFFER_SIZE)))
         err = CAHUTE_ERROR_ALLOC;
 
 #if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
@@ -747,9 +741,9 @@ cahute_open_serial_link(
                             | CAHUTE_SERIAL_DTR_MASK | CAHUTE_SERIAL_RTS_MASK);
     link->serial_speed = speed;
     link->protocol = protocol;
-    link->protocol_buffer = (cahute_u8 *)link + sizeof(cahute_link);
-    link->protocol_buffer_size = 0;
-    link->protocol_buffer_capacity = DEFAULT_PROTOCOL_BUFFER_SIZE;
+    link->data_buffer = (cahute_u8 *)link + sizeof(cahute_link);
+    link->data_buffer_size = 0;
+    link->data_buffer_capacity = DEFAULT_DATA_BUFFER_SIZE;
     link->medium_read_start = 0;
     link->medium_read_size = 0;
     link->cached_device_info = NULL;
@@ -1257,7 +1251,7 @@ cahute_open_usb_link(
     goto fail;
 
 ready:
-    link = malloc(sizeof(cahute_link) + DEFAULT_PROTOCOL_BUFFER_SIZE);
+    link = malloc(sizeof(cahute_link) + DEFAULT_DATA_BUFFER_SIZE);
     if (!link) {
         err = CAHUTE_ERROR_ALLOC;
         goto fail;
@@ -1307,9 +1301,9 @@ prepared:
     link->serial_flags = 0;
     link->serial_speed = 0;
     link->protocol = protocol;
-    link->protocol_buffer = (cahute_u8 *)link + sizeof(cahute_link);
-    link->protocol_buffer_size = 0;
-    link->protocol_buffer_capacity = DEFAULT_PROTOCOL_BUFFER_SIZE;
+    link->data_buffer = (cahute_u8 *)link + sizeof(cahute_link);
+    link->data_buffer_size = 0;
+    link->data_buffer_capacity = DEFAULT_DATA_BUFFER_SIZE;
     link->medium_read_start = 0;
     link->medium_read_size = 0;
     link->cached_device_info = NULL;

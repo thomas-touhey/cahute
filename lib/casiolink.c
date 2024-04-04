@@ -29,6 +29,12 @@
 #include <string.h>
 #include "internals.h"
 
+/* 1-character program names for the PZ CAS40 data.
+ * \xCD is ro and \xCE is theta. */
+CAHUTE_LOCAL_DATA(cahute_u8 const *)
+pz_program_names =
+    (cahute_u8 const *)"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ\xCD\xCE";
+
 /* TIMEOUT_PACKET_TYPE is the timeout before reading the packet type, i.e.
  * the first byte, while TIMEOUT_PACKET_CONTENTS is the timeout before
  * reading any of the following bytes. */
@@ -68,17 +74,17 @@ cahute_casiolink_checksum(cahute_u8 const *data, size_t size) {
 CAHUTE_INLINE(int) cahute_casiolink_is_end(cahute_link *link) {
     switch (link->protocol_state.casiolink.variant) {
     case CAHUTE_CASIOLINK_VARIANT_CAS40:
-        if (!memcmp(&link->protocol_buffer[1], "\x17\xFF", 2))
+        if (!memcmp(&link->data_buffer[1], "\x17\xFF", 2))
             return 1;
         break;
 
     case CAHUTE_CASIOLINK_VARIANT_CAS50:
-        if (!memcmp(&link->protocol_buffer[1], "END", 4))
+        if (!memcmp(&link->data_buffer[1], "END", 4))
             return 1;
         break;
 
     case CAHUTE_CASIOLINK_VARIANT_CAS100:
-        if (!memcmp(&link->protocol_buffer[1], "END1", 4))
+        if (!memcmp(&link->data_buffer[1], "END1", 4))
             return 1;
         break;
     }
@@ -102,9 +108,9 @@ CAHUTE_INLINE(int) cahute_casiolink_is_end(cahute_link *link) {
  * @return Cahute error, or 0 if ok.
  */
 CAHUTE_LOCAL(int)
-cahute_casiolink_receive_data(cahute_link *link, unsigned long timeout) {
-    cahute_u8 *buf = link->protocol_buffer;
-    size_t buf_capacity = link->protocol_buffer_capacity;
+cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
+    cahute_u8 *buf = link->data_buffer;
+    size_t buf_capacity = link->data_buffer_capacity;
     size_t buf_size, part_count = 1, part_repeat = 1;
     size_t part_sizes[2];
     int packet_type, err, variant = 0, checksum, checksum_alt;
@@ -267,22 +273,28 @@ cahute_casiolink_receive_data(cahute_link *link, unsigned long timeout) {
     switch (variant) {
     case CAHUTE_CASIOLINK_VARIANT_CAS40:
         if (!memcmp(&buf[1], "\x17\xFF", 2)) {
-            /* End packet for CAS40. */
+            /* CAS40 End */
             part_count = 0;
             is_end = 1;
+        } else if (!memcmp(&buf[1], "BU", 2)) {
+            /* CAS40 Backup */
+            if (!memcmp(&buf[3], "TYPEA00", 7))
+                part_sizes[0] = 32768;
+
+            is_final = 1;
         } else if (!memcmp(&buf[1], "DD", 2)) {
+            /* CAS40 Monochrome Screenshot. */
             int width = buf[3], height = buf[4];
 
-            /* Monochrome Screenshot. */
             if (!memcmp(&buf[5], "\x10\x44WF", 4))
                 part_sizes[0] = ((width >> 3) + !!(width & 7)) * height;
 
             log_part_data = 0;
             is_final = 1;
         } else if (!memcmp(&buf[1], "DC", 2)) {
+            /* CAS40 Color Screenshot. */
             int width = buf[3], height = buf[4];
 
-            /* Color Screenshot. */
             if (!memcmp(&buf[5], "\x11UWF\x03", 4)) {
                 part_repeat = 3;
                 part_sizes[0] = 1 + ((width >> 3) + !!(width & 7)) * height;
@@ -290,17 +302,53 @@ cahute_casiolink_receive_data(cahute_link *link, unsigned long timeout) {
 
             log_part_data = 0;
             is_final = 1;
-        } else if (!memcmp(&buf[1], "P1", 2)) {
-            /* Single Numbered Program. */
+        } else if (!memcmp(&buf[1], "EN", 2)) {
+            /* CAS40 Single Editor Program */
             part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "EP", 2)) {
+            /* CAS40 Single Password Protected Editor Program */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "F1", 2)) {
+            /* CAS40 Single Function */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "F6", 2)) {
+            /* CAS40 Multiple Functions */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "FN", 2)) {
+            /* CAS40 Single Editor Program in Bulk */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+        } else if (!memcmp(&buf[1], "FP", 2)) {
+            /* CAS40 Single Password Protected Editor Program in Bulk */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+        } else if (!memcmp(&buf[1], "M1", 2)) {
+            /* CAS40 Single Matrix */
+            int width = buf[5], height = buf[6];
+
+            part_sizes[0] = 14;
+            part_repeat = width * height + 1; /* Sentinel data part. */
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "MA", 2)) {
+            /* CAS40 Single Matrix in Bulk */
+            int width = buf[5], height = buf[6];
+
+            part_sizes[0] = 14;
+            part_repeat = width * height;
+        } else if (!memcmp(&buf[1], "P1", 2)) {
+            /* CAS40 Single Numbered Program. */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            is_final = 1;
         } else if (!memcmp(&buf[1], "PZ", 2)) {
-            /* Multiple Numbered Programs */
+            /* CAS40 Multiple Numbered Programs */
             part_count = 2;
             part_sizes[0] = 190;
             part_sizes[1] = ((buf[4] << 8) | buf[5]) - 2;
+            is_final = 1;
         }
 
-        /* TODO */
         break;
 
     case CAHUTE_CASIOLINK_VARIANT_CAS50:
@@ -375,7 +423,7 @@ cahute_casiolink_receive_data(cahute_link *link, unsigned long timeout) {
         if (total_size > buf_capacity) {
             msg(ll_error,
                 "Cannot get %" CAHUTE_PRIuSIZE "B into a %" CAHUTE_PRIuSIZE
-                "B protocol buffer.",
+                "B data buffer.",
                 total_size,
                 buf_capacity);
 
@@ -536,13 +584,13 @@ cahute_casiolink_receive_data(cahute_link *link, unsigned long timeout) {
     }
 
     link->protocol_state.casiolink.last_variant = variant;
-    link->protocol_buffer_size = buf_size;
+    link->data_buffer_size = buf_size;
 
     if (is_end) {
         /* The packet was an end packet. */
         link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
         msg(ll_info, "Received data was a sentinel!");
-        return CAHUTE_ERROR_GONE;
+        return CAHUTE_ERROR_TERMINATED;
     }
 
     if (is_final) {
@@ -671,6 +719,124 @@ CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
 }
 
 /**
+ * Receive data.
+ *
+ * @param link Link to the device.
+ * @param datap Data to allocate.
+ * @param timeout Timeout to apply.
+ * @return Cahute error.
+ */
+CAHUTE_EXTERN(int)
+cahute_casiolink_receive_data(
+    cahute_link *link,
+    cahute_data **datap,
+    unsigned long timeout
+) {
+    cahute_u8 const *buf = link->data_buffer;
+    int err;
+
+    do {
+        err = cahute_casiolink_receive_raw_data(link, timeout);
+        if (err == CAHUTE_ERROR_TIMEOUT_START) {
+            msg(ll_error, "No data received in a timely matter, exiting.");
+            break;
+        }
+
+        if (err)
+            return err;
+
+        switch (link->protocol_state.casiolink.last_variant) {
+        case CAHUTE_CASIOLINK_VARIANT_CAS40:
+            if (!memcmp(&buf[1], "P1", 2))
+                return cahute_create_program(
+                    datap,
+                    CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE,
+                    NULL, /* No program name, this is anonymous. */
+                    0,
+                    NULL, /* No password. */
+                    0,
+                    &buf[40],
+                    link->data_buffer_size - 41
+                );
+
+            if (!memcmp(&buf[1], "PZ", 2)) {
+                cahute_data *data = NULL;
+                cahute_u8 const *content, *names = pz_program_names;
+                int i = 0;
+
+                /* We want to copy all 38 programs. */
+                buf = &buf[40];
+                content = &buf[190];
+
+                *datap = data;
+                for (i = 1; i < 39; i++) {
+                    size_t program_length = (buf[1] << 8) | buf[2];
+
+                    err = cahute_create_program(
+                        datap,
+                        CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE,
+                        names++,
+                        1,
+                        NULL, /* No password. */
+                        0,
+                        content,
+                        program_length ? program_length - 1 : 0
+                    );
+                    if (err) {
+                        cahute_destroy_data(data);
+                        return err;
+                    }
+
+                    datap = &(*datap)->cahute_data_next;
+                    buf += 5;
+                    content += program_length;
+                }
+
+                *datap = data;
+                return CAHUTE_OK;
+            }
+
+            break;
+
+        case CAHUTE_CASIOLINK_VARIANT_CAS50:
+            if (!memcmp(&buf[1], "TXT", 4)) {
+                size_t data_size =
+                    (buf[7] << 24) | (buf[8] << 16) | (buf[9] << 8) | buf[10];
+                size_t name_size = 8;
+                size_t pw_size = 8;
+
+                if (data_size >= 2)
+                    data_size -= 2;
+
+                for (; name_size && buf[10 + name_size] == 255; name_size--)
+                    ;
+                for (; pw_size && buf[26 + pw_size] == 255; pw_size--)
+                    ;
+
+                if (!memcmp(&buf[5], "PG", 2))
+                    return cahute_create_program(
+                        datap,
+                        CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE,
+                        &buf[11],
+                        name_size,
+                        &buf[27],
+                        pw_size,
+                        &buf[50],
+                        data_size
+                    );
+            }
+            break;
+        }
+
+        /* If the data was final, we still need to break here. */
+        if (link->flags & CAHUTE_LINK_FLAG_TERMINATED)
+            return CAHUTE_ERROR_TERMINATED;
+    } while (1);
+
+    return CAHUTE_ERROR_UNKNOWN;
+}
+
+/**
  * Receive a frame through screen capture.
  *
  * @param link Link for which to receive screens.
@@ -684,12 +850,12 @@ cahute_casiolink_receive_screen(
     cahute_frame *frame,
     unsigned long timeout
 ) {
-    cahute_u8 *buf = link->protocol_buffer;
+    cahute_u8 *buf = link->data_buffer;
     size_t sheet_size;
     int err;
 
     do {
-        err = cahute_casiolink_receive_data(link, timeout);
+        err = cahute_casiolink_receive_raw_data(link, timeout);
         if (err == CAHUTE_ERROR_TIMEOUT_START) {
             msg(ll_error, "No data received in a timely matter, exiting.");
             break;

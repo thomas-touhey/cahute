@@ -5,6 +5,7 @@
     :maxdepth: 1
 
     cahute/cdefs
+    cahute/data
     cahute/detection
     cahute/error
     cahute/link
