@@ -787,6 +787,14 @@ cahute_set_serial_params_to_link(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
+        if (tcdrain(link->medium_state.posix.fd)) {
+            msg(ll_error,
+                "Could not wait until data has been written: %s (%d)",
+                strerror(errno),
+                errno);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
         if (tcgetattr(link->medium_state.posix.fd, &term) < 0) {
             msg(ll_error,
                 "Could not get serial attributes: %s (%d)",
