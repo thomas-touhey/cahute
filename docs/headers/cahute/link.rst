@@ -184,10 +184,9 @@ Link management related function declarations
 
         .. warning::
 
-            This cannot be used if :c:macro:`CAHUTE_SERIAL_RECEIVER` is not
-            set and :c:macro:`CAHUTE_SERIAL_NOCHECK` is set, as the
-            sender / active side tweaks the checking flow to determine the
-            protocol of the other side.
+            This cannot be used if :c:macro:`CAHUTE_SERIAL_NOCHECK` is set,
+            as we tweak the checking flow to determine the protocol of the
+            other side.
 
     .. c:macro:: CAHUTE_SERIAL_PROTOCOL_CASIOLINK
 
@@ -339,9 +338,8 @@ Link management related function declarations
 
         .. warning::
 
-            This cannot be used if :c:macro:`CAHUTE_SERIAL_RECEIVER` is not
-            set and :c:macro:`CAHUTE_SERIAL_PROTOCOL_AUTO` is used, as the
-            sender / active side tweaks the checking flow to determine the
+            This cannot be used if :c:macro:`CAHUTE_SERIAL_PROTOCOL_AUTO`
+            is used, as we tweak the checking flow to determine the
             protocol of the other side.
 
     .. c:macro:: CAHUTE_SERIAL_NODISC

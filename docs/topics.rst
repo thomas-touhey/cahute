@@ -1,9 +1,9 @@
 Discussion topics
 =================
 
-In this section, we will explore discussion topics regarding the project's
-environment and design. These topics provide keys to understanding what is
-happening in this project, and why it is happening.
+In this section, we will explore topics regarding the project's environment,
+i.e. the protocols and formats implemented or to be implemented,
+rationales behind those, and some of Cahute's external-facing logics.
 
 .. toctree::
     :maxdepth: 2
@@ -13,6 +13,5 @@ happening in this project, and why it is happening.
     topics/text-encodings
     topics/file-formats
     topics/protocols
-    topics/data
     topics/usb-detection
     topics/logging

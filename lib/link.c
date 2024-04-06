@@ -85,7 +85,6 @@ cahute_receive_screen(
 
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
-    case CAHUTE_LINK_PROTOCOL_UMS_OHP:
         return cahute_seven_ohp_receive_screen(link, frame, timeout);
     }
 

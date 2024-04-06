@@ -28,6 +28,7 @@ This documentation is organized using `Diátaxis`_' structure.
     cli-guides
     developer-guides
     topics
+    internals
     project
     cli
     headers

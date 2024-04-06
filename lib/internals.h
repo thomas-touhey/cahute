@@ -152,10 +152,9 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE 32768
 
 /* Flags that can be present on a link at runtime. */
-#define CAHUTE_LINK_FLAG_CLOSE_MEDIUM   0x00000001
-#define CAHUTE_LINK_FLAG_CLOSE_PROTOCOL 0x00000002
-#define CAHUTE_LINK_FLAG_TERMINATE      0x00000004 /* Should terminate. */
-#define CAHUTE_LINK_FLAG_RECEIVER       0x00000008 /* Act as a receiver. */
+#define CAHUTE_LINK_FLAG_CLOSE_MEDIUM 0x00000001
+#define CAHUTE_LINK_FLAG_TERMINATE    0x00000002 /* Should terminate. */
+#define CAHUTE_LINK_FLAG_RECEIVER     0x00000004 /* Act as a receiver. */
 
 #define CAHUTE_LINK_FLAG_GONE          0x00000100 /* Underlying medium gone. */
 #define CAHUTE_LINK_FLAG_TERMINATED    0x00000200 /* Was terminated! */
@@ -170,7 +169,8 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 # define CAHUTE_LINK_MEDIUM_WIN32_CESG   3
 #endif
 #if LIBUSB_ENABLED
-# define CAHUTE_LINK_MEDIUM_LIBUSB 4
+# define CAHUTE_LINK_MEDIUM_LIBUSB     4
+# define CAHUTE_LINK_MEDIUM_LIBUSB_UMS 5
 #endif
 
 /* Protocol selection for 'initialize_link_protocol()'. */
@@ -180,8 +180,7 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #define CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP 3
 #define CAHUTE_LINK_PROTOCOL_USB_SEVEN        4
 #define CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP    5
-#define CAHUTE_LINK_PROTOCOL_UMS              6
-#define CAHUTE_LINK_PROTOCOL_UMS_OHP          7
+#define CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE 6
 
 /* CASIOLINK variant selection for the same function. */
 #define CAHUTE_CASIOLINK_VARIANT_AUTO   0

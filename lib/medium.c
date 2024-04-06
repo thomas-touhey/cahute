@@ -209,8 +209,184 @@ cahute_read_from_link(
          * ``target_size`` (while the caller only requires ``size``).
          * It must set ``bytes_read`` to the actual number of bytes read
          * this pass. */
-        if (link->protocol == CAHUTE_LINK_PROTOCOL_UMS
-            || link->protocol == CAHUTE_LINK_PROTOCOL_UMS_OHP) {
+        switch (link->medium) {
+#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
+        case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
+            ssize_t ret;
+
+            if (timeout > 0) {
+                /* Use select() to wait for input to be present. */
+                fd_set read_fds, write_fds, except_fds;
+                struct timeval timeout_tv;
+                int select_ret;
+
+                FD_ZERO(&read_fds);
+                FD_ZERO(&write_fds);
+                FD_ZERO(&except_fds);
+                FD_SET(link->medium_state.posix.fd, &read_fds);
+
+                timeout_tv.tv_sec = timeout / 1000;
+                timeout_tv.tv_usec = (timeout % 1000) * 1000;
+
+                select_ret = select(
+                    link->medium_state.posix.fd + 1,
+                    &read_fds,
+                    &write_fds,
+                    &except_fds,
+                    &timeout_tv
+                );
+
+                switch (select_ret) {
+                case 1:
+                    /* Input is ready for us to read! */
+                    break;
+
+                case 0:
+                    goto time_out;
+
+                default:
+                    msg(ll_error,
+                        "An error occurred while calling select() %s (%d)",
+                        strerror(errno),
+                        errno);
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
+            }
+
+            ret = read(link->medium_state.posix.fd, dest, target_size);
+
+            if (ret < 0)
+                switch (errno) {
+                case 0:
+                    continue;
+
+                case ENODEV:
+                case EIO:
+                    link->flags |= CAHUTE_LINK_FLAG_GONE;
+                    return CAHUTE_ERROR_GONE;
+
+                default:
+                    msg(ll_error,
+                        "An error occurred while calling read() %s (%d)",
+                        strerror(errno),
+                        errno);
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
+
+            bytes_read = (size_t)ret;
+        }
+
+        break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+        case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
+        case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
+            DWORD received = 0;
+            BOOL ret;
+
+            ret = ReadFile(
+                link->medium_state.windows.handle,
+                dest,
+                target_size,
+                &received,
+                &link->medium_state.windows.overlapped
+            );
+            if (!ret) {
+                DWORD werr = GetLastError();
+
+                if (werr == ERROR_IO_PENDING) {
+                    ret = WaitForSingleObject(
+                        link->medium_state.windows.overlapped.hEvent,
+                        timeout ? timeout : INFINITE
+                    );
+                    switch (ret) {
+                    case WAIT_OBJECT_0:
+                        ret = GetOverlappedResult(
+                            link->medium_state.windows.handle,
+                            &link->medium_state.windows.overlapped,
+                            &received,
+                            FALSE
+                        );
+
+                        if (!ret) {
+                            werr = GetLastError();
+                            if (werr == ERROR_GEN_FAILURE)
+                                return CAHUTE_ERROR_GONE;
+
+                            log_windows_error("GetOverlappedResult", werr);
+                            return CAHUTE_ERROR_UNKNOWN;
+                        }
+                        break;
+
+                    case WAIT_TIMEOUT:
+                        CancelIo(link->medium_state.windows.handle);
+                        goto time_out;
+
+                    default:
+                        log_windows_error(
+                            "WaitForSingleObject",
+                            GetLastError()
+                        );
+                        CancelIo(link->medium_state.windows.handle);
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
+                } else {
+                    log_windows_error("ReadFile", GetLastError());
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
+            }
+
+            bytes_read = (size_t)received;
+        }
+
+        break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
+        case CAHUTE_LINK_MEDIUM_LIBUSB: {
+            int libusberr;
+            int received;
+
+            libusberr = libusb_bulk_transfer(
+                link->medium_state.libusb.handle,
+                link->medium_state.libusb.bulk_in,
+                dest,
+                target_size,
+                &received,
+                timeout
+            );
+
+            switch (libusberr) {
+            case 0:
+                break;
+
+            case LIBUSB_ERROR_PIPE:
+            case LIBUSB_ERROR_NO_DEVICE:
+            case LIBUSB_ERROR_IO:
+                msg(ll_error, "USB device is no longer available.");
+                link->flags |= CAHUTE_LINK_FLAG_GONE;
+                return CAHUTE_ERROR_GONE;
+
+            case LIBUSB_ERROR_TIMEOUT:
+                goto time_out;
+
+            default:
+                msg(ll_error,
+                    "libusb_bulk_transfer returned %d: %s",
+                    libusberr,
+                    libusb_error_name(libusberr));
+                if (libusberr == LIBUSB_ERROR_OVERFLOW)
+                    msg(ll_error, "Required buffer size was %d.", received);
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+
+            bytes_read = (size_t)received;
+        } break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB_UMS
+        case CAHUTE_LINK_MEDIUM_LIBUSB_UMS: {
             cahute_u8 status_buf[16];
             cahute_u8 payload[16];
             size_t avail;
@@ -274,189 +450,11 @@ cahute_read_from_link(
                 return err;
 
             bytes_read = avail;
-        } else {
-            switch (link->medium) {
-#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
-            case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
-                ssize_t ret;
-
-                if (timeout > 0) {
-                    /* Use select() to wait for input to be present. */
-                    fd_set read_fds, write_fds, except_fds;
-                    struct timeval timeout_tv;
-                    int select_ret;
-
-                    FD_ZERO(&read_fds);
-                    FD_ZERO(&write_fds);
-                    FD_ZERO(&except_fds);
-                    FD_SET(link->medium_state.posix.fd, &read_fds);
-
-                    timeout_tv.tv_sec = timeout / 1000;
-                    timeout_tv.tv_usec = (timeout % 1000) * 1000;
-
-                    select_ret = select(
-                        link->medium_state.posix.fd + 1,
-                        &read_fds,
-                        &write_fds,
-                        &except_fds,
-                        &timeout_tv
-                    );
-
-                    switch (select_ret) {
-                    case 1:
-                        /* Input is ready for us to read! */
-                        break;
-
-                    case 0:
-                        goto time_out;
-
-                    default:
-                        msg(ll_error,
-                            "An error occurred while calling select() %s (%d)",
-                            strerror(errno),
-                            errno);
-                        return CAHUTE_ERROR_UNKNOWN;
-                    }
-                }
-
-                ret = read(link->medium_state.posix.fd, dest, target_size);
-
-                if (ret < 0)
-                    switch (errno) {
-                    case 0:
-                        continue;
-
-                    case ENODEV:
-                    case EIO:
-                        link->flags |= CAHUTE_LINK_FLAG_GONE;
-                        return CAHUTE_ERROR_GONE;
-
-                    default:
-                        msg(ll_error,
-                            "An error occurred while calling read() %s (%d)",
-                            strerror(errno),
-                            errno);
-                        return CAHUTE_ERROR_UNKNOWN;
-                    }
-
-                bytes_read = (size_t)ret;
-            }
-
-            break;
+        } break;
 #endif
 
-#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
-            case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
-            case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
-                DWORD received = 0;
-                BOOL ret;
-
-                ret = ReadFile(
-                    link->medium_state.windows.handle,
-                    dest,
-                    target_size,
-                    &received,
-                    &link->medium_state.windows.overlapped
-                );
-                if (!ret) {
-                    DWORD werr = GetLastError();
-
-                    if (werr == ERROR_IO_PENDING) {
-                        ret = WaitForSingleObject(
-                            link->medium_state.windows.overlapped.hEvent,
-                            timeout ? timeout : INFINITE
-                        );
-                        switch (ret) {
-                        case WAIT_OBJECT_0:
-                            ret = GetOverlappedResult(
-                                link->medium_state.windows.handle,
-                                &link->medium_state.windows.overlapped,
-                                &received,
-                                FALSE
-                            );
-
-                            if (!ret) {
-                                werr = GetLastError();
-                                if (werr == ERROR_GEN_FAILURE)
-                                    return CAHUTE_ERROR_GONE;
-
-                                log_windows_error("GetOverlappedResult", werr);
-                                return CAHUTE_ERROR_UNKNOWN;
-                            }
-                            break;
-
-                        case WAIT_TIMEOUT:
-                            CancelIo(link->medium_state.windows.handle);
-                            goto time_out;
-
-                        default:
-                            log_windows_error(
-                                "WaitForSingleObject",
-                                GetLastError()
-                            );
-                            CancelIo(link->medium_state.windows.handle);
-                            return CAHUTE_ERROR_UNKNOWN;
-                        }
-                    } else {
-                        log_windows_error("ReadFile", GetLastError());
-                        return CAHUTE_ERROR_UNKNOWN;
-                    }
-                }
-
-                bytes_read = (size_t)received;
-            }
-
-            break;
-#endif
-
-#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
-            case CAHUTE_LINK_MEDIUM_LIBUSB: {
-                int libusberr;
-                int received;
-
-                libusberr = libusb_bulk_transfer(
-                    link->medium_state.libusb.handle,
-                    link->medium_state.libusb.bulk_in,
-                    dest,
-                    target_size,
-                    &received,
-                    timeout
-                );
-
-                switch (libusberr) {
-                case 0:
-                    break;
-
-                case LIBUSB_ERROR_PIPE:
-                case LIBUSB_ERROR_NO_DEVICE:
-                case LIBUSB_ERROR_IO:
-                    msg(ll_error, "USB device is no longer available.");
-                    link->flags |= CAHUTE_LINK_FLAG_GONE;
-                    return CAHUTE_ERROR_GONE;
-
-                case LIBUSB_ERROR_TIMEOUT:
-                    goto time_out;
-
-                default:
-                    msg(ll_error,
-                        "libusb_bulk_transfer returned %d: %s",
-                        libusberr,
-                        libusb_error_name(libusberr));
-                    if (libusberr == LIBUSB_ERROR_OVERFLOW)
-                        msg(ll_error, "Required buffer size was %d.", received
-                        );
-                    return CAHUTE_ERROR_UNKNOWN;
-                }
-
-                bytes_read = (size_t)received;
-            }
-
-            break;
-#endif
-
-            default:
-                CAHUTE_RETURN_IMPL("No method available for reading.");
-            }
+        default:
+            CAHUTE_RETURN_IMPL("No method available for reading.");
         }
 
         if (!bytes_read)
@@ -552,8 +550,126 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
          *
          * This way, if only a partial write was achieved, the
          * implementation-specific write function can be called again. */
-        if (link->protocol == CAHUTE_LINK_PROTOCOL_UMS
-            || link->protocol == CAHUTE_LINK_PROTOCOL_UMS_OHP) {
+        switch (link->medium) {
+#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
+        case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
+            ssize_t ret;
+
+            ret = write(link->medium_state.posix.fd, buf, size);
+            if (ret < 0)
+                switch (errno) {
+                case ENODEV:
+                    link->flags |= CAHUTE_LINK_FLAG_GONE;
+                    return CAHUTE_ERROR_GONE;
+
+                default:
+                    msg(ll_fatal, "errno was %d: %s", errno, strerror(errno));
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
+
+            bytes_written = (size_t)ret;
+        } break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+        case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
+        case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
+            DWORD sent;
+            BOOL ret;
+
+            ret = WriteFile(
+                link->medium_state.windows.handle,
+                buf,
+                size,
+                &sent,
+                &link->medium_state.windows.overlapped
+            );
+            if (!ret) {
+                DWORD werr = GetLastError();
+
+                if (werr == ERROR_IO_PENDING) {
+                    ret = WaitForSingleObject(
+                        link->medium_state.windows.overlapped.hEvent,
+                        INFINITE
+                    );
+                    switch (ret) {
+                    case WAIT_OBJECT_0:
+                        ret = GetOverlappedResult(
+                            link->medium_state.windows.handle,
+                            &link->medium_state.windows.overlapped,
+                            &sent,
+                            FALSE
+                        );
+                        if (!ret) {
+                            werr = GetLastError();
+                            if (werr == ERROR_GEN_FAILURE)
+                                return CAHUTE_ERROR_GONE;
+
+                            log_windows_error("GetOverlappedResult", werr);
+                            return CAHUTE_ERROR_UNKNOWN;
+                        }
+                        break;
+
+                    default:
+                        log_windows_error(
+                            "WaitForSingleObject",
+                            GetLastError()
+                        );
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
+                } else {
+                    log_windows_error("WriteFile", werr);
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
+            }
+
+            bytes_written = (size_t)sent;
+        }
+
+        break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
+        case CAHUTE_LINK_MEDIUM_LIBUSB: {
+            int libusberr;
+            int sent;
+
+            libusberr = libusb_bulk_transfer(
+                link->medium_state.libusb.handle,
+                link->medium_state.libusb.bulk_out,
+                (cahute_u8 *)buf,
+                size,
+                &sent,
+                0 /* Unlimited timeout. */
+            );
+
+            switch (libusberr) {
+            case 0:
+                break;
+
+            case LIBUSB_ERROR_PIPE:
+            case LIBUSB_ERROR_NO_DEVICE:
+            case LIBUSB_ERROR_IO:
+                msg(ll_error, "USB device is no longer available.");
+                link->flags |= CAHUTE_LINK_FLAG_GONE;
+                return CAHUTE_ERROR_GONE;
+
+            default:
+                msg(ll_error,
+                    "libusb_bulk_transfer returned %d: %s",
+                    libusberr,
+                    libusb_error_name(libusberr));
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+
+            bytes_written = (size_t)sent;
+        }
+
+        break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB_UMS
+        case CAHUTE_LINK_MEDIUM_LIBUSB_UMS: {
             size_t to_send = size > 0xFFFF ? 0xFFFF : size;
             cahute_u8 payload[16], status_buf[16];
             int err;
@@ -593,131 +709,11 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
                 return err;
 
             bytes_written = to_send;
-        } else {
-            switch (link->medium) {
-#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
-            case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
-                ssize_t ret;
-
-                ret = write(link->medium_state.posix.fd, buf, size);
-                if (ret < 0)
-                    switch (errno) {
-                    case ENODEV:
-                        link->flags |= CAHUTE_LINK_FLAG_GONE;
-                        return CAHUTE_ERROR_GONE;
-
-                    default:
-                        msg(ll_fatal,
-                            "errno was %d: %s",
-                            errno,
-                            strerror(errno));
-                        return CAHUTE_ERROR_UNKNOWN;
-                    }
-
-                bytes_written = (size_t)ret;
-            } break;
+        } break;
 #endif
 
-#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
-            case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
-            case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
-                DWORD sent;
-                BOOL ret;
-
-                ret = WriteFile(
-                    link->medium_state.windows.handle,
-                    buf,
-                    size,
-                    &sent,
-                    &link->medium_state.windows.overlapped
-                );
-                if (!ret) {
-                    DWORD werr = GetLastError();
-
-                    if (werr == ERROR_IO_PENDING) {
-                        ret = WaitForSingleObject(
-                            link->medium_state.windows.overlapped.hEvent,
-                            INFINITE
-                        );
-                        switch (ret) {
-                        case WAIT_OBJECT_0:
-                            ret = GetOverlappedResult(
-                                link->medium_state.windows.handle,
-                                &link->medium_state.windows.overlapped,
-                                &sent,
-                                FALSE
-                            );
-                            if (!ret) {
-                                werr = GetLastError();
-                                if (werr == ERROR_GEN_FAILURE)
-                                    return CAHUTE_ERROR_GONE;
-
-                                log_windows_error("GetOverlappedResult", werr);
-                                return CAHUTE_ERROR_UNKNOWN;
-                            }
-                            break;
-
-                        default:
-                            log_windows_error(
-                                "WaitForSingleObject",
-                                GetLastError()
-                            );
-                            return CAHUTE_ERROR_UNKNOWN;
-                        }
-                    } else {
-                        log_windows_error("WriteFile", werr);
-                        return CAHUTE_ERROR_UNKNOWN;
-                    }
-                }
-
-                bytes_written = (size_t)sent;
-            }
-
-            break;
-#endif
-
-#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
-            case CAHUTE_LINK_MEDIUM_LIBUSB: {
-                int libusberr;
-                int sent;
-
-                libusberr = libusb_bulk_transfer(
-                    link->medium_state.libusb.handle,
-                    link->medium_state.libusb.bulk_out,
-                    (cahute_u8 *)buf,
-                    size,
-                    &sent,
-                    0 /* Unlimited timeout. */
-                );
-
-                switch (libusberr) {
-                case 0:
-                    break;
-
-                case LIBUSB_ERROR_PIPE:
-                case LIBUSB_ERROR_NO_DEVICE:
-                case LIBUSB_ERROR_IO:
-                    msg(ll_error, "USB device is no longer available.");
-                    link->flags |= CAHUTE_LINK_FLAG_GONE;
-                    return CAHUTE_ERROR_GONE;
-
-                default:
-                    msg(ll_error,
-                        "libusb_bulk_transfer returned %d: %s",
-                        libusberr,
-                        libusb_error_name(libusberr));
-                    return CAHUTE_ERROR_UNKNOWN;
-                }
-
-                bytes_written = (size_t)sent;
-            }
-
-            break;
-#endif
-
-            default:
-                CAHUTE_RETURN_IMPL("No method available for writing.");
-            }
+        default:
+            CAHUTE_RETURN_IMPL("No method available for writing.");
         }
 
         if (bytes_written >= size)
@@ -1057,8 +1053,8 @@ cahute_scsi_request(
     /* The medium-specific implementation must store the status in the
      * ``status`` variable (NOT ``*statusp``). */
     switch (link->medium) {
-#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
-    case CAHUTE_LINK_MEDIUM_LIBUSB: {
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB_UMS
+    case CAHUTE_LINK_MEDIUM_LIBUSB_UMS: {
         cahute_u8 cbw_buf[32];
         int libusberr, sent = 0;
 

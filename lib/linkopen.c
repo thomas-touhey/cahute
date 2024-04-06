@@ -77,10 +77,41 @@ CAHUTE_INLINE(char const *) get_protocol_name(int protocol) {
         return "Protocol 7.00 (USB)";
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
         return "Protocol 7.00 Screenstreaming (USB)";
-    case CAHUTE_LINK_PROTOCOL_UMS:
+    case CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE:
         return "USB Mass Storage";
-    case CAHUTE_LINK_PROTOCOL_UMS_OHP:
-        return "USB Mass Storage (Screenstreaming)";
+    default:
+        return "(unknown)";
+    }
+}
+
+/**
+ * Get the name of a link medium.
+ *
+ * @param medium Medium identifier, as a constant.
+ * @return Textual name of the medium.
+ */
+CAHUTE_LOCAL(char const *) get_medium_name(int medium) {
+    switch (medium) {
+#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
+    case CAHUTE_LINK_MEDIUM_POSIX_SERIAL:
+        return "Serial (POSIX)";
+#endif
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+    case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
+        return "Serial (Win32)";
+#endif
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_CESG
+    case CAHUTE_LINK_MEDIUM_WIN32_CESG:
+        return "CESG502 (Win32)";
+#endif
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
+    case CAHUTE_LINK_MEDIUM_LIBUSB:
+        return "USB Bulk (libusb)";
+#endif
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB_UMS
+    case CAHUTE_LINK_MEDIUM_LIBUSB_UMS:
+        return "USB Mass Storage (libusb)";
+#endif
     default:
         return "(unknown)";
     }
@@ -247,11 +278,7 @@ fail:
  * @return Cahute error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_LOCAL(int)
-initialize_link_protocol(
-    cahute_link *link,
-    unsigned long flags,
-    int casiolink_variant
-) {
+init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
     struct cahute_casiolink_state *casiolink_state;
     struct cahute_seven_state *seven_state;
     struct cahute_seven_ohp_state *seven_ohp_state;
@@ -277,7 +304,10 @@ initialize_link_protocol(
         flags |= PROTOCOL_FLAG_NOCHECK;
     }
 
-    msg(ll_info, "Using %s.", get_protocol_name(protocol));
+    msg(ll_info,
+        "Using %s over %s.",
+        get_protocol_name(protocol),
+        get_medium_name(link->medium));
     msg(ll_info,
         "Playing the role of %s.",
         flags & PROTOCOL_FLAG_RECEIVER ? "receiver / passive side"
@@ -341,7 +371,6 @@ initialize_link_protocol(
 
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
-    case CAHUTE_LINK_PROTOCOL_UMS_OHP:
         seven_ohp_state = &link->protocol_state.seven_ohp;
 
         /* No need to guarantee a minimum protocol buffer size here;
@@ -355,35 +384,6 @@ initialize_link_protocol(
 
     default:
         CAHUTE_RETURN_IMPL("No initialization routine for the protocol.");
-    }
-
-    return CAHUTE_OK;
-}
-
-/**
- * De-initialize a link's protocol state.
- *
- * @param link Link to deinitialize.
- * @return Cahute error, or CAHUTE_OK if no error has occurred.
- */
-CAHUTE_LOCAL(int) deinitialize_link_protocol(cahute_link *link) {
-    if (!(link->flags
-          & (CAHUTE_LINK_FLAG_IRRECOVERABLE | CAHUTE_LINK_FLAG_TERMINATED
-             | CAHUTE_LINK_FLAG_GONE | CAHUTE_LINK_FLAG_RECEIVER))) {
-        switch (link->protocol) {
-        case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
-            if (link->flags & CAHUTE_LINK_FLAG_TERMINATE)
-                cahute_casiolink_terminate(link);
-
-            break;
-
-        case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
-        case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
-            if (link->flags & CAHUTE_LINK_FLAG_TERMINATE)
-                cahute_seven_terminate(link);
-
-            break;
-        }
     }
 
     return CAHUTE_OK;
@@ -466,11 +466,10 @@ cahute_open_serial_link(
 
     switch (flags & CAHUTE_SERIAL_PROTOCOL_MASK) {
     case CAHUTE_SERIAL_PROTOCOL_AUTO:
-        /* If we are to be the sender or active side, and are not allowed
-         * to initiate the connection, we cannot test different things,
-         * therefore this cannot be used with ``CAHUTE_SERIAL_NOCHECK``. */
-        if ((~flags & CAHUTE_SERIAL_RECEIVER)
-            && (flags & CAHUTE_SERIAL_NOCHECK)) {
+        /* If we are not allowed to initiate the connection, we cannot test
+         * different things, therefore this cannot be used with
+         * ``CAHUTE_SERIAL_NOCHECK``. */
+        if (flags & CAHUTE_SERIAL_NOCHECK) {
             msg(ll_error, "We need the check flow to determine the protocol.");
             return CAHUTE_ERROR_UNKNOWN;
         }
@@ -773,13 +772,11 @@ cahute_open_serial_link(
     if (flags & CAHUTE_SERIAL_RECEIVER)
         protocol_flags |= PROTOCOL_FLAG_RECEIVER;
 
-    err = initialize_link_protocol(link, protocol_flags, casiolink_variant);
+    err = init_link(link, protocol_flags, casiolink_variant);
     if (err) {
         cahute_close_link(link);
         return err;
     }
-
-    link->flags |= CAHUTE_LINK_FLAG_CLOSE_PROTOCOL;
 
     *linkp = link;
     return CAHUTE_OK;
@@ -803,7 +800,7 @@ cahute_open_usb_link(
     int address
 ) {
     cahute_link *link = NULL;
-    int protocol;
+    int protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
     unsigned long protocol_flags = 0;
     int i, err = CAHUTE_ERROR_UNKNOWN;
 
@@ -822,6 +819,7 @@ cahute_open_usb_link(
     struct libusb_config_descriptor *config_descriptor = NULL;
     libusb_device_handle *device_handle = NULL;
     int device_count, libusberr, bulk_in = -1, bulk_out = -1;
+    int medium = CAHUTE_LINK_MEDIUM_LIBUSB;
 #endif
 
     if (flags & CAHUTE_USB_OHP) {
@@ -1017,8 +1015,6 @@ cahute_open_usb_link(
         /* The device has been found and is running the CESG502 driver! */
         if (flags & CAHUTE_USB_OHP)
             protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
-        else
-            protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
 
         msg(ll_info, "Opening the following CESG502 interface:");
         msg(ll_info, "%ls", device_interface);
@@ -1118,18 +1114,19 @@ cahute_open_usb_link(
         interface_descriptor = config_descriptor->interface[0].altsetting;
         interface_class = interface_descriptor->bInterfaceClass;
 
-        if (interface_class == 8) {
-            if (flags & CAHUTE_USB_OHP)
-                protocol = CAHUTE_LINK_PROTOCOL_UMS_OHP;
-            else
-                protocol = CAHUTE_LINK_PROTOCOL_UMS;
-        } else if (interface_class == 255) {
-            if (flags & CAHUTE_USB_OHP)
-                protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
-            else
-                protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
-        } else
+        if (interface_class == 8)
+            medium = CAHUTE_LINK_MEDIUM_LIBUSB_UMS;
+        else if (interface_class == 255)
+            medium = CAHUTE_LINK_MEDIUM_LIBUSB;
+        else {
+            msg(ll_error, "Unsupported interface class %d", interface_class);
             goto fail;
+        }
+
+        if (flags & CAHUTE_USB_OHP)
+            protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
+        else if (medium == CAHUTE_LINK_MEDIUM_LIBUSB_UMS)
+            protocol = CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE;
 
         /* Find bulk in and out endpoints.
          * This search is in case they vary between host platforms. */
@@ -1287,7 +1284,7 @@ ready:
 
 #if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
     link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
-    link->medium = CAHUTE_LINK_MEDIUM_LIBUSB;
+    link->medium = medium;
     link->medium_state.libusb.context = context;
     link->medium_state.libusb.handle = device_handle;
     link->medium_state.libusb.bulk_in = bulk_in;
@@ -1324,12 +1321,10 @@ prepared:
     if (flags & CAHUTE_USB_NOTERM)
         protocol_flags |= PROTOCOL_FLAG_NOTERM;
 
-    if ((err = initialize_link_protocol(link, protocol_flags, 0)))
+    if ((err = init_link(link, protocol_flags, 0)))
         goto fail;
 
-    link->flags |= CAHUTE_LINK_FLAG_CLOSE_PROTOCOL;
     *linkp = link;
-
     return CAHUTE_OK;
 
 fail:
@@ -1479,8 +1474,23 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
     if (link->cached_device_info)
         free(link->cached_device_info);
 
-    if (link->flags & CAHUTE_LINK_FLAG_CLOSE_PROTOCOL)
-        deinitialize_link_protocol(link);
+    if ((link->flags & CAHUTE_LINK_FLAG_TERMINATE)
+        && !(
+            link->flags
+            & (CAHUTE_LINK_FLAG_IRRECOVERABLE | CAHUTE_LINK_FLAG_TERMINATED
+               | CAHUTE_LINK_FLAG_GONE | CAHUTE_LINK_FLAG_RECEIVER)
+        )) {
+        switch (link->protocol) {
+        case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+            cahute_casiolink_terminate(link);
+            break;
+
+        case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
+        case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
+            cahute_seven_terminate(link);
+            break;
+        }
+    }
 
     if (link->flags & CAHUTE_LINK_FLAG_CLOSE_MEDIUM) {
         switch (link->medium) {

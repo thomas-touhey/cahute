@@ -48,6 +48,8 @@ when the file system and main memory are presented using SCSI.
     Note however that these should be used through the system's serial
     bus interface rather than directly.
 
+.. _usb-detection-windows:
+
 Driver detection on Microsoft Windows
 -------------------------------------
 
