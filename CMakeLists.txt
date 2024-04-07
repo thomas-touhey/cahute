@@ -13,9 +13,14 @@ set(PROJECT_ISSUES_URL "https://cahuteproject.org/guides/report.html")
 # Options.
 # ---
 
-option(ENABLE_CLI "Whether to enable building the utilities or not." ON)
-option(ENABLE_UDEV "Whether to install the udev rule or not." ON)
-option(ENABLE_LIBUSB "Whether to use libusb or not." ON)
+include(CMakeDependentOption)
+
+cmake_dependent_option(ENABLE_CLI "Whether to enable building the utilities or not."
+    ON "NOT DEFINED FXSDK_PLATFORM" OFF)
+cmake_dependent_option(ENABLE_UDEV "Whether to install the udev rule or not."
+    ON "NOT DEFINED FXSDK_PLATFORM" OFF)
+cmake_dependent_option(ENABLE_LIBUSB "Whether to use libusb or not."
+    ON "NOT DEFINED FXSDK_PLATFORM" OFF)
 set(LOGLEVEL $ENV{LOGLEVEL} CACHE STRING "Default logging level")
 
 if(NOT "${LOGLEVEL}" MATCHES "|none|info|warning|error|fatal")
