@@ -9,17 +9,23 @@ identifiers (VID/PID) can be used:
 .. list-table::
     :header-rows: 1
 
-    * - Vendor ID
-      - Product ID
-      - Interface class
+    * - ``idVendor``
+      - ``idProduct``
+      - ``bInterfaceClass``
+      - ``bInterfaceSubclass``
+      - ``bInterfaceProtocol``
       - Description
     * - ``07cf``
       - ``6101``
       - ``255`` (Vendor-Specific)
+      - ``0``
+      - ``0``
       - Graph 35+/75/85/95, fx-9860G Slim, Classpad 300
     * - ``07cf``
       - ``6102``
       - ``8`` (Mass Storage)
+      - ``0``
+      - ``0``
       - Classpad 330+, fx-CG20, fx-CP400, fx-CP400+E
 
 The interface class ``255`` is used when the device presents protocol 7.00
@@ -34,8 +40,8 @@ when the file system and main memory are presented using SCSI.
     .. list-table::
         :header-rows: 1
 
-        * - Vendor ID
-          - Product ID
+        * - ``idVendor``
+          - ``idProduct``
           - Description
         * - ``0711``
           - ``0230``
