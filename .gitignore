@@ -356,3 +356,4 @@ GitHub.sublime-settings
 /.envrc
 /vgcore.*
 /misc/cahute.pc
+/giteapc-config.make

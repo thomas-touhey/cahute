@@ -53,6 +53,16 @@ for access to serial and USB devices, by running the following command
 
     usermod -a -G uucp <your-username>
 
+|lephe| GiteaPC
+---------------
+
+Cahute and its command-line utilities are installable as a desktop application
+through GiteaPC_, by running the following command:
+
+.. parsed-literal::
+
+    giteapc install cake/cahute@\ |version|
+
 .. _build-cahute:
 
 |linux| Other Linux distributions
@@ -147,6 +157,7 @@ That's it! You should be able to run the following command::
 .. _p7screen on AUR: https://aur.archlinux.org/packages/p7screen
 .. _paru: https://github.com/morganamilo/paru
 .. _pikaur: https://github.com/actionless/pikaur
+.. _GiteaPC: https://git.planet-casio.com/Lephenixnoir/giteapc
 
 .. _cmake: https://cmake.org/
 .. _GNU Make: https://www.gnu.org/software/make/
@@ -163,4 +174,5 @@ That's it! You should be able to run the following command::
 .. |homebrew| image:: homebrew.svg
 .. |archlinux| image:: arch.svg
 .. |manjaro| image:: manjaro.svg
+.. |lephe| image:: lephe.png
 .. |linux| image:: linux.svg
