@@ -342,7 +342,7 @@ static inline int check_directory_name(char const *name) {
         return 0;
 
     for (; n--; name++)
-        if (!isascii(*name) || *name == '/' || *name == '\\'
+        if (*name <= 0 || *name == '/' || *name == '\\'
             || (!isgraph(*name) && !isblank(*name)))
             return 0;
 
@@ -366,7 +366,7 @@ static inline int check_file_name(char const *name) {
         return 0;
 
     for (; n--; name++)
-        if (!isascii(*name) || *name == '/' || *name == '\\'
+        if (*name <= 0 || *name == '/' || *name == '\\'
             || (!isgraph(*name) && !isblank(*name)))
             return 0;
 
@@ -692,13 +692,10 @@ int parse_args(int argc, char **argv, struct args *args) {
     }
 
     if (args->storage_name
-        && (strlen(args->storage_name) != 4 || !isascii(args->storage_name[0])
-            || !islower(args->storage_name[0])
-            || !isascii(args->storage_name[1])
-            || !islower(args->storage_name[1])
-            || !isascii(args->storage_name[2])
-            || !isascii(args->storage_name[2])
-            || !isascii(args->storage_name[3])
+        && (strlen(args->storage_name) != 4 || args->storage_name[0] <= 0
+            || !islower(args->storage_name[0]) || args->storage_name[1] <= 0
+            || !islower(args->storage_name[1]) || args->storage_name[2] <= 0
+            || !islower(args->storage_name[2]) || args->storage_name[3] <= 0
             || !isdigit(args->storage_name[3]))) {
         fprintf(stderr, "Invalid storage name format.\n");
         return 0;

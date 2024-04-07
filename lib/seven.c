@@ -2937,7 +2937,7 @@ cahute_seven_list_storage_entries(
             size_t size;
 
             for (size = raw_directory_name_size; size; size--, p++)
-                if (!isascii(*p) || (!isgraph(*p) && !isblank(*p)))
+                if (*p > 0x7F || (!isgraph(*p) && !isblank(*p)))
                     goto skip_entry;
 
             entry.cahute_storage_entry_directory = directory_name_buf;
@@ -2958,7 +2958,7 @@ cahute_seven_list_storage_entries(
             size_t size;
 
             for (size = raw_file_name_size; size; size--, p++)
-                if (!isascii(*p) || (!isgraph(*p) && !isblank(*p)))
+                if (*p > 0x7F || (!isgraph(*p) && !isblank(*p)))
                     goto skip_entry;
 
             entry.cahute_storage_entry_name = file_name_buf;
