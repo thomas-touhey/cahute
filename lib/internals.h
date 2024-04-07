@@ -58,8 +58,9 @@
 # include <unistd.h>
 #endif
 
-#include <libusb.h>
-#define LIBUSB_ENABLED 1
+#if LIBUSB_ENABLED
+# include <libusb.h>
+#endif
 
 /* ---
  * Logging internals.

@@ -796,7 +796,7 @@ cahute_open_usb_link(
     cahute_link *link = NULL;
     int protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
     unsigned long protocol_flags = 0;
-    int i, err = CAHUTE_ERROR_UNKNOWN;
+    int err = CAHUTE_ERROR_UNKNOWN;
 
 #if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
     HANDLE cesg_handle = INVALID_HANDLE_VALUE;
@@ -812,7 +812,7 @@ cahute_open_usb_link(
     libusb_device **device_list = NULL;
     struct libusb_config_descriptor *config_descriptor = NULL;
     libusb_device_handle *device_handle = NULL;
-    int device_count, libusberr, bulk_in = -1, bulk_out = -1;
+    int device_count, i, libusberr, bulk_in = -1, bulk_out = -1;
     int medium = CAHUTE_LINK_MEDIUM_LIBUSB;
 #endif
 

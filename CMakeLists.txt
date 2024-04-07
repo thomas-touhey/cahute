@@ -9,18 +9,26 @@ project(
 )
 set(PROJECT_ISSUES_URL "https://cahuteproject.org/guides/report.html")
 
-add_custom_target(lint COMMAND pre-commit run --all-files)
+# ---
+# Options.
+# ---
 
-if(WIN32 OR MINGW)
-    set(SDL2_NO_MWINDOWS 1)
-    set(PLATFORM_LIBS
-        cfgmgr32
-        uuid)
+option(ENABLE_CLI "Whether to enable building the utilities or not." ON)
+option(ENABLE_UDEV "Whether to install the udev rule or not." ON)
+option(ENABLE_LIBUSB "Whether to use libusb or not." ON)
+set(LOGLEVEL $ENV{LOGLEVEL} CACHE STRING "Default logging level")
+
+if(NOT "${LOGLEVEL}" MATCHES "|none|info|warning|error|fatal")
+    message(SEND_ERROR "LOGLEVEL should be one of [info, warning, error, fatal, none]")
 endif()
 
-include(GNUInstallDirs)
-find_package(PkgConfig REQUIRED)
-find_package(SDL2 REQUIRED)
+if(NOT LOGLEVEL)
+    set(LOGLEVEL "fatal")
+endif()
+
+# ---
+# Other options.
+# ---
 
 set(CPACK_SOURCE_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}")
 set(CPACK_SOURCE_GENERATOR "TGZ")
@@ -37,16 +45,6 @@ set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
 set(CPACK_VERBATIM_VARIABLES true)
 include(CPack)
 
-set(LOGLEVEL $ENV{LOGLEVEL})
-
-if(NOT "${LOGLEVEL}" MATCHES "|none|info|warning|error|fatal")
-    message(SEND_ERROR "LOGLEVEL should be one of [info, warning, error, fatal, none]")
-endif()
-
-if(NOT LOGLEVEL)
-    set(LOGLEVEL "fatal")
-endif()
-
 string(TOUPPER ${LOGLEVEL} DEFAULT_LOGLEVEL)
 
 execute_process(
@@ -55,13 +53,74 @@ execute_process(
 )
 
 configure_file(include/cahute/config.h.in include/cahute/config.h ESCAPE_QUOTES)
-configure_file(misc/cahute.pc.in misc/cahute.pc ESCAPE_QUOTES @ONLY)
+
+add_custom_target(lint COMMAND pre-commit run --all-files)
 
 # ---
 # Build options.
 # ---
+# Here, for portability, we define the following variables:
+#
+#   LIB_INCLUDE_DIRS
+#      Include directories for the library.
+#
+#   LIB_COMPILE_DEFS
+#      Compile definitions for the library.
+#
+#   CLI_INCLUDE_DIRS
+#      Include directories for the command-line utilities.
+#
+#   CLI_LIBRARIES
+#      Additional libraries for the command-line utilities.
+#
+#   PKGCONFIG_DEPS
+#      pkg-config additional dependencies.
 
-pkg_check_modules(libusb REQUIRED libusb-1.0 IMPORTED_TARGET)
+set(LIB_INCLUDE_DIRS
+    "${CMAKE_CURRENT_BINARY_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+set(CLI_INCLUDE_DIRS
+    "${CMAKE_CURRENT_BINARY_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+set(CLI_LIBRARIES
+    ${PROJECT_NAME}
+)
+set(PKGCONFIG_DEPS "")
+set(LIB_COMPILE_DEFS "")
+
+include(GNUInstallDirs)
+find_package(PkgConfig REQUIRED)
+
+if(WIN32 OR MINGW)
+    list(APPEND CLI_LIBRARIES cfgmgr32 uuid)
+    set(SDL2_NO_MWINDOWS 1)
+endif()
+
+if(ENABLE_CLI)
+    find_package(SDL2 REQUIRED)
+endif()
+
+if(ENABLE_LIBUSB)
+    pkg_check_modules(libusb REQUIRED libusb-1.0 IMPORTED_TARGET)
+    list(APPEND LIB_INCLUDE_DIRS
+        "${libusb_INCLUDE_DIRS}"
+    )
+    list(APPEND LIB_COMPILE_DEFS
+        "-DLIBUSB_ENABLED=1"
+    )
+    list(APPEND CLI_LIBRARIES
+        PkgConfig::libusb
+    )
+    list(APPEND PKGCONFIG_DEPS
+        "libusb-1.0"
+    )
+else()
+    list(APPEND LIB_COMPILE_DEFS
+        "-DLIBUSB_ENABLED=0"
+    )
+endif()
 
 set(CMAKE_C_STANDARD 90)
 add_compile_options(
@@ -71,6 +130,10 @@ add_compile_options(
     -Wdate-time -Wmissing-prototypes -Wreturn-type -Wpointer-arith
     -Wstack-protector -Wno-unused-parameter
 )
+
+# ---
+# Target definitions.
+# ---
 
 add_library(${PROJECT_NAME} STATIC
     lib/casiolink.c
@@ -87,67 +150,71 @@ add_library(${PROJECT_NAME} STATIC
     lib/seven.c
     lib/seven_ohp.c
 )
+target_include_directories(${PROJECT_NAME} PRIVATE ${LIB_INCLUDE_DIRS})
+target_compile_definitions(${PROJECT_NAME} PRIVATE ${LIB_COMPILE_DEFS})
 
-add_executable(p7
-    cli/p7.c
-    cli/p7_args.c
-    cli/common.c
-    cli/options.c
-)
+if(ENABLE_CLI)
+    add_executable(CaS
+        cli/cas.c
+        cli/cas_args.c
+        cli/casrc.c
+        cli/common.c
+        cli/options.c
+    )
+    target_link_libraries(CaS PRIVATE ${CLI_LIBRARIES})
+    target_include_directories(CaS PRIVATE ${CLI_INCLUDE_DIRS})
 
-add_executable(p7os
-    cli/p7os.c
-    cli/p7os_args.c
-    cli/common.c
-    cli/options.c
-    cli/fxremote-update.exe.bin.c
-)
+    add_executable(p7
+        cli/p7.c
+        cli/p7_args.c
+        cli/common.c
+        cli/options.c
+    )
+    target_link_libraries(p7 PRIVATE ${CLI_LIBRARIES})
+    target_include_directories(p7 PRIVATE ${CLI_INCLUDE_DIRS})
 
-add_executable(p7screen
-    cli/p7screen.c
-    cli/p7screen_args.c
-    cli/common.c
-    cli/options.c
-)
+    add_executable(p7os
+        cli/p7os.c
+        cli/p7os_args.c
+        cli/common.c
+        cli/options.c
+        cli/fxremote-update.exe.bin.c
+    )
+    target_link_libraries(p7os PRIVATE ${CLI_LIBRARIES})
+    target_include_directories(p7os PRIVATE ${CLI_INCLUDE_DIRS})
 
-add_executable(xfer9860
-    cli/xfer9860.c
-    cli/xfer9860_args.c
-    cli/common.c
-    cli/options.c
-)
+    add_executable(p7screen
+        cli/p7screen.c
+        cli/p7screen_args.c
+        cli/common.c
+        cli/options.c
+    )
+    target_link_libraries(p7screen PRIVATE
+        ${CLI_LIBRARIES}
+        ${SDL2_LIBRARIES}
+    )
+    target_include_directories(p7screen PRIVATE
+        ${CLI_INCLUDE_DIRS}
+        ${SDL2_INCLUDE_DIRS}
+    )
 
-add_executable(CaS
-    cli/cas.c
-    cli/cas_args.c
-    cli/casrc.c
-    cli/common.c
-    cli/options.c
-)
+    add_executable(xfer9860
+        cli/xfer9860.c
+        cli/xfer9860_args.c
+        cli/common.c
+        cli/options.c
+    )
+    target_link_libraries(xfer9860 PRIVATE ${CLI_LIBRARIES})
+    target_include_directories(xfer9860 PRIVATE ${CLI_INCLUDE_DIRS})
+endif()
 
-include_directories(
-    "${CMAKE_CURRENT_BINARY_DIR}/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${libusb_INCLUDE_DIRS}"
-)
-target_include_directories(p7screen PRIVATE ${SDL2_INCLUDE_DIRS})
-
-target_link_libraries(CaS PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
-target_link_libraries(p7 PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
-target_link_libraries(p7os PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
-target_link_libraries(p7screen PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${SDL2_LIBRARIES} ${PLATFORM_LIBS})
-target_link_libraries(xfer9860 PRIVATE ${PROJECT_NAME} PkgConfig::libusb ${PLATFORM_LIBS})
+configure_file(misc/cahute.pc.in misc/cahute.pc ESCAPE_QUOTES @ONLY)
 
 # ---
 # Packaging options.
 # ---
 
 install(TARGETS ${PROJECT_NAME} ARCHIVE)
-install(TARGETS p7 RUNTIME)
-install(TARGETS p7os RUNTIME)
-install(TARGETS p7screen RUNTIME)
-install(TARGETS xfer9860 RUNTIME)
-install(TARGETS CaS RUNTIME)
 install(
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/" "${CMAKE_CURRENT_BINARY_DIR}/include/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
@@ -157,7 +224,18 @@ install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/misc/cahute.pc
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
 )
-install(
-    FILES ${CMAKE_CURRENT_SOURCE_DIR}/misc/60-casio-calculators.rules
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/udev/rules.d"
-)
+
+if(ENABLE_CLI)
+    install(TARGETS p7 RUNTIME)
+    install(TARGETS p7os RUNTIME)
+    install(TARGETS p7screen RUNTIME)
+    install(TARGETS xfer9860 RUNTIME)
+    install(TARGETS CaS RUNTIME)
+endif()
+
+if(ENABLE_UDEV)
+    install(
+        FILES ${CMAKE_CURRENT_SOURCE_DIR}/misc/60-casio-calculators.rules
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/udev/rules.d"
+    )
+endif()
