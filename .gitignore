@@ -358,3 +358,4 @@ GitHub.sublime-settings
 /misc/cahute.pc
 /build*
 /giteapc-config.make
+/lib/chars.c

@@ -33,6 +33,13 @@
 extern char const *get_current_log_level(void);
 extern void set_log_level(char const *loglevel);
 
+extern void print_content(
+    void const *data,
+    size_t data_size,
+    int encoding,
+    int dest_encoding
+);
+
 /* Portable getdelim() implementation. */
 extern ssize_t
 portable_getdelim(char **sp, size_t *np, int delim, FILE *filep);

@@ -32,9 +32,46 @@
 
 CAHUTE_BEGIN_NAMESPACE
 
-#define CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE 1
-#define CAHUTE_TEXT_ENCODING_FONTCHARACTER_FIXED    2
+#define CAHUTE_TEXT_ENCODING_LEGACY_8       1
+#define CAHUTE_TEXT_ENCODING_LEGACY_16_HOST 2
+#define CAHUTE_TEXT_ENCODING_LEGACY_16_BE   3
+#define CAHUTE_TEXT_ENCODING_LEGACY_16_LE   4
 
+#define CAHUTE_TEXT_ENCODING_9860_8       5
+#define CAHUTE_TEXT_ENCODING_9860_16_HOST 6
+#define CAHUTE_TEXT_ENCODING_9860_16_BE   7
+#define CAHUTE_TEXT_ENCODING_9860_16_LE   8
+
+#define CAHUTE_TEXT_ENCODING_CAT 10
+#define CAHUTE_TEXT_ENCODING_CTF 11
+
+#define CAHUTE_TEXT_ENCODING_UTF32_HOST 20
+#define CAHUTE_TEXT_ENCODING_UTF32_BE   21
+#define CAHUTE_TEXT_ENCODING_UTF32_LE   22
+#define CAHUTE_TEXT_ENCODING_UTF8       23
+
+CAHUTE_BEGIN_DECLS
+
+CAHUTE_EXTERN(int)
+cahute_convert_text(
+    void **cahute__bufp,
+    size_t *cahute__buf_sizep,
+    void const **cahute__datap,
+    size_t *cahute__data_sizep,
+    int cahute__dest_encoding,
+    int cahute__source_encoding
+);
+
+CAHUTE_EXTERN(int)
+cahute_convert_to_utf8(
+    char *cahute__buf,
+    size_t cahute__buf_size,
+    void const *cahute__data,
+    size_t cahute__data_size,
+    int cahute__encoding
+);
+
+CAHUTE_END_DECLS
 CAHUTE_END_NAMESPACE
 
 #endif /* CAHUTE_TEXT_H */

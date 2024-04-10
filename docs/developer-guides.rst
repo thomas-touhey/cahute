@@ -8,6 +8,6 @@ the Cahute C library directly.
     :maxdepth: 1
 
     developer-guides/build
-    developer-guides/detect-usb
-    developer-guides/detect-serial
-    developer-guides/open-usb-link
+    developer-guides/detection
+    developer-guides/links
+    developer-guides/text

@@ -67,7 +67,7 @@ cahute_mcs_decode_data(
 
         return cahute_create_program(
             datap,
-            CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE,
+            CAHUTE_TEXT_ENCODING_9860_8,
             name,
             name_size,
             content,

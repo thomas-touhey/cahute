@@ -19,6 +19,9 @@ Preparing the dependencies
 Cahute depends on the following, build-only dependencies:
 
 * cmake_ >= 3.16;
+* Python_ >= 3.8;
+* `toml module for Python <python-toml_>`_, either installed through pip
+  or as a native package such as ``python-toml`` or ``python3-toml``;
 * `GNU Make`_, `pkg-config`_, and other C compilation and linking utilities.
 
 It also depends on the following build and runtime dependencies:
@@ -83,6 +86,8 @@ following the steps in `Get notified when a release is created`_.
 .. _Archlinux CMake packaging guidelines:
     https://wiki.archlinux.org/title/CMake_package_guidelines
 .. _cmake: https://cmake.org/
+.. _Python: https://www.python.org/
+.. _python-toml: https://pypi.org/project/toml/
 .. _GNU Make: https://www.gnu.org/software/make/
 .. _pkg-config: https://git.sr.ht/~kaniini/pkgconf
 .. _SDL: https://www.libsdl.org/

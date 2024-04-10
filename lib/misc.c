@@ -50,16 +50,20 @@ CAHUTE_EXTERN(char const *) cahute_get_error_name(int code) {
         return "CAHUTE_ERROR_INT";
     case CAHUTE_ERROR_SIZE:
         return "CAHUTE_ERROR_SIZE";
+    case CAHUTE_ERROR_TRUNC:
+        return "CAHUTE_ERROR_TRUNC";
+    case CAHUTE_ERROR_INVALID:
+        return "CAHUTE_ERROR_INVALID";
+    case CAHUTE_ERROR_INCOMPAT:
+        return "CAHUTE_ERROR_INCOMPAT";
+    case CAHUTE_ERROR_TERMINATED:
+        return "CAHUTE_ERROR_TERMINATED";
     case CAHUTE_ERROR_NOT_FOUND:
         return "CAHUTE_ERROR_NOT_FOUND";
     case CAHUTE_ERROR_TOO_MANY:
         return "CAHUTE_ERROR_TOO_MANY";
-    case CAHUTE_ERROR_INCOMPAT:
-        return "CAHUTE_ERROR_INCOMPAT";
     case CAHUTE_ERROR_GONE:
         return "CAHUTE_ERROR_GONE";
-    case CAHUTE_ERROR_TERMINATED:
-        return "CAHUTE_ERROR_TERMINATED";
     case CAHUTE_ERROR_TIMEOUT_START:
         return "CAHUTE_ERROR_TIMEOUT_START";
     case CAHUTE_ERROR_TIMEOUT:

@@ -13,10 +13,11 @@ pre-commit:
 
 build (linux):
     stage: build
-    image: debian:bookworm-slim
+    image: python:3.8-slim-bookworm
     before_script:
         - apt-get update -y
         - apt-get install -y cmake pkg-config gcc libusb-1.0-0-dev libsdl2-dev
+        - pip install toml
     script:
         - cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr
         - cmake --build build

@@ -80,6 +80,9 @@ your distribution, you can build the command-line utilities yourself.
 First, you need to install the build and runtime dependencies for Cahute:
 
 * cmake_ >= 3.16;
+* Python_ >= 3.8;
+* `toml module for Python <python-toml_>`_, either installed through pip
+  or as a native package such as ``python-toml`` or ``python3-toml``;
 * `GNU Make`_, `pkg-config`_, and other C compilation and linking utilities;
 * SDL_ >= 2.0 (for ``p7screen``);
 * libusb_.
@@ -160,6 +163,8 @@ That's it! You should be able to run the following command::
 .. _GiteaPC: https://git.planet-casio.com/Lephenixnoir/giteapc
 
 .. _cmake: https://cmake.org/
+.. _Python: https://www.python.org/
+.. _python-toml: https://pypi.org/project/toml/
 .. _GNU Make: https://www.gnu.org/software/make/
 .. _pkg-config: https://git.sr.ht/~kaniini/pkgconf
 .. _SDL: https://www.libsdl.org/

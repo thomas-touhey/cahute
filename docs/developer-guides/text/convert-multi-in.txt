@@ -1,0 +1,42 @@
+Pass 0: 32 bytes read, error set to 0x0000
+Pass 1: 31 bytes read, error set to 0x0007
+Pass 2: 32 bytes read, error set to 0x0000
+Pass 3: 31 bytes read, error set to 0x0007
+Pass 4: 32 bytes read, error set to 0x0000
+Pass 5: 32 bytes read, error set to 0x0000
+Pass 6: 32 bytes read, error set to 0x0000
+Pass 7: 32 bytes read, error set to 0x0000
+Pass 8: 23 bytes read, error set to 0x000A
+---
+4→N
+8→S
+1→C
+"ENTREZ LES OPERATEURS"
+While N
+While Getkey:WhileEnd:Do:Getkey→D
+LpWhile D=0
+
+If D=43:Then
+Locate S,4,"×"
+S+1→S:N‐1→N
+N≠3 And N≠2 And N≠0⇒0→C:IfEnd
+If D=42:Then
+Locate S,4,"+"
+S+1→S:N‐1→N
+0→C:IfEnd
+If D=32:Then
+Locate S,4,"‐"
+S+1→S:N‐1→N
+N≠1⇒0→C:IfEnd
+If D=33:Then
+Locate S,4,"÷"
+S+1→S:N‐1→N
+0→C:IfEnd
+WhileEnd
+
+If C=1:Then
+"GOLDORAK"
+Else
+"INVALIDE"
+IfEnd
+---

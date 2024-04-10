@@ -48,6 +48,30 @@ Macro definitions
     Error raised if an incoming message was too big for the corresponding
     internal buffers.
 
+.. c:macro:: CAHUTE_ERROR_TRUNC
+
+    Error raised when the source data was incomplete or truncated.
+
+.. c:macro:: CAHUTE_ERROR_INVALID
+
+    Error raised when the source data was invalid.
+
+.. c:macro:: CAHUTE_ERROR_INCOMPAT
+
+    Error raised if:
+
+    * A device was not suitable to be opened to be used by a link.
+    * An input buffer contained a character that had no equivalent in
+      the destination encoding.
+
+.. c:macro:: CAHUTE_ERROR_TERMINATED
+
+    Error raised if:
+
+    * A connection to a device over a link has been terminated, and the
+      requested operation is therefore not possible.
+    * An input buffer contained a sentinel, for text conversion.
+
 .. c:macro:: CAHUTE_ERROR_NOT_FOUND
 
     Error code raised if a device could not be found using the provided
@@ -57,16 +81,6 @@ Macro definitions
 
     Error raised if only a single device was expected, but multiple were
     found.
-
-.. c:macro:: CAHUTE_ERROR_INCOMPAT
-
-    Error raised if a device was not suitable to be opened to be used by
-    a link.
-
-.. c:macro:: CAHUTE_ERROR_TERMINATED
-
-    Error raised if a device is still present, but has terminated the
-    communication.
 
 .. c:macro:: CAHUTE_ERROR_GONE
 

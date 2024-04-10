@@ -2164,10 +2164,10 @@ cahute_seven_receive_data(
             );
             if (err) {
                 /* We have successfully negociated with the device to switch
-                * serial settings but have not managed to change settings
-                * ourselves. We can no longer communicate with the device,
-                * hence can no longer negotiate the serial settings back.
-                * Therefore, we consider the link to be irrecoverable. */
+                 * serial settings but have not managed to change settings
+                 * ourselves. We can no longer communicate with the device,
+                 * hence can no longer negotiate the serial settings back.
+                 * Therefore, we consider the link to be irrecoverable. */
                 msg(ll_error,
                     "Could not set the serial params; that makes our "
                     "connection "

@@ -1,0 +1,58 @@
+Pass 0: 63 bytes converted, error set to 0x0006:
+---
+4→N
+8→S
+1→C
+"ENTREZ LES OPERATEURS"
+While N
+While Getkey:
+---
+Pass 1: 64 bytes converted, error set to 0x0006:
+---
+WhileEnd:Do:Getkey→D
+LpWhile D=0
+
+If D=43:Then
+Locate S,4,"×
+---
+Pass 2: 64 bytes converted, error set to 0x0006:
+---
+"
+S+1→S:N‐1→N
+N≠3 And N≠2 And N≠0⇒0→C:IfEnd
+If D
+---
+Pass 3: 63 bytes converted, error set to 0x0006:
+---
+=42:Then
+Locate S,4,"+"
+S+1→S:N‐1→N
+0→C:IfEnd
+If D=32:
+---
+Pass 4: 64 bytes converted, error set to 0x0006:
+---
+Then
+Locate S,4,"‐"
+S+1→S:N‐1→N
+N≠1⇒0→C:IfEnd
+If
+---
+Pass 5: 57 bytes converted, error set to 0x0006:
+---
+D=33:Then
+Locate S,4,"÷"
+S+1→S:N‐1→N
+0→C:IfEnd
+
+---
+Pass 6: 56 bytes converted, error set to 0x0000:
+---
+WhileEnd
+
+If C=1:Then
+"GOLDORAK"
+Else
+"INVALIDE"
+IfEnd
+---

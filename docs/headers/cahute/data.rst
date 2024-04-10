@@ -74,8 +74,8 @@ Type definitions
 
             .. c:member:: void *cahute_data_content_program_content
 
-                PRogram content, in the encoding set in
-                :c:member:`cahute_data_content_program_content`.
+                Program content, in the encoding set in
+                :c:member:`cahute_data_content_program_encoding`.
 
 Function declarations
 ---------------------

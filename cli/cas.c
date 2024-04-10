@@ -27,6 +27,10 @@
  * ************************************************************************* */
 
 #include "cas.h"
+#include "common.h"
+
+/* TODO: This should probably be set to CTF once it has been implemented. */
+#define OUTPUT_ENCODING CAHUTE_TEXT_ENCODING_UTF8
 
 /**
  * Read data.
@@ -90,28 +94,37 @@ fail:
  */
 CAHUTE_LOCAL(int)
 list_data_types(struct args const *args, cahute_data const *data) {
-    /* TODO: Use character conversion to ensure that we have
-     * terminal-compatible strings here. */
     printf("\n");
     for (; data; data = data->cahute_data_next) {
         switch (data->cahute_data_type) {
         case CAHUTE_DATA_TYPE_PROGRAM: {
-            size_t name_size =
+            size_t program_name_size =
                 data->cahute_data_content.cahute_data_content_program
                     .cahute_data_content_program_name_size;
             size_t program_size =
                 data->cahute_data_content.cahute_data_content_program
                     .cahute_data_content_program_size;
 
-            printf(
-                name_size ? "%" CAHUTE_PRIuSIZE " bytes \tProgram \"%.*s\".\n"
-                          : "%" CAHUTE_PRIuSIZE " bytes \tProgram.\n",
-                program_size,
-                (int)name_size,
-                (char const *)
+            if (program_name_size) {
+                printf(
+                    "%" CAHUTE_PRIuSIZE " bytes \tProgram \"",
+                    program_size
+                );
+                print_content(
                     data->cahute_data_content.cahute_data_content_program
-                        .cahute_data_content_program_name
-            );
+                        .cahute_data_content_program_name,
+                    program_name_size,
+                    data->cahute_data_content.cahute_data_content_program
+                        .cahute_data_content_program_encoding,
+                    OUTPUT_ENCODING
+                );
+
+                printf("\".\n");
+            } else
+                printf(
+                    "%" CAHUTE_PRIuSIZE " bytes \tProgram.\n",
+                    program_size
+                );
         } break;
 
         default:
@@ -130,6 +143,56 @@ list_data_types(struct args const *args, cahute_data const *data) {
  * @return Return code.
  */
 CAHUTE_LOCAL(int) list_data(struct args const *args, cahute_data const *data) {
+    int is_first = 1;
+
+    for (; data; data = data->cahute_data_next, is_first = 0) {
+        /* TODO: If the 'pager' flag is set, and is_first is not set,
+         * we want to put a break here. */
+
+        switch (data->cahute_data_type) {
+        case CAHUTE_DATA_TYPE_PROGRAM: {
+            size_t program_password_size =
+                data->cahute_data_content.cahute_data_content_program
+                    .cahute_data_content_program_password_size;
+
+            printf("@@display program \"");
+            print_content(
+                data->cahute_data_content.cahute_data_content_program
+                    .cahute_data_content_program_name,
+                data->cahute_data_content.cahute_data_content_program
+                    .cahute_data_content_program_name_size,
+                data->cahute_data_content.cahute_data_content_program
+                    .cahute_data_content_program_encoding,
+                OUTPUT_ENCODING
+            );
+            printf("\"");
+            if (program_password_size) {
+                printf(" (");
+                print_content(
+                    data->cahute_data_content.cahute_data_content_program
+                        .cahute_data_content_program_password,
+                    program_password_size,
+                    data->cahute_data_content.cahute_data_content_program
+                        .cahute_data_content_program_encoding,
+                    OUTPUT_ENCODING
+                );
+                printf(")\n");
+            } else
+                printf("\n");
+
+            print_content(
+                data->cahute_data_content.cahute_data_content_program
+                    .cahute_data_content_program_content,
+                data->cahute_data_content.cahute_data_content_program
+                    .cahute_data_content_program_size,
+                data->cahute_data_content.cahute_data_content_program
+                    .cahute_data_content_program_encoding,
+                OUTPUT_ENCODING
+            );
+            printf("\n");
+        } break;
+        }
+    }
     /* TODO */
     return 0;
 }

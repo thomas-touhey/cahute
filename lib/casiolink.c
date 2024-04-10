@@ -856,7 +856,7 @@ cahute_casiolink_receive_data(
             if (!memcmp(&buf[1], "P1", 2))
                 return cahute_create_program(
                     datap,
-                    CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE,
+                    CAHUTE_TEXT_ENCODING_LEGACY_8,
                     NULL, /* No program name, this is anonymous. */
                     0,
                     NULL, /* No password. */
@@ -880,7 +880,7 @@ cahute_casiolink_receive_data(
 
                     err = cahute_create_program(
                         datap,
-                        CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE,
+                        CAHUTE_TEXT_ENCODING_LEGACY_8,
                         names++,
                         1,
                         NULL, /* No password. */
@@ -922,7 +922,7 @@ cahute_casiolink_receive_data(
                 if (!memcmp(&buf[5], "PG", 2))
                     return cahute_create_program(
                         datap,
-                        CAHUTE_TEXT_ENCODING_FONTCHARACTER_VARIABLE,
+                        CAHUTE_TEXT_ENCODING_LEGACY_8,
                         &buf[11],
                         name_size,
                         &buf[27],

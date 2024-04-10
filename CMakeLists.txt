@@ -97,6 +97,7 @@ set(LIB_COMPILE_DEFS "")
 
 include(GNUInstallDirs)
 find_package(PkgConfig REQUIRED)
+find_package(Python3 REQUIRED)
 
 if(WIN32 OR MINGW)
     list(APPEND CLI_LIBRARIES cfgmgr32 uuid)
@@ -140,9 +141,18 @@ add_compile_options(
 # Target definitions.
 # ---
 
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/lib/chars.c"
+    COMMAND "${Python3_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/chars/process_chars.py
+        "${CMAKE_CURRENT_BINARY_DIR}/lib/chars.c"
+    DEPENDS chars/process_chars.py chars/chars.toml
+    VERBATIM
+)
+
 add_library(${PROJECT_NAME} STATIC
     lib/casiolink.c
     lib/cdefs.c
+    "${CMAKE_CURRENT_BINARY_DIR}/lib/chars.c"
     lib/data.c
     lib/detection.c
     lib/link.c
@@ -154,8 +164,11 @@ add_library(${PROJECT_NAME} STATIC
     lib/picture.c
     lib/seven.c
     lib/seven_ohp.c
+    lib/text.c
 )
-target_include_directories(${PROJECT_NAME} PRIVATE ${LIB_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${LIB_INCLUDE_DIRS}
+    "${CMAKE_SOURCE_DIR}/lib")
 target_compile_definitions(${PROJECT_NAME} PRIVATE ${LIB_COMPILE_DEFS})
 
 if(ENABLE_CLI)

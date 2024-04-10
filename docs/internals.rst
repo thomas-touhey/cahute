@@ -14,3 +14,4 @@ happening in this project, and why it is happening.
     :maxdepth: 2
 
     internals/links
+    internals/text

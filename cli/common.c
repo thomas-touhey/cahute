@@ -75,6 +75,54 @@ extern void set_log_level(char const *loglevel) {
 }
 
 /**
+ * Print content from an encoding into a destination one.
+ *
+ * @param data Data to convert on-the-fly.
+ * @param data_size Size of the data to convert.
+ * @param encoding Encoding of the data.
+ * @param dest_encoding Encoding to display the data as.
+ */
+extern void print_content(
+    void const *data,
+    size_t data_size,
+    int encoding,
+    int dest_encoding
+) {
+    cahute_u8 buf[128], *p;
+    size_t p_size;
+    int err;
+
+    while (1) {
+        p = buf;
+        p_size = sizeof(buf);
+        err = cahute_convert_text(
+            (void **)&p,
+            &p_size,
+            &data,
+            &data_size,
+            dest_encoding,
+            encoding
+        );
+        if (p_size < sizeof(buf)) {
+            fwrite(buf, sizeof(buf) - p_size, 1, stdout);
+            if (!err || err == CAHUTE_ERROR_TERMINATED)
+                return;
+
+            if (err == CAHUTE_ERROR_SIZE)
+                continue;
+
+            break;
+        }
+
+        if (!err)
+            return;
+        break; /* Including CAHUTE_ERROR_SIZE. */
+    }
+
+    fprintf(stdout, "<CONVERSION FAILED: 0x%04X>", err);
+}
+
+/**
  * Get a line and allocate it.
  *
  * Source: https://github.com/ivanrad/getline
