@@ -376,8 +376,9 @@ sequence_found:
 
         if (expected_size != frame_length) {
             msg(ll_error,
-                "Frame length %zuo did not match expected size %zuo for "
-                "a %dx%d picture (format: %d).",
+                "Frame length %" CAHUTE_PRIuSIZE
+                "o did not match expected "
+                "size %" CAHUTE_PRIuSIZE "o for a %dx%d picture (format: %d).",
                 frame_length,
                 expected_size,
                 width,
@@ -400,8 +401,9 @@ sequence_found:
 
         if (frame_length > link->data_buffer_capacity) {
             msg(ll_info,
-                "Frame length %zuo exceeded data buffer capacity "
-                "%zuo.",
+                "Frame length %" CAHUTE_PRIuSIZE
+                "o exceeded data buffer "
+                "capacity %" CAHUTE_PRIuSIZE "o.",
                 frame_length,
                 link->data_buffer_capacity);
 

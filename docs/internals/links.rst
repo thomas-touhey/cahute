@@ -267,6 +267,21 @@ Available mediums are the following:
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
+.. c:macro:: CAHUTE_LINK_MEDIUM_WIN32_UMS
+
+    USB Mass Storage device used as a host using the Windows API.
+
+    It is used with a |HANDLE|_:
+
+    * Closing uses |CloseHandle|_;
+    * Requesting using SCSI uses |DeviceIoControl|_ with
+      |IOCTL_SCSI_PASS_THROUGH_DIRECT|_.
+
+    Available protocols on this medium are the following:
+
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
+
 .. c:macro:: CAHUTE_LINK_MEDIUM_LIBUSB
 
     USB device used as a host through libusb, with bulk transport.
@@ -411,32 +426,13 @@ In this section, we will describe the behaviour of link opening functions.
     This function first validates all params to ensure compatibility, e.g.
     throws an error in case of unsupported flag or combination.
 
-    If Cahute runs on Windows, this function makes use of cfgmgr32_ to
-    look for USB device interfaces, and get the associated USB devices.
-    If it finds one matching the provided bus and address numbers, it
-    checks if the device driver is CESG502, and if this is the case, it
-    opens the device interface using |CreateFile|_, and creates the link
-    with the :c:macro:`CAHUTE_LINK_MEDIUM_WIN32_CESG` medium, and:
+    If libusb support has been disabled, the function returns
+    :c:macro:`CAHUTE_ERROR_IMPL`.
 
-    * Either the :c:macro:`CAHUTE_LINK_PROTOCOL_SEVEN_OHP` protocol if the
-      :c:macro:`CAHUTE_USB_OHP` flag has been passed;
-    * Or the :c:macro:`CAHUTE_LINK_PROTOCOL_SEVEN` protocol otherwise.
-
-    .. note::
-
-        In order to get bus and address numbers for USB devices that are
-        equivalent to what is obtained through libusb,
-        |DEVPKEY_Device_LocationInfo|_ is used.
-
-        This property returns a string of the form ``Port_#0002.Hub_#000D``,
-        which must be parsed to obtain the address number (here, 2) and
-        the bus number (here, 13).
-
-    Otherwise, and on other platforms, if libusb support is enabled, this
-    function creates a context using |libusb_init|_, gets the device list
-    using |libusb_get_device_list|_, and finds one matching the provided bus
-    and address numbers using |libusb_get_bus_number|_ and
-    |libusb_get_device_address|_ on every entry.
+    Otherwise, on all platforms, this function creates a context using
+    |libusb_init|_, gets the device list using |libusb_get_device_list|_,
+    and finds one matching the provided bus and address numbers using
+    |libusb_get_bus_number|_ and |libusb_get_device_address|_ on every entry.
 
     If a matching device is found, the configuration is obtained using
     |libusb_get_device_descriptor|_ and |libusb_get_active_config_descriptor|_,
@@ -500,15 +496,25 @@ In this section, we will describe the behaviour of link opening functions.
         See `#3 <https://gitlab.com/cahuteproject/cahute/-/issues/3>`_
         for more context.
 
-    Once this is done, the link is created with the previously selected
-    medium and protocol.
+    If the device opening yields ``LIBUSB_ERROR_NOT_SUPPORTED``,
+    it means that the device is running a driver that is not supported by
+    libusb.
 
-    Otherwise, if libusb support has been disabled, the function returns
-    :c:macro:`CAHUTE_ERROR_IMPL`.
+        On Windows, in this case, we look for a USB device with a device
+        address equal to the libusb port number, obtained using
+        |libusb_get_port_number|_, then:
 
-    If medium initialization has been successful, the function will then
-    initialize the protocol using the common protocol initialization
-    procedure; see :ref:`internals-link-protocol-initialization`.
+        * If the underlying driver to the device is identified as CESG502,
+          we use the USB device interface as a
+          :c:macro:`CAHUTE_LINK_MEDIUM_WIN32_CESG` medium;
+        * Otherwise, we look for disk drive then volume devices via bus
+          relations, and use the volume device interface as a
+          :c:macro:`CAHUTE_LINK_MEDIUM_WIN32_UMS` medium.
+
+    Once all is done, the link is created with the selected medium and
+    protocol. The function will then initialize the protocol using the
+    common protocol initialization procedure; see
+    :ref:`internals-link-protocol-initialization`.
 
 :c:func:`cahute_open_simple_usb_link`
     This function is a convenience function, using mostly public functions
@@ -559,7 +565,8 @@ of the original function).
 .. |CancelIo| replace:: ``CancelIo``
 .. |CloseHandle| replace:: ``CloseHandle``
 .. |SetCommState| replace:: ``SetCommState``
-.. |DEVPKEY_Device_LocationInfo| replace:: ``DEVPKEY_Device_LocationInfo``
+.. |DeviceIoControl| replace:: ``DeviceIoControl``
+.. |IOCTL_SCSI_PASS_THROUGH_DIRECT| replace:: ``IOCTL_SCSI_PASS_THROUGH_DIRECT``
 
 .. |libusb_context| replace:: ``libusb_context``
 .. |libusb_init| replace:: ``libusb_init``
@@ -569,9 +576,10 @@ of the original function).
 .. |libusb_get_bus_number| replace:: ``libusb_get_bus_number``
 .. |libusb_get_device_address| replace:: ``libusb_get_device_address``
 .. |libusb_get_device_descriptor| replace:: ``libusb_get_device_descriptor``
+.. |libusb_get_port_number| replace:: ``libusb_get_port_number``
 .. |libusb_get_active_config_descriptor|
    replace:: ``libusb_get_active_config_descriptor``
-.. |libusb_detach_kernel_driver| replace:: ``_libusb_detach_kernel_driver``
+.. |libusb_detach_kernel_driver| replace:: ``libusb_detach_kernel_driver``
 .. |libusb_claim_interface| replace:: ``libusb_claim_interface``
 .. |libusb_open| replace:: ``libusb_open``
 .. |libusb_close| replace:: ``libusb_close``
@@ -611,9 +619,12 @@ of the original function).
 .. _SetCommState:
     https://learn.microsoft.com/en-us/windows/win32/api/
     winbase/nf-winbase-setcommstate
-.. _DEVPKEY_Device_LocationInfo:
-    https://learn.microsoft.com/en-us/windows-hardware/
-    drivers/install/devpkey-device-locationinfo
+.. _DeviceIoControl:
+    https://learn.microsoft.com/en-us/windows/win32/api/
+    ioapiset/nf-ioapiset-deviceiocontrol
+.. _IOCTL_SCSI_PASS_THROUGH_DIRECT:
+    https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddscsi/
+    ni-ntddscsi-ioctl_scsi_pass_through_direct
 .. _Serial Communications in Win32:
     https://learn.microsoft.com/en-us/previous-versions/ms810467(v=msdn.10)
 
@@ -643,6 +654,9 @@ of the original function).
 .. _libusb_get_device_address:
     https://libusb.sourceforge.io/api-1.0/group__libusb__dev.html
     #gab6d4e39ac483ebaeb108f2954715305d
+.. _libusb_get_port_number:
+    https://libusb.sourceforge.io/api-1.0/group__libusb__dev.html
+    #ga14879a0ea7daccdcddb68852d86c00c4
 .. _libusb_get_device_descriptor:
     https://libusb.sourceforge.io/api-1.0/group__libusb__desc.html
     #ga5e9ab08d490a7704cf3a9b0439f16f00

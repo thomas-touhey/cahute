@@ -203,9 +203,19 @@ typedef unsigned long cahute_u32;
 
 /* printf definition for `size_t`. */
 
-#define CAHUTE_PRIuSIZE "zu"
-#define CAHUTE_PRIxSIZE "zx"
-#define CAHUTE_PRIXSIZE "zX"
+#if defined(_WIN64)
+# define CAHUTE_PRIuSIZE "llu"
+# define CAHUTE_PRIxSIZE "llx"
+# define CAHUTE_PRIXSIZE "llX"
+#elif defined(_WIN32)
+# define CAHUTE_PRIuSIZE "u"
+# define CAHUTE_PRIxSIZE "x"
+# define CAHUTE_PRIXSIZE "X"
+#else
+# define CAHUTE_PRIuSIZE "zu"
+# define CAHUTE_PRIxSIZE "zx"
+# define CAHUTE_PRIXSIZE "zX"
+#endif
 
 /* ---
  * Endianess management.
@@ -246,29 +256,6 @@ CAHUTE_END_DECLS
 # define cahute_macro_htole16(CAHUTE__X) htole16(CAHUTE__X)
 # define cahute_macro_htobe32(CAHUTE__X) htobe32(CAHUTE__X)
 # define cahute_macro_htole32(CAHUTE__X) htole32(CAHUTE__X)
-#elif defined(_WIN16) || defined(_WIN32) || defined(_WIN64) \
-    || defined(__WINDOWS__)
-# include <sys/param.h>
-# include <winsock2.h>
-# if BYTE_ORDER == LITTLE_ENDIAN
-#  define cahute_macro_be16toh(CAHUTE__X) ntohs(CAHUTE__X)
-#  define cahute_macro_le16toh(CAHUTE__X) (CAHUTE__X)
-#  define cahute_macro_be32toh(CAHUTE__X) ntohl(CAHUTE__X)
-#  define cahute_macro_le32toh(CAHUTE__X) (CAHUTE__X)
-#  define cahute_macro_htobe16(CAHUTE__X) htons(CAHUTE__X)
-#  define cahute_macro_htole16(CAHUTE__X) (CAHUTE__X)
-#  define cahute_macro_htobe32(CAHUTE__X) htonl(CAHUTE__X)
-#  define cahute_macro_htole32(CAHUTE__X) (CAHUTE__X)
-# else
-#  define cahute_macro_be16toh(CAHUTE__X) (CAHUTE__X)
-#  define cahute_macro_le16toh(CAHUTE__X) ntohs(CAHUTE__X)
-#  define cahute_macro_be32toh(CAHUTE__X) (CAHUTE__X)
-#  define cahute_macro_le32toh(CAHUTE__X) ntohl(CAHUTE__X)
-#  define cahute_macro_htobe16(CAHUTE__X) (CAHUTE__X)
-#  define cahute_macro_htole16(CAHUTE__X) htons(CAHUTE__X)
-#  define cahute_macro_htobe32(CAHUTE__X) (CAHUTE__X)
-#  define cahute_macro_htole32(CAHUTE__X) htonl(CAHUTE__X)
-# endif
 #elif defined(__GLIBC__) && defined(__USE_MISC)
 # include <endian.h>
 # define cahute_macro_be16toh(CAHUTE__X) be16toh(CAHUTE__X)

@@ -27,6 +27,9 @@
  * ************************************************************************* */
 
 #include "internals.h"
+#if WIN32_ENABLED
+# include <ntddscsi.h>
+#endif
 
 /**
  * Skip data synchronously from the medium associated with the link.
@@ -195,15 +198,14 @@ cahute_read_from_link(
         }
 
         bytes_read = 0;
-        if (size >= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE) {
-            is_link_buffer = 0;
-            dest = buf;
-            target_size = size;
-        } else {
-            is_link_buffer = 1;
-            dest = &link->medium_read_buffer[0];
-            target_size = CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
-        }
+
+        /* NOTE: Historically here, we used to write directly to the
+         * destination buffer if the output was big enough. However, the
+         * medium sometimes requires aligned buffers, and the medium read
+         * buffer is guaranteed to be aligned at the 8-byte mark. */
+        is_link_buffer = 1;
+        dest = link->medium_read_buffer;
+        target_size = CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
 
         /* The implementation must read data in ``dest``, for up to
          * ``target_size`` (while the caller only requires ``size``).
@@ -279,9 +281,15 @@ cahute_read_from_link(
         break;
 #endif
 
-#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG) \
+    || defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
+# if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
+        case CAHUTE_LINK_MEDIUM_WIN32_CESG:
+# endif
+# if defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
         case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
-        case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
+# endif
+        {
             DWORD received = 0;
             BOOL ret;
 
@@ -320,7 +328,12 @@ cahute_read_from_link(
                         break;
 
                     case WAIT_TIMEOUT:
-                        CancelIo(link->medium_state.windows.handle);
+                        if (!CancelIo(link->medium_state.windows.handle)) {
+                            werr = GetLastError();
+                            log_windows_error("CancelIo", werr);
+                            return CAHUTE_ERROR_UNKNOWN;
+                        }
+
                         goto time_out;
 
                     default:
@@ -328,7 +341,12 @@ cahute_read_from_link(
                             "WaitForSingleObject",
                             GetLastError()
                         );
-                        CancelIo(link->medium_state.windows.handle);
+
+                        if (!CancelIo(link->medium_state.windows.handle)) {
+                            werr = GetLastError();
+                            log_windows_error("CancelIo", werr);
+                        }
+
                         return CAHUTE_ERROR_UNKNOWN;
                     }
                 } else {
@@ -385,8 +403,15 @@ cahute_read_from_link(
         } break;
 #endif
 
-#ifdef CAHUTE_LINK_MEDIUM_LIBUSB_UMS
-        case CAHUTE_LINK_MEDIUM_LIBUSB_UMS: {
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_UMS) \
+    || defined(CAHUTE_LINK_MEDIUM_LIBUSB_UMS)
+# if defined(CAHUTE_LINK_MEDIUM_WIN32_UMS)
+        case CAHUTE_LINK_MEDIUM_WIN32_UMS:
+# endif
+# if defined(CAHUTE_LINK_MEDIUM_LIBUSB_UMS)
+        case CAHUTE_LINK_MEDIUM_LIBUSB_UMS:
+# endif
+        {
             cahute_u8 status_buf[16];
             cahute_u8 payload[16];
             size_t avail;
@@ -489,7 +514,7 @@ cahute_read_from_link(
         }
 
         if (is_link_buffer)
-            memcpy(buf, &link->medium_read_buffer[0], bytes_read);
+            memcpy(buf, link->medium_read_buffer, bytes_read);
 
         buf += bytes_read;
         size -= bytes_read;
@@ -571,9 +596,15 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
         } break;
 #endif
 
-#ifdef CAHUTE_LINK_MEDIUM_WIN32_SERIAL
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG) \
+    || defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
+# if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
+        case CAHUTE_LINK_MEDIUM_WIN32_CESG:
+# endif
+# if defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
         case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
-        case CAHUTE_LINK_MEDIUM_WIN32_CESG: {
+# endif
+        {
             DWORD sent;
             BOOL ret;
 
@@ -668,8 +699,15 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
         break;
 #endif
 
-#ifdef CAHUTE_LINK_MEDIUM_LIBUSB_UMS
-        case CAHUTE_LINK_MEDIUM_LIBUSB_UMS: {
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_UMS) \
+    || defined(CAHUTE_LINK_MEDIUM_LIBUSB_UMS)
+# if defined(CAHUTE_LINK_MEDIUM_WIN32_UMS)
+        case CAHUTE_LINK_MEDIUM_WIN32_UMS:
+# endif
+# if defined(CAHUTE_LINK_MEDIUM_LIBUSB_UMS)
+        case CAHUTE_LINK_MEDIUM_LIBUSB_UMS:
+# endif
+        {
             size_t to_send = size > 0xFFFF ? 0xFFFF : size;
             cahute_u8 payload[16], status_buf[16];
             int err;
@@ -1053,6 +1091,56 @@ cahute_scsi_request(
     /* The medium-specific implementation must store the status in the
      * ``status`` variable (NOT ``*statusp``). */
     switch (link->medium) {
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_UMS
+    case CAHUTE_LINK_MEDIUM_WIN32_UMS: {
+        SCSI_PASS_THROUGH_DIRECT req;
+        DWORD wret, werr, wcnt;
+
+        SecureZeroMemory(&req, sizeof(SCSI_PASS_THROUGH_DIRECT));
+        req.Length = sizeof(SCSI_PASS_THROUGH_DIRECT);
+        req.TimeOutValue = 30;
+        req.CdbLength = command_size;
+        memcpy(req.Cdb, command, command_size);
+
+        if (!is_send) {
+            req.DataIn = SCSI_IOCTL_DATA_IN;
+            req.DataBuffer = buf;
+            req.DataTransferLength = buf_size;
+        } else if (buf_size) {
+            req.DataIn = SCSI_IOCTL_DATA_OUT;
+            req.DataBuffer = buf;
+            req.DataTransferLength = buf_size;
+        } else {
+            req.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+            req.DataBuffer = NULL;
+            req.DataTransferLength = 0;
+        }
+
+        wret = DeviceIoControl(
+            link->medium_state.windows.handle,
+            IOCTL_SCSI_PASS_THROUGH_DIRECT,
+            &req,
+            sizeof(req),
+            &req,
+            sizeof(req),
+            &wcnt,
+            NULL
+        );
+
+        if (!wret) {
+            werr = GetLastError();
+
+            if (werr == ERROR_SEM_TIMEOUT)
+                return CAHUTE_ERROR_GONE;
+
+            log_windows_error("DeviceIoControl", werr);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        status = (int)req.ScsiStatus;
+    } break;
+#endif
+
 #ifdef CAHUTE_LINK_MEDIUM_LIBUSB_UMS
     case CAHUTE_LINK_MEDIUM_LIBUSB_UMS: {
         cahute_u8 cbw_buf[32];

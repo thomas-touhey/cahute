@@ -77,9 +77,19 @@ one must use detection with SetupAPI_ or cfgmgr32_, check that the device
 driver is CESG502, and if it's the case, open and use the device using
 fileapi_ (``CreateFile``, ``ReadFile``, ``WriteFile``, ``CloseFile``).
 
-It can be detected by checking if the device driver, using device
-property key |DEVPKEY_Device_Driver|_ or ``SPDRP_DRIVER``, starts with
-``{36fc9e60-c465-11cf-8056-444553540000}``.
+.. note::
+
+    It is possible to access device instance properties on Windows OSes
+    before Vista, e.g. Windows XP; see `Accessing Device Instance Properties
+    (Prior to Windows Vista)`_ for more information.
+
+It uses ``{36fc9e60-c465-11cf-8056-444553540000}``, the same GUID as
+generic USB devices, which is normally forbidden for Independent
+Hardware Vendors (IHV) such as CASIO, so **this key cannot be used to
+uniquely identify the driver**.
+
+Cahute currently matches the service (``CM_DRP_SERVICE``) to ``PVUSB``,
+since this is the value encountered in the wild.
 
 .. |DEVPKEY_Device_Driver| replace:: ``DEVPKEY_Device_Driver``
 
@@ -98,3 +108,6 @@ property key |DEVPKEY_Device_Driver|_ or ``SPDRP_DRIVER``, starts with
 .. _FA-124:
     https://www.planet-casio.com/Fr/logiciels/voir_un_logiciel_casio.php
     ?showid=16
+.. _Accessing Device Instance Properties (Prior to Windows Vista):
+    https://learn.microsoft.com/en-us/windows-hardware/drivers/install/
+    accessing-device-instance-spdrp-xxx-properties

@@ -104,8 +104,8 @@ list_data_types(struct args const *args, cahute_data const *data) {
                     .cahute_data_content_program_size;
 
             printf(
-                name_size ? "%zu bytes \tProgram \"%.*s\".\n"
-                          : "%zu bytes \tProgram.\n",
+                name_size ? "%" CAHUTE_PRIuSIZE " bytes \tProgram \"%.*s\".\n"
+                          : "%" CAHUTE_PRIuSIZE " bytes \tProgram.\n",
                 program_size,
                 (int)name_size,
                 (char const *)

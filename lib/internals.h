@@ -118,11 +118,17 @@ cahute_log_memory(
  * This is implemented as a separate function to the rest, because gathering
  * an error message for a given error code is quite lengthy.
  *
- * @param func_name Name of the Windows API function that returned the
+ * @param func_name Name of the function from which the log is emitted.
+ * @param win_func Name of the Windows API function that returned the
  *        error.
  * @param code Windows API error code that was actually returned.
  */
-CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
+CAHUTE_INLINE(void)
+cahute__log_win_error(
+    char const *func_name,
+    char const *win_func,
+    DWORD code
+) {
     char buf[1024];
     DWORD buf_size;
 
@@ -137,13 +143,29 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
     );
 
     if (!buf_size) {
-        msg(ll_error, "Error 0x%08lX occurred in %s.", code, func_name);
+        cahute_log_message(
+            30,
+            func_name,
+            "Error 0x%08lX occurred in %s.",
+            code,
+            win_func
+        );
         return;
     }
 
     buf[buf_size] = '\0';
-    msg(ll_error, "Error 0x%08lX occurred in %s: %s", code, func_name, buf);
+    cahute_log_message(
+        30,
+        func_name,
+        "Error 0x%08lX occurred in %s: %s",
+        code,
+        win_func,
+        buf
+    );
 }
+
+# define log_windows_error(FUNC, CODE) \
+     cahute__log_win_error(CAHUTE_LOGFUNC, FUNC, CODE)
 #endif
 
 /* ---
@@ -168,10 +190,11 @@ CAHUTE_INLINE(void) log_windows_error(char const *func_name, DWORD code) {
 #if WIN32_ENABLED
 # define CAHUTE_LINK_MEDIUM_WIN32_SERIAL 2
 # define CAHUTE_LINK_MEDIUM_WIN32_CESG   3
+# define CAHUTE_LINK_MEDIUM_WIN32_UMS    4
 #endif
 #if LIBUSB_ENABLED
-# define CAHUTE_LINK_MEDIUM_LIBUSB     4
-# define CAHUTE_LINK_MEDIUM_LIBUSB_UMS 5
+# define CAHUTE_LINK_MEDIUM_LIBUSB     5
+# define CAHUTE_LINK_MEDIUM_LIBUSB_UMS 6
 #endif
 
 /* Protocol selection for 'initialize_link_protocol()'. */
@@ -206,10 +229,22 @@ struct cahute_link_posix_medium_state {
  * Windows API medium state.
  *
  * @property handle Device handle.
+ * @property overlapped Overlapped I/O adapter.
  */
 struct cahute_link_windows_medium_state {
     HANDLE handle;
     OVERLAPPED overlapped;
+};
+#endif
+
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_UMS)
+/**
+ * Windows API UMS (SCSI) medium state.
+ *
+ * @property handle Device handle.
+ */
+struct cahute_link_windows_ums_medium_state {
+    HANDLE handle;
 };
 #endif
 
@@ -236,6 +271,8 @@ struct cahute_link_libusb_medium_state {
  * @property posix Medium state if the selected medium type is POSIX_SERIAL.
  * @property windows Medium state if the selected medium type is WIN32_SERIAL
  *           or WIN32_CESG.
+ * @property windows_ums Medium state if the selected medium type is
+ *           WIN32_UMS (SCSI over a Windows HANDLE).
  * @property libusb Medium state if the selected medium type is LIBUSB.
  */
 union cahute_link_medium_state {
@@ -245,6 +282,9 @@ union cahute_link_medium_state {
 #if defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL) \
     || defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
     struct cahute_link_windows_medium_state windows;
+#endif
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_UMS)
+    struct cahute_link_windows_ums_medium_state windows_ums;
 #endif
 #if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
     struct cahute_link_libusb_medium_state libusb;
@@ -411,7 +451,7 @@ struct cahute_link {
 
     /* Read buffer. See ``cahute_read`` definition for more information. */
     size_t medium_read_start, medium_read_size;
-    cahute_u8 medium_read_buffer[CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE];
+    cahute_u8 *medium_read_buffer;
 };
 
 /* ---
