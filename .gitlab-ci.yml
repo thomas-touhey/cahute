@@ -21,7 +21,14 @@ build (linux):
         - cmake -B build -S . -DCMAKE_INSTALL_PREFIX=/usr
         - cmake --build build
 
-build (mingw-w64):
+build (i686-w64-mingw32):
+    stage: build
+    image: registry.gitlab.com/cahuteproject/docker-images/mingw-w64:latest
+    script:
+        - i686-w64-mingw32-cmake -B build -S .
+        - cmake --build build
+
+build (x86_64-w64-mingw32):
     stage: build
     image: registry.gitlab.com/cahuteproject/docker-images/mingw-w64:latest
     script:
