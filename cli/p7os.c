@@ -253,7 +253,9 @@ end:
         cahute_close_link(link);
 
     if (err) {
-        fprintf(stderr, "Error 0x%02X has occurred.\n", err);
+        if (err != CAHUTE_ERROR_ABORT)
+            fprintf(stderr, "Error 0x%02X has occurred.\n", err);
+
         ret = 1;
     }
 

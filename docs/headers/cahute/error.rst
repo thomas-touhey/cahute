@@ -25,6 +25,10 @@ Macro definitions
 
     The logs can be investigated for more information.
 
+.. c:macro:: CAHUTE_ERROR_ABORT
+
+    Error raised if a function was aborted by the user.
+
 .. c:macro:: CAHUTE_ERROR_IMPL
 
     Error raised if a required feature or code path was unimplemented.
@@ -36,6 +40,11 @@ Macro definitions
 .. c:macro:: CAHUTE_ERROR_PRIV
 
     Error raised if a system privilege error has been encountered.
+
+.. c:macro:: CAHUTE_ERROR_BUSY
+
+    Error raised when opening a device or file that is currently being used
+    by another process or program.
 
 .. c:macro:: CAHUTE_ERROR_INT
 

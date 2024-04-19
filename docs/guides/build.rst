@@ -172,6 +172,45 @@ one of the following command depending on the architecture you're targetting::
     `MinGW build image for Cahute`_, which is exploited in the project's
     continuous integration pipelines as described in ``.gitlab-ci.yml``.
 
+|amigaos| AmigaOS 3.2 and above, from Linux distributions
+---------------------------------------------------------
+
+Building Cahute for AmigaOS 3.2 and above from Linux distributions
+using `m68k-amigaos-gcc`_, including the Native Development Kit (NDK),
+as described in `Cross Compiling With CMake`_.
+
+You need to first install ``m68k-amigaos-gcc`` and all available tools,
+using instructions present in the `m68k-amigaos-gcc README`_.
+
+.. warning::
+
+    Unfortunately this may not come easy, and there is no issue tracker
+    with the project. Good luck!
+
+This section assumes the toolchain is installed in ``/opt/amiga``, as set by
+default. You must also download `m68k-amigaos.cmake`_ on your system, and
+prepare the absolute path to it.
+
+You can now create the ``build`` directory aside the source directory,
+by running the following command:
+
+.. parsed-literal::
+
+    cmake -B build -S cahute-|version| \
+    -DCMAKE_TOOLCHAIN_FILE=/path/to/m68k-amigaos.cmake \
+    -DTOOLCHAIN_PREFIX=m68k-amigaos \
+    -DTOOLCHAIN_PATH=/opt/amiga
+
+
+You can now build the project using the following command::
+
+    cmake --build build
+
+.. warning::
+
+    ``p7screen`` will not be included, since it requires SDL2 which is not
+    available with the AmigaOS 3.2 toolchain.
+
 |win| Windows XP and above, using Visual Studio
 -----------------------------------------------
 
@@ -273,6 +312,13 @@ run the command-line utilities from here with the options you want to test.
     https://gitlab.com/cahuteproject/docker-images/-/blob/develop/mingw-w64/
     archlinux.Dockerfile?ref_type=heads
 
+.. _m68k-amigaos-gcc: https://github.com/AmigaPorts/m68k-amigaos-gcc
+.. _m68k-amigaos-gcc README:
+    https://github.com/AmigaPorts/m68k-amigaos-gcc/blob/master/README.md
+.. _m68k-amigaos.cmake:
+    https://github.com/AmigaPorts/AmigaCMakeCrossToolchains/blob/master/
+    m68k-amigaos.cmake
+
 .. _Visual Studio: https://visualstudio.microsoft.com/fr/
 .. _Visual Studio Code: https://visualstudio.microsoft.com/fr/
 .. _vcpkg is Now Included with Visual Studio:
@@ -284,3 +330,4 @@ run the command-line utilities from here with the options you want to test.
 .. |linux| image:: linux.svg
 .. |mingw-w64| image:: mingw-w64.svg
 .. |win| image:: win.png
+.. |amigaos| image:: amigaos.png

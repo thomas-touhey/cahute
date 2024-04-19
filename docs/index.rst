@@ -15,7 +15,8 @@ dating from the 1990s to today. It provides the following features:
 * **Flashing fx-9860G and compatible** using
   :ref:`the fxRemote method <seven-fxremote-flash>`.
 
-Officially supported OSes are Archlinux_-based and macOS_.
+Officially supported OSes are Archlinux_-based, macOS_ and AmigaOS_ 3.2 and
+above.
 
 .. note::
 
@@ -25,7 +26,6 @@ Officially supported OSes are Archlinux_-based and macOS_.
       <https://gitlab.com/cahuteproject/cahute/-/issues/10>`_;
     * `Debian-based distributions
       <https://gitlab.com/cahuteproject/cahute/-/issues/8>`_;
-    * `AmigaOS <https://gitlab.com/cahuteproject/cahute/-/issues/26>`_.
 
 The project is being worked on `on Gitlab <Cahute on Gitlab_>`_.
 It is maintained by `Thomas Touhey`_.
@@ -126,6 +126,7 @@ is based on.
 
 .. _Archlinux: https://archlinux.org/
 .. _macOS: https://www.apple.com/macos/
+.. _AmigaOS: https://www.amigaos.net/
 
 .. _Cahute on Gitlab: https://gitlab.com/cahuteproject/cahute
 .. _Thomas Touhey: https://thomas.touhey.fr/

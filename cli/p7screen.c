@@ -323,6 +323,7 @@ int main(int ac, char **av) {
             /* No frame was received in the given time. */
             continue;
 
+        case CAHUTE_ERROR_ABORT:
         case CAHUTE_ERROR_GONE:
         case CAHUTE_ERROR_TERMINATED:
             ret = 0;

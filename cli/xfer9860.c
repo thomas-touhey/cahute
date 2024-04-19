@@ -68,7 +68,7 @@ static int print_device_info(cahute_link *link) {
 int main(int argc, char **argv) {
     struct args args;
     cahute_link *link = NULL;
-    int err = 0;
+    int err = 0, ret;
 
     /* Since xfer9860 has no logging level of any kind, we disable logging
      * entirely here. */
@@ -128,8 +128,13 @@ fail:
     if (args.local_target_fp && args.local_target_path)
         fclose(args.local_target_fp);
 
+    ret = 1;
     switch (err) {
     case 0:
+        ret = 0;
+        break;
+
+    case CAHUTE_ERROR_ABORT:
         break;
 
     case CAHUTE_ERROR_IMPL:
@@ -148,5 +153,5 @@ fail:
         fprintf(stderr, "An unknown error has occurred.\n");
     }
 
-    return 0;
+    return ret;
 }

@@ -258,6 +258,18 @@ Available mediums are the following:
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP`.
 
+.. c:macro:: CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL
+
+    Serial medium using AmigaOS serial I/O, as described in the
+    `AmigaOS Serial Device Guide`_.
+
+    Available protocols on this medium are the following:
+
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_AUTO`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP`.
+
 .. c:macro:: CAHUTE_LINK_MEDIUM_WIN32_SERIAL
 
     Serial medium using the Windows API, with a |HANDLE|_ and
@@ -727,5 +739,7 @@ of the original function).
     https://libusb.sourceforge.io/api-1.0/group__libusb__syncio.html
     #ga2f90957ccc1285475ae96ad2ceb1f58c
 
+.. _AmigaOS Serial Device Guide:
+    https://wiki.amigaos.net/wiki/Serial_Device
 .. _USB Mass Storage Class, Bulk-Only Transport:
     https://www.usb.org/sites/default/files/usbmassbulk_10.pdf

@@ -40,12 +40,16 @@ CAHUTE_EXTERN(char const *) cahute_get_error_name(int code) {
         return "CAHUTE_OK";
     case CAHUTE_ERROR_UNKNOWN:
         return "CAHUTE_ERROR_UNKNOWN";
+    case CAHUTE_ERROR_ABORT:
+        return "CAHUTE_ERROR_ABORT";
     case CAHUTE_ERROR_IMPL:
         return "CAHUTE_ERROR_IMPL";
     case CAHUTE_ERROR_ALLOC:
         return "CAHUTE_ERROR_ALLOC";
     case CAHUTE_ERROR_PRIV:
         return "CAHUTE_ERROR_PRIV";
+    case CAHUTE_ERROR_BUSY:
+        return "CAHUTE_ERROR_BUSY";
     case CAHUTE_ERROR_INT:
         return "CAHUTE_ERROR_INT";
     case CAHUTE_ERROR_SIZE:
@@ -130,6 +134,106 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
     *msp = (unsigned long)res.tv_sec * 1000
            + (unsigned long)res.tv_nsec / 1000000;
 # endif
+    return CAHUTE_OK;
+}
+
+#elif AMIGAOS_ENABLED
+
+struct cahute_amiga_timer {
+    struct MsgPort *msg_port;
+    struct timerequest *timer_io;
+};
+
+CAHUTE_LOCAL_DATA(struct cahute_amiga_timer) cahute_amiga_timer = {0};
+
+CAHUTE_LOCAL(void) close_amiga_timer() {
+    AbortIO((struct IORequest *)cahute_amiga_timer.timer_io);
+    WaitIO((struct IORequest *)cahute_amiga_timer.timer_io);
+    CloseDevice((struct IORequest *)cahute_amiga_timer.timer_io);
+    DeleteIORequest(cahute_amiga_timer.timer_io);
+    DeleteMsgPort(cahute_amiga_timer.msg_port);
+}
+
+CAHUTE_EXTERN(int)
+cahute_get_amiga_timer(
+    struct MsgPort **msg_portp,
+    struct timerequest **timerp
+) {
+    struct MsgPort *msg_port;
+    struct timerequest *timer_io;
+    int ret;
+
+    if (cahute_amiga_timer.timer_io)
+        goto end;
+
+    msg_port = CreateMsgPort();
+    if (!msg_port) {
+        msg(ll_error,
+            "An error has occurred while creating the port for the timer.");
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    timer_io = CreateIORequest(msg_port, sizeof(struct timerequest));
+    if (!timer_io) {
+        msg(ll_error, "An error has occurred while creating the timer I/O.");
+        DeleteMsgPort(msg_port);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    ret = OpenDevice(
+        (CONST_STRPTR)TIMERNAME,
+        UNIT_VBLANK,
+        (struct IORequest *)timer_io,
+        0L
+    );
+    if (ret) {
+        msg(ll_error, "An error has occurred while creating the timer I/O.");
+        DeleteIORequest(timer_io);
+        DeleteMsgPort(msg_port);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    atexit(close_amiga_timer);
+
+    cahute_amiga_timer.msg_port = msg_port;
+    cahute_amiga_timer.timer_io = timer_io;
+
+end:
+    if (msg_portp)
+        *msg_portp = cahute_amiga_timer.msg_port;
+    if (timerp)
+        *timerp = cahute_amiga_timer.timer_io;
+    return CAHUTE_OK;
+}
+
+CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms) {
+    struct timerequest *timer;
+    int err;
+
+    err = cahute_get_amiga_timer(NULL, &timer);
+    if (err)
+        return err;
+
+    timer->tr_time.tv_secs = ms / 1000;
+    timer->tr_time.tv_micro = ms % 1000 * 1000;
+    timer->tr_node.io_Command = TR_ADDREQUEST;
+
+    DoIO((struct IORequest *)timer);
+    return CAHUTE_OK;
+}
+
+CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
+    struct timerequest *timer;
+    int err;
+
+    err = cahute_get_amiga_timer(NULL, &timer);
+    if (err)
+        return err;
+
+    timer->tr_node.io_Command = TR_GETSYSTIME;
+    DoIO((struct IORequest *)timer);
+
+    *msp = timer->tr_time.tv_secs * 1000 + timer->tr_time.tv_micro / 1000;
     return CAHUTE_OK;
 }
 

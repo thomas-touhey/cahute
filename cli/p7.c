@@ -49,6 +49,10 @@ static char const error_noaccess[] =
     "Could not get access to the calculator.\n"
     "Install the appropriate udev rule, or run as root.\n";
 
+static char const error_busy[] =
+    "The calculator is currently being used by another process.\n"
+    "Please terminate that other process, then re-run the command.\n";
+
 static char const error_unsupported[] =
     "The command is unsupported by the calculator.\n"
     "- Does the calculator have mass storage?\n"
@@ -463,12 +467,19 @@ fail:
 
     /* And now, to display an error corresponding to the obtained error. */
     switch (err) {
+    case CAHUTE_ERROR_ABORT:
+        break;
+
     case CAHUTE_ERROR_IMPL:
         fprintf(stderr, error_notimplemented);
         break;
 
     case CAHUTE_ERROR_PRIV:
         fprintf(stderr, error_noaccess);
+        break;
+
+    case CAHUTE_ERROR_BUSY:
+        fprintf(stderr, error_busy);
         break;
 
     case CAHUTE_ERROR_NOT_FOUND:

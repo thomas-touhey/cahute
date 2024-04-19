@@ -36,16 +36,6 @@
  * https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt */
 #define WINVER 0x0501 /* Windows XP */
 
-#include <cahute.h>
-#include <ctype.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
-CAHUTE_DECLARE_TYPE(cahute_link_medium)
-
 #if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)
 # define WIN32_ENABLED 1
 #else
@@ -67,6 +57,31 @@ CAHUTE_DECLARE_TYPE(cahute_link_medium)
 # define POSIX_ENABLED 0
 #endif
 
+#if defined(AMIGA) || defined(__amigaos__)
+# define AMIGAOS_ENABLED 1
+#else
+# define AMIGAOS_ENABLED 0
+#endif
+
+#if AMIGAOS_ENABLED
+# include <exec/types.h>
+# include <exec/errors.h>
+# include <exec/io.h>
+# include <exec/ports.h>
+# include <dos/dos.h>
+# include <proto/exec.h>
+# include <devices/serial.h>
+# include <devices/timer.h>
+#endif
+
+#include <cahute.h>
+#include <ctype.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
 #if POSIX_ENABLED
 # include <fcntl.h>
 # include <sys/ioctl.h>
@@ -80,6 +95,16 @@ CAHUTE_DECLARE_TYPE(cahute_link_medium)
 #endif
 
 #include <compat.h>
+
+CAHUTE_DECLARE_TYPE(cahute_link_medium)
+
+#if AMIGAOS_ENABLED
+CAHUTE_EXTERN(int)
+cahute_get_amiga_timer(
+    struct MsgPort **msg_portp,
+    struct timerequest **timerp
+);
+#endif
 
 /* ---
  * Endianess management.
@@ -295,6 +320,9 @@ cahute__log_win_error(
 # define CAHUTE_LINK_MEDIUM_LIBUSB     5
 # define CAHUTE_LINK_MEDIUM_LIBUSB_UMS 6
 #endif
+#if AMIGAOS_ENABLED
+# define CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL 7
+#endif
 
 /* Protocol selection for 'initialize_link_protocol()'. */
 #define CAHUTE_LINK_PROTOCOL_SERIAL_AUTO      0
@@ -339,6 +367,19 @@ struct cahute_link_windows_medium_state {
 };
 #endif
 
+#if defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
+/**
+ * AmigaOS serial device medium state.
+ *
+ * @property msg_port Message port with which the device was opened.
+ * @property io IO structure of the device.
+ */
+struct cahute_link_amigaos_serial_medium_state {
+    struct MsgPort *msg_port;
+    struct IOExtSer *io;
+};
+#endif
+
 #if defined(CAHUTE_LINK_MEDIUM_WIN32_UMS)
 /**
  * Windows API UMS (SCSI) medium state.
@@ -376,6 +417,8 @@ struct cahute_link_libusb_medium_state {
  * @property windows_ums Medium state if the selected medium type is
  *           WIN32_UMS (SCSI over a Windows HANDLE).
  * @property libusb Medium state if the selected medium type is LIBUSB.
+ * @property amigaos_serial Medium state if the selected medium type is
+ *           AMIGAOS_SERIAL.
  */
 union cahute_link_medium_state {
 #if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
@@ -390,6 +433,9 @@ union cahute_link_medium_state {
 #endif
 #if defined(CAHUTE_LINK_MEDIUM_LIBUSB)
     struct cahute_link_libusb_medium_state libusb;
+#endif
+#if defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
+    struct cahute_link_amigaos_serial_medium_state amigaos_serial;
 #endif
 };
 

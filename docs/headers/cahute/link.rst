@@ -182,6 +182,9 @@ Link management related function declarations
     * On other POSIX-compatible platforms, it will be the path to the device,
       usually ``/dev/cu*`` or ``/dev/tty*`` (e.g. ``/dev/ttyUSB0`` for a
       serial link over a USB-serial cable);
+    * On AmigaOS, it will be the serial unit number with the case-insensitive
+      ``U=`` or ``UNIT=`` keyword parameter, e.g. ``unit=0`` for the
+      built-in serial device.
 
     Available device names can be probed using :c:func:`cahute_detect_serial`,
     although the list may be incomplete and other devices may be used.

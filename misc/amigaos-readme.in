@@ -1,0 +1,15 @@
+Short:        Communication tools for CASIO calculators
+Author:       Thomas Touhey
+Uploader:     thomas@touhey.fr (Thomas Touhey)
+Type:         comm/misc
+Architecture: m68k-amigaos
+Version:      @PROJECT_VERSION_MAJOR@.@PROJECT_VERSION_MINOR@
+Distribution: Aminet
+
+Cahute is a library and set of command-line utilities to handle serial
+and USB communication protocols and file formats related to CASIO calculators,
+dating from the 1990s to today.
+
+For guides, topics and references, see the following website:
+
+    https://cahuteproject.org/

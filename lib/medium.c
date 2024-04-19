@@ -301,6 +301,92 @@ cahute_read_from_link_medium(
         break;
 #endif
 
+#if defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
+        case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL: {
+            struct timerequest *timer;
+            struct IOExtSer *io = medium->state.amigaos_serial.io;
+            struct MsgPort *timer_msgport,
+                *serial_msgport = medium->state.amigaos_serial.msg_port;
+            cahute_u32 signals = 0;
+            int has_serial = 0;
+
+            err = cahute_get_amiga_timer(&timer_msgport, &timer);
+            if (err)
+                return err;
+
+            /* Run two operations at once:
+             * - Read into the buffer.
+             * - Start a timer to the currently requested timeout. */
+            io->IOSer.io_Command = CMD_READ;
+            io->IOSer.io_Length = target_size;
+            io->IOSer.io_Data = (APTR)dest;
+
+            SendIO((struct IORequest *)io);
+            signals = (1L << serial_msgport->mp_SigBit) | SIGBREAKF_CTRL_C;
+
+            if (timeout > 0) {
+                timer->tr_time.tv_secs = timeout / 1000;
+                timer->tr_time.tv_micro = timeout % 1000 * 1000;
+                timer->tr_node.io_Command = TR_ADDREQUEST;
+
+                SendIO((struct IORequest *)timer);
+                signals |= (1L << timer_msgport->mp_SigBit);
+            }
+
+            if (CheckIO((struct IORequest *)io)) {
+                /* Request has terminated immediately.
+                 * Note that we may have started a timer request for nothing
+                 * here, but we want to have this CheckIO() call as close as
+                 * possible to the Wait() to avoid race conditions as much
+                 * as possible. */
+                signals = 0;
+                has_serial = 1;
+            } else {
+                /* We want to wait only if the request has not finished
+                 * immediately. */
+                signals = Wait(signals);
+                has_serial = CheckIO((struct IORequest *)io) ? 1 : 0;
+            }
+
+            if (timeout > 0) {
+                if (!CheckIO((struct IORequest *)timer))
+                    AbortIO((struct IORequest *)timer);
+
+                WaitIO((struct IORequest *)timer);
+            }
+
+            /* Wait for either completion and clearing of serial read, or
+             * for cancellation of I/O request.
+             * This is required for refreshing the buffer and 'io_Actual'. */
+            if (!has_serial)
+                AbortIO((struct IORequest *)io);
+
+            WaitIO((struct IORequest *)io);
+
+            if (signals & SIGBREAKF_CTRL_C)
+                return CAHUTE_ERROR_ABORT;
+            else if (!has_serial)
+                goto time_out;
+
+            if (io->IOSer.io_Error) {
+                msg(ll_error,
+                    "Error %d occurred while reading from device.",
+                    io->IOSer.io_Error);
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+
+            /* I/O request was completed, we want to read the contents. */
+            if (io->IOSer.io_Error) {
+                msg(ll_error,
+                    "Error %d occurred while reading from device.",
+                    io->IOSer.io_Error);
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+
+            bytes_read = io->IOSer.io_Actual;
+        } break;
+#endif
+
 #ifdef CAHUTE_LINK_MEDIUM_LIBUSB
         case CAHUTE_LINK_MEDIUM_LIBUSB: {
             int libusberr;
@@ -598,6 +684,22 @@ cahute_write_to_link_medium(
         break;
 #endif
 
+#if defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
+        case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL: {
+            struct IOExtSer *io = medium->state.amigaos_serial.io;
+
+            io->IOSer.io_Length = size;
+            io->IOSer.io_Data = (cahute_u8 *)buf; /* Explicit non-const. */
+            io->IOSer.io_Command = CMD_WRITE;
+            if (DoIO((struct IORequest *)io)) {
+                msg(ll_error, "Unable to set the serial parameters!");
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+
+            bytes_written = size;
+        } break;
+#endif
+
 #ifdef CAHUTE_LINK_MEDIUM_LIBUSB
         case CAHUTE_LINK_MEDIUM_LIBUSB: {
             int libusberr;
@@ -718,26 +820,6 @@ cahute_set_serial_params_to_link_medium(
 ) {
     if (medium->serial_flags == flags && medium->serial_speed == speed)
         return CAHUTE_OK;
-
-    msg(ll_info, "Setting the following serial settings:");
-    msg(ll_info,
-        "  baud=%lu, parity=%s, stop bits=%d,",
-        speed,
-        (flags & CAHUTE_SERIAL_PARITY_MASK) == CAHUTE_SERIAL_PARITY_ODD ? "odd"
-        : (flags & CAHUTE_SERIAL_PARITY_MASK) == CAHUTE_SERIAL_PARITY_EVEN
-            ? "even"
-            : "none",
-        (flags & CAHUTE_SERIAL_STOP_MASK) == CAHUTE_SERIAL_STOP_TWO ? 2 : 1);
-    msg(ll_info,
-        "  dtr=%s, rts=%s",
-        (flags & CAHUTE_SERIAL_DTR_MASK) == CAHUTE_SERIAL_DTR_HANDSHAKE
-            ? "handshake"
-        : (flags & CAHUTE_SERIAL_DTR_ENABLE) ? "enabled"
-                                             : "disabled",
-        (flags & CAHUTE_SERIAL_RTS_MASK) == CAHUTE_SERIAL_RTS_HANDSHAKE
-            ? "handshake"
-        : (flags & CAHUTE_SERIAL_RTS_ENABLE) ? "enabled"
-                                             : "disabled");
 
     switch (medium->type) {
 #ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
@@ -1023,6 +1105,59 @@ cahute_set_serial_params_to_link_medium(
 
         if (!SetCommState(medium->state.windows.handle, &dcb)) {
             log_windows_error("SetCommState", GetLastError());
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+    } break;
+#endif
+
+#if defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
+    case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL: {
+        struct IOExtSer *io = medium->state.amigaos_serial.io;
+
+        io->io_CtlChar = 0x00001311;
+        io->io_RBufLen = 1024;
+        io->io_ExtFlags = 0;
+        io->io_Baud = speed;
+        io->io_BrkTime = 250000;
+        io->io_TermArray.TermArray0 = 0;
+        io->io_TermArray.TermArray1 = 0;
+        io->io_ReadLen = 8;
+        io->io_WriteLen = 8;
+        io->io_SerFlags = SERF_SHARED;
+        io->io_Status = 0;
+
+        switch (flags & CAHUTE_SERIAL_XONXOFF_MASK) {
+        case CAHUTE_SERIAL_XONXOFF_DISABLE:
+            io->io_SerFlags |= SERF_XDISABLED;
+            break;
+        }
+
+        switch (flags & CAHUTE_SERIAL_STOP_MASK) {
+        case CAHUTE_SERIAL_STOP_ONE:
+            io->io_StopBits = 1;
+            break;
+
+        case CAHUTE_SERIAL_STOP_TWO:
+            io->io_StopBits = 2;
+            break;
+        }
+
+        switch (flags & CAHUTE_SERIAL_PARITY_MASK) {
+        case CAHUTE_SERIAL_PARITY_EVEN:
+            io->io_SerFlags |= SERF_PARTY_ON;
+            break;
+
+        case CAHUTE_SERIAL_PARITY_ODD:
+            io->io_SerFlags |= SERF_PARTY_ON | SERF_PARTY_ODD;
+            break;
+        }
+
+        /* TODO: AmigaOS doesn't manage DTR/RTS directly, which means we
+         * may have to manage it here manually! */
+
+        io->IOSer.io_Command = SDCMD_SETPARAMS;
+        if (DoIO((struct IORequest *)io)) {
+            msg(ll_error, "Unable to set the serial parameters!");
             return CAHUTE_ERROR_UNKNOWN;
         }
     } break;

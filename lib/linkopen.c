@@ -116,6 +116,10 @@ CAHUTE_LOCAL(char const *) get_medium_name(int medium) {
     case CAHUTE_LINK_MEDIUM_LIBUSB_UMS:
         return "USB Mass Storage (libusb)";
 #endif
+#ifdef CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL
+    case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL:
+        return "Serial (AmigaOS)";
+#endif
     default:
         return "(unknown)";
     }
@@ -312,6 +316,16 @@ close_medium(int type, union cahute_link_medium_state *state) {
 
         CloseHandle(state->windows.overlapped.hEvent);
         CloseHandle(state->windows.handle);
+        break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL
+    case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL:
+        AbortIO((struct IORequest *)state->amigaos_serial.io);
+        WaitIO((struct IORequest *)state->amigaos_serial.io);
+        CloseDevice((struct IORequest *)state->amigaos_serial.io);
+        DeleteIORequest(state->amigaos_serial.io);
+        DeleteMsgPort(state->amigaos_serial.msg_port);
         break;
 #endif
 
@@ -1105,6 +1119,46 @@ fail:
 }
 #endif
 
+#if AMIGAOS_ENABLED
+/**
+ * Get the AmigaOS serial port from the raw device name.
+ *
+ * This function expects a format such as "U=<unit>" or "UNIT=<unit>",
+ * case-insensitive;
+ *
+ * @param raw Raw device name.
+ * @param unitp Pointer to the unit number to set.
+ * @return Cahute error, or 0 if successful.
+ */
+CAHUTE_LOCAL(int)
+get_amigaos_serial_port(char const *raw, unsigned long *unitp) {
+    unsigned long unit;
+
+    if (tolower(raw[0]) == 'u' && raw[1] == '=')
+        raw += 2;
+    else if (tolower(raw[0]) == 'u' && tolower(raw[1]) == 'n' && tolower(raw[2]) == 'i' && tolower(raw[3]) == 't' && raw[4] == '=')
+        raw += 5;
+    else {
+        /* Unknown port format. */
+        return CAHUTE_ERROR_NOT_FOUND;
+    }
+
+    if (!isdigit(raw[0]))
+        return CAHUTE_ERROR_NOT_FOUND;
+
+    unit = raw[0] - '0';
+    while (*++raw) {
+        if (!isdigit(*raw))
+            return CAHUTE_ERROR_NOT_FOUND;
+
+        unit = unit * 10 + (raw[0] - '0');
+    }
+
+    *unitp = unit;
+    return CAHUTE_OK;
+}
+#endif
+
 /**
  * Open a link over a serial medium.
  *
@@ -1394,6 +1448,61 @@ cahute_open_serial_link(
         SecureZeroMemory(&medium_state.windows.overlapped, sizeof(OVERLAPPED));
 
         medium_state.windows.overlapped.hEvent = overlapped_event_handle;
+    }
+#elif defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
+    {
+        struct MsgPort *msg_port;
+        struct IOExtSer *io;
+        unsigned long unit;
+        int ret;
+
+        /* The serial device name is the unit number for the serial device. */
+        ret = get_amigaos_serial_port(name_or_path, &unit);
+        if (ret)
+            return ret;
+
+        msg_port = CreateMsgPort();
+        if (!msg_port) {
+            msg(ll_error, "Could not open message port.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        io = CreateIORequest(msg_port, sizeof(struct IOExtSer));
+        if (!io) {
+            msg(ll_error, "Could not create IORequest.");
+            DeleteMsgPort(msg_port);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        msg(ll_info, "Opening DEVICE=%s,UNIT=%lu.", SERIALNAME, unit);
+        ret = OpenDevice(
+            (CONST_STRPTR)SERIALNAME,
+            unit,
+            (struct IORequest *)io,
+            0L
+        );
+        if (ret) {
+            msg(ll_error,
+                "Error %d has occurred while opening DEVICE=%s,UNIT=%lu.",
+                ret,
+                SERIALNAME,
+                unit);
+
+            if (ret == IOERR_BADADDRESS)
+                ret = CAHUTE_ERROR_NOT_FOUND;
+            else if (ret == IOERR_UNITBUSY)
+                ret = CAHUTE_ERROR_BUSY;
+            else
+                ret = CAHUTE_ERROR_UNKNOWN;
+
+            DeleteIORequest(io);
+            DeleteMsgPort(msg_port);
+            return ret;
+        }
+
+        medium_type = CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL;
+        medium_state.amigaos_serial.msg_port = msg_port;
+        medium_state.amigaos_serial.io = io;
     }
 #else
     CAHUTE_RETURN_IMPL("No serial device opening method available.");

@@ -245,6 +245,21 @@ end:
     return err;
 #endif
 
+#if AMIGAOS_ENABLED
+    cahute_serial_detection_entry entry;
+
+    /* When opening a serial port on the AmigaOS, we systematically use
+     * the serial device, but allow selecting the unit number using the
+     * name. */
+    entry.cahute_serial_detection_entry_name = "UNIT=0";
+    if (func(cookie, &entry))
+        return CAHUTE_ERROR_INT;
+
+    /* TODO: How to detect multiple serial devices? */
+
+    return CAHUTE_OK;
+#endif
+
     CAHUTE_RETURN_IMPL("No serial device detection method available.");
 }
 
