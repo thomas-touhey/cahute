@@ -28,8 +28,15 @@
 
 #ifndef CAHUTE_ERROR_H
 #define CAHUTE_ERROR_H 1
+#include "cdefs.h"
 
 CAHUTE_BEGIN_NAMESPACE
+
+/* WARNING: When adding error codes to this file, you must also add:
+ *
+ * - The related documentation in ``docs/headers/cahute/error.rst``;
+ * - The related entry in the ``cahute_get_error_name()`` definition
+ *   in ``lib/misc.c``. */
 
 #define CAHUTE_OK 0x0000 /* No error has occurred. */
 
@@ -51,6 +58,12 @@ CAHUTE_BEGIN_NAMESPACE
 #define CAHUTE_ERROR_IRRECOV       0x0109 /* Irrecoverable link */
 
 #define CAHUTE_ERROR_NOOW 0x0201 /* File was not overwritten. */
+
+CAHUTE_BEGIN_DECLS
+
+CAHUTE_EXTERN(char const *) cahute_get_error_name(int cahute__code);
+
+CAHUTE_END_DECLS
 
 CAHUTE_END_NAMESPACE
 

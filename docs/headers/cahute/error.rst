@@ -97,3 +97,15 @@ Macro definitions
 
     Error raised if overwrite was requested and rejected by either us or
     the calculator.
+
+Function declarations
+---------------------
+
+.. c:function:: char const *cahute_get_error_name(int code)
+
+    Get the name of the constant corresponding to the given error code,
+    in ASCII, using only capital letters, decimal digits and low lines
+    (underscores).
+
+    :param code: Code for which to get the error name.
+    :return: Name of the error code, in ASCII.

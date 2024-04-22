@@ -28,6 +28,53 @@
 
 #include "internals.h"
 
+/**
+ * Get the name of a given error.
+ *
+ * @param code Code of the error to give the name for.
+ * @return Name of the error.
+ */
+CAHUTE_EXTERN(char const *) cahute_get_error_name(int code) {
+    switch (code) {
+    case CAHUTE_OK:
+        return "CAHUTE_OK";
+    case CAHUTE_ERROR_UNKNOWN:
+        return "CAHUTE_ERROR_UNKNOWN";
+    case CAHUTE_ERROR_IMPL:
+        return "CAHUTE_ERROR_IMPL";
+    case CAHUTE_ERROR_ALLOC:
+        return "CAHUTE_ERROR_ALLOC";
+    case CAHUTE_ERROR_PRIV:
+        return "CAHUTE_ERROR_PRIV";
+    case CAHUTE_ERROR_INT:
+        return "CAHUTE_ERROR_INT";
+    case CAHUTE_ERROR_SIZE:
+        return "CAHUTE_ERROR_SIZE";
+    case CAHUTE_ERROR_NOT_FOUND:
+        return "CAHUTE_ERROR_NOT_FOUND";
+    case CAHUTE_ERROR_TOO_MANY:
+        return "CAHUTE_ERROR_TOO_MANY";
+    case CAHUTE_ERROR_INCOMPAT:
+        return "CAHUTE_ERROR_INCOMPAT";
+    case CAHUTE_ERROR_GONE:
+        return "CAHUTE_ERROR_GONE";
+    case CAHUTE_ERROR_TERMINATED:
+        return "CAHUTE_ERROR_TERMINATED";
+    case CAHUTE_ERROR_TIMEOUT_START:
+        return "CAHUTE_ERROR_TIMEOUT_START";
+    case CAHUTE_ERROR_TIMEOUT:
+        return "CAHUTE_ERROR_TIMEOUT";
+    case CAHUTE_ERROR_CORRUPT:
+        return "CAHUTE_ERROR_CORRUPT";
+    case CAHUTE_ERROR_IRRECOV:
+        return "CAHUTE_ERROR_IRRECOV";
+    case CAHUTE_ERROR_NOOW:
+        return "CAHUTE_ERROR_NOOW";
+    default:
+        return "(unknown)";
+    }
+}
+
 #if WIN32_ENABLED
 # include <windows.h>
 
