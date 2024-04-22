@@ -11,6 +11,19 @@ h1 img, h2 img, p img {
     text-align: center;
 }
 
+#cahute-version .toctree-wrapper > ul {
+    display: flex;
+    list-style-type: none;
+    flex-wrap: wrap;
+    padding-left: 0;
+    gap: .5em 1em;
+}
+
+#cahute-version .toctree-wrapper > ul > li {
+    display: inline-block;
+    flex: 1 0 20em;
+}
+
 .bottom-of-page .icons svg,
 .bottom-of-page .icons img {
     width: auto;

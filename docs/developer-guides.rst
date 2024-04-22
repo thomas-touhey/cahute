@@ -1,4 +1,4 @@
-Developer Guides
+Developer guides
 ================
 
 These sections describe specific problems that you may want to solve using
