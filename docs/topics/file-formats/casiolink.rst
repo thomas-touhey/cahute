@@ -62,6 +62,18 @@ The format of such headers is the following:
       -
       -
 
+.. _casiolink-cas40-al-end:
+
+``\x17\x17`` CAS40 AL End
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This header represents an end of sequence when in ``AL`` mode. It is only
+used with the CASIOLINK protocol, when using the CAS40 header format, and
+when the ``AL`` data type has been sent and received at least once;
+see :ref:`casiolink-cas40-al-mode` for more information.
+
+This is not followed by any data parts.
+
 .. _casiolink-cas40-end:
 
 ``\x17\xFF`` CAS40 End
@@ -72,33 +84,137 @@ protocol, when using the CAS40 header format.
 
 This is not followed by any data parts.
 
+.. note::
+
+    This prefix is common to all sentinels in the CAS40 variant, i.e.
+    headers and data parts, of the size corresponding to the expected
+    data part size.
+
+.. note::
+
+    This data type does not end the communication when ``AL`` mode has been
+    enabled; see :ref:`casiolink-cas40-al-mode`.
+
+.. _casiolink-cas40-a1:
+
+``A1`` CAS40 Dynamic Graph
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 1 B
+      - Reserved
+      -
+      - Set to ``\0``.
+    * - 2 (0x02)
+      - 2 B
+      - Length (*L*)
+      - Size of the data part, plus 2.
+      - 8-bit integer.
+
+This is followed by 1 data part of *L - 2* bytes, being the definition of the
+dynamic graph with a ``\xFF`` sentinel.
+
+This data type is final.
+
 .. _casiolink-cas40-aa:
 
-``AA`` CAS40 Dynamic Graphs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``AA`` CAS40 Dynamic Graph in Bulk
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+This file type is actually the same as :ref:`casiolink-cas40-a1`, except
+it is in a context where multiple editor programs are being sent, i.e.
+the data type is non-final.
 
 .. _casiolink-cas40-ad:
 
-``AD`` CAS40 All Memories
-~~~~~~~~~~~~~~~~~~~~~~~~~
+``AD`` CAS40 All Variable Memories
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+This data type contains all variable memories currently defined on the
+device.
+
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``"CA"``.
+    * - 2 (0x02)
+      - 2 B
+      - Count (*C*)
+      - Number of elements, including the sentinel.
+      - Big endian 16-bit integer.
+
+There are *C* times data parts of 22 bytes each, the last one being
+the sentinel, with the following data:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Type
+      - Data part type.
+      - ``\0\0`` for the cells, ``\x17\xFF`` for the sentinel.
+    * - 2 (0x02)
+      - 10 B
+      - Value (real part)
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 12 (0x0C)
+      - 10 B
+      - Value (imaginary part)
+      -
+      - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
 
 .. _casiolink-cas40-al:
 
 ``AL`` CAS40 All
 ~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+This data type signals that the calculator is about to send all of its data.
+
+This does does have type-specific data, and is not followed by any data parts.
+
+.. note::
+
+    If this data type is received at least once, it means that all final
+    data types become non-final, and that a special sentinel header is
+    required; see :ref:`casiolink-cas40-al-mode` for more information.
 
 .. _casiolink-cas40-am:
 
 ``AM`` CAS40 Variable Memories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+This is equivalent to :ref:`casiolink-cas40-ad`, but only returns variables
+designated using a letter or symbol.
 
 .. _casiolink-cas40-bu:
 
@@ -122,6 +238,7 @@ Type-specific data for such files are the following:
       - Backup type, among:
 
         * ``TYPEA00``: fx-9700GH style backup (32768 bytes).
+        * ``TYPEA02``: CFX-9800G style backup (32768 bytes).
 
 There is one data part, for which the size depends on the backup type.
 
@@ -189,10 +306,12 @@ Type-specific data for such files are the following:
       -
       - Should be set to ``\x03``.
 
+.. todo:: Document the role of the different fields here!
+
 This is followed by 3 data parts, each representing a monochrome picture with
 a one-byte prefix representing the color.
 
-.. todo:: Document the role of the different fields here!
+This data type is final.
 
 .. _casiolink-cas40-dd:
 
@@ -251,14 +370,19 @@ Type-specific data for such files are the following:
       -
       - ``F`` (?)
 
+.. todo:: Document the role of the different fields here!
+
 This is followed by a single data part representing the monochrome picture.
+
+This data type is final.
 
 .. _casiolink-cas40-dm:
 
 ``DM`` CAS40 Defined Memories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+This is equivalent to :ref:`casiolink-cas40-ad`, but only returns defined
+memories.
 
 .. _casiolink-cas40-en:
 
@@ -379,7 +503,7 @@ Type-specific data is the following:
       -
       - Should be set to ``\0``.
 
-This is followed by a single program being the program's content.
+This is followed by a single data part being the program's content.
 
 This data type is final.
 
@@ -445,6 +569,11 @@ Type-specific data is the following:
       -
       - Big endian 16-bit length of the function 6 definition.
 
+This is followed by a single data part with the contents of all of the
+functions.
+
+This data type is final.
+
 .. _casiolink-cas40-fn:
 
 ``FN`` CAS40 Single Editor Program in Bulk
@@ -456,40 +585,328 @@ the data is non-final.
 
 .. _casiolink-cas40-fp:
 
-``FN`` Single Password Protected Editor Program in Bulk
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``FP`` CAS40 Single Password Protected Editor Program in Bulk
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This file type is actually the same as :ref:`casiolink-cas40-ep`, except
 it is in a context where multiple editor programs are being sent, i.e.
 the data is non-final.
 
+.. _casiolink-cas40-g1:
+
+``G1`` CAS40 Graph Function
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 1 B
+      - Reserved
+      -
+      - Set to ``\0``.
+    * - 1 (0x01)
+      - 2 B
+      - Length (*L*)
+      - Length of the contents, plus two.
+      - Big-endian 16-bit integer.
+    * - 3 (0x03)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``\0`` by default.
+    * - 5 (0x05)
+      - 2 B
+      - Type (*T*)
+      -
+      - Big-endian 16-bit integer, for which the values are:
+
+        .. list-table::
+            :header-rows: 1
+
+            * - Value
+              - Description
+            * - ``0x0000``
+              - Unset
+            * - ``0x0100``
+              - Rect (``Y=...X``)
+            * - ``0x0102``
+              - Pol (``r=...θ``), with optional ``0xF6`` (``,``) separator.
+            * - ``0x0103``
+              - Parm (``Xt=...T``)
+            * - ``0x0104``
+              - Ineq (``Y>...X``)
+            * - ``0x0105``
+              - Ineq (``Y<...X``)
+            * - ``0x0106``
+              - Ineq (``Y≥...X``)
+            * - ``0x0107``
+              - Ineq (``Y≤...X``)
+
+There is exactly 1 data part of *L* - 2 bytes, containing the source of
+the Graph Function.
+
+This data type is final.
+
 .. _casiolink-cas40-ga:
 
-``GA`` CAS40 Graph
-~~~~~~~~~~~~~~~~~~
+``GA`` CAS40 Graph Function in Bulk
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+This file type is actually the same as :ref:`casiolink-cas40-g1`, except
+it is in a context where multiple graph functions are being sent, i.e.
+the data is non-final.
 
 .. _casiolink-cas40-gf:
 
-``GF`` CAS40 Graph Zoom
-~~~~~~~~~~~~~~~~~~~~~~~
+``GF`` CAS40 Factor
+~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``\x00\x02``.
+
+There is exactly 1 data part of 22 bytes, of the following format:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Reserved
+      -
+      - Set to ``\0``.
+    * - 2 (0x02)
+      - 10 B
+      - Xfact
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 12 (0x0C)
+      - 10 B
+      - Yfact
+      -
+      - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
 
 .. _casiolink-cas40-gr:
 
-``GR`` CAS40 Graph Range
-~~~~~~~~~~~~~~~~~~~~~~~~
+``GR`` CAS40 Range
+~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``\x00\x09``.
+
+There is exactly 1 data part of 92 bytes, of the following format:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Reserved
+      -
+      - Set to ``\0``.
+    * - 2 (0x02)
+      - 10 B
+      - Xmin
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 12 (0x0C)
+      - 10 B
+      - Xmax
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 22 (0x16)
+      - 10 B
+      - Xscale
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 32 (0x20)
+      - 10 B
+      - Ymin
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 42 (0x2A)
+      - 10 B
+      - Ymax
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 52 (0x34)
+      - 10 B
+      - Yscale
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 62 (0x3E)
+      - 10 B
+      - Tmin, θmin
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 72 (0x48)
+      - 10 B
+      - Tmax, θmax
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 82 (0x52)
+      - 10 B
+      - Tpitch, θpitch
+      -
+      - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
 
 .. _casiolink-cas40-gt:
 
 ``GT`` CAS40 Function Table
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Reserved
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 2 B
+      - Length (*L*)
+      - Length of the function definition, plus two.
+      - Big endian 16-bit integer.
+    * - 4 (0x04)
+      - 2 B
+      - Count (*C*)
+      -
+      - Big endian 16-bit integer.
+    * - 6 (0x06)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``\0\0``.
+
+There is *C* + 2 data parts, where:
+
+* The first data part is the source function from which the table is
+  computed, which is *L - 2* bytes long and includes a sentinel (``\xFF``).
+* The second data part are the table properties, which are 32 bytes long.
+  They have the following format:
+
+  .. list-table::
+      :header-rows: 1
+
+      * - Offset
+        - Size
+        - Field name
+        - Description
+        - Values
+      * - 0 (0x00)
+        - 2 B
+        - Reserved
+        -
+        - Set to ``\0\0``.
+      * - 2 (0x02)
+        - 10 B
+        - Start
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 12 (0x0C)
+        - 10 B
+        - End
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 22 (0x16)
+        - 10 B
+        - Pitch
+        -
+        - :ref:`number-format-casiolink-bcd`
+
+* The next *C* data parts are the cells, which are 22 bytes long.
+  They have the following format:
+
+  .. list-table::
+      :header-rows: 1
+
+      * - Offset
+        - Size
+        - Field name
+        - Description
+        - Values
+      * - 0 (0x00)
+        - 2 B
+        - Reserved
+        -
+        - Set to ``\0\0``.
+      * - 2 (0x02)
+        - 10 B
+        - X
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 12 (0x0C)
+        - 10 B
+        - Y
+        -
+        - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
 
 .. _casiolink-cas40-m1:
 
@@ -508,7 +925,7 @@ Type-specific data is the following:
       - Values
     * - 0 (0x00)
       - 2 B
-      - Unknown
+      - Reserved
       -
       - Set to ``"RA"``.
     * - 2 (0x02)
@@ -563,16 +980,9 @@ This data type is final.
 
 Equivalent to :ref:`casiolink-cas40-m1`, except:
 
-* There are *W* times *H* data parts instead of *W* times *H* + 1, as the
+* There are *W* times *H* data parts instead of *W* times *H*, as the
   sentinel is not present;
 * The data type is not final.
-
-.. _casiolink-cas40-pd:
-
-``PD`` CAS40 Polynomial Equation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. todo:: Describe this.
 
 .. _casiolink-cas40-p1:
 
@@ -631,6 +1041,107 @@ Type-specific data for such files are the following:
 
 This is followed by a single data part containing the program's content.
 
+This data type is final.
+
+.. _casiolink-cas40-pd:
+
+``PD`` CAS40 Polynomial Equation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Reserved
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 2 B
+      - Degree (*D*)
+      -
+      - Big endian 16-bit integer.
+
+The contents depends on the degree (*D*) field:
+
+* For degree 2, there is 1 data part which is 32 bytes long, and contains the
+  components of the ``ax²+bx+c=0`` equation, in the following format:
+
+  .. list-table::
+      :header-rows: 1
+
+      * - Offset
+        - Size
+        - Field name
+        - Description
+        - Values
+      * - 0 (0x00)
+        - 2 B
+        - Reserved
+        -
+        - Set to ``\0\0``
+      * - 2 (0x02)
+        - 10 B
+        - a
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 12 (0x0C)
+        - 10 B
+        - b
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 22 (0x16)
+        - 10 B
+        - c
+        -
+        - :ref:`number-format-casiolink-bcd`
+
+* For degree 3, there is 1 data part which is 42 bytes long, and contains the
+  components of the ``ax³+bx²+cx+d=0`` equation, in the following format:
+
+  .. list-table::
+      :header-rows: 1
+
+      * - Offset
+        - Size
+        - Field name
+        - Description
+        - Values
+      * - 0 (0x00)
+        - 2 B
+        - Reserved
+        -
+        - Set to ``\0\0``
+      * - 2 (0x02)
+        - 10 B
+        - a
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 12 (0x0C)
+        - 10 B
+        - b
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 22 (0x16)
+        - 10 B
+        - c
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 32 (0x20)
+        - 10 B
+        - d
+        -
+        - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
+
 .. _casiolink-cas40-pz:
 
 ``PZ`` CAS40 Multiple Numbered Programs
@@ -674,33 +1185,287 @@ This is followed by 2 data parts:
 
 See :ref:`casiolink-cas40-p1` for more information.
 
+This data type is final.
+
 .. _casiolink-cas40-rt:
 
 ``RT`` CAS40 Recursion Table
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Reserved
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 2 B
+      - Length (*L*)
+      - Length of the function definition, plus two.
+      - Big endian 16-bit integer.
+    * - 4 (0x04)
+      - 2 B
+      - Count (*C*)
+      -
+      - Big endian 16-bit integer.
+    * - 6 (0x06)
+      - 2 B
+      - Unknown
+      -
+      - Set to ``\0\0``.
+
+There is *C* + 2 data parts, where:
+
+* The first data part is the source function from which the table is
+  computed, which is *L - 2* bytes long and includes a sentinel (``\xFF``).
+* The second data part are the table properties, which are 22 bytes long.
+  They have the following format:
+
+  .. list-table::
+      :header-rows: 1
+
+      * - Offset
+        - Size
+        - Field name
+        - Description
+        - Values
+      * - 0 (0x00)
+        - 2 B
+        - Reserved
+        -
+        - Set to ``\0\0``.
+      * - 2 (0x02)
+        - 10 B
+        - nStart
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 12 (0x0C)
+        - 10 B
+        - nEnd
+        -
+        - :ref:`number-format-casiolink-bcd`
+
+* The next *C* data parts are the cells, which are 32 bytes long.
+  They have the following format:
+
+  .. list-table::
+      :header-rows: 1
+
+      * - Offset
+        - Size
+        - Field name
+        - Description
+        - Values
+      * - 0 (0x00)
+        - 2 B
+        - Reserved
+        -
+        - Set to ``\0\0``.
+      * - 2 (0x02)
+        - 10 B
+        - n
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 12 (0x0C)
+        - 10 B
+        - an
+        -
+        - :ref:`number-format-casiolink-bcd`
+      * - 22 (0x16)
+        - 10 B
+        - Σan
+        -
+        - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
 
 .. _casiolink-cas40-sd:
 
 ``SD`` CAS40 Simultaneous Equations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Reserved
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 1 B
+      - Width (*W*)
+      -
+      - 8-bit integer.
+    * - 3 (0x03)
+      - 1 B
+      - Height (*H*)
+      -
+      - 8-bit integer.
+
+There is *W* * *H* + 1 data parts, each 14 bytes long, of the following format:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Type
+      - Data part type.
+      - ``\0\0`` for the cells, ``\x17\xFF`` for the sentinel.
+    * - 2 (0x02)
+      - 1 B
+      - X
+      - Horizontal coordinate in the matrix, starting from 1.
+      - 8-bit integer.
+    * - 3 (0x03)
+      - 1 B
+      - Y
+      - Vertical coordinate in the matrix, starting from 1.
+      - 8-bit integer.
+    * - 4 (0x02)
+      - 10 B
+      - Value for the cell.
+      -
+      - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
 
 .. _casiolink-cas40-sr:
 
 ``SR`` CAS40 Paired Variable Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Reserved
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 2 B
+      - Count (*C*)
+      - Number of elements, including the sentinel.
+      - Big endian 16-bit integer.
+
+There are *C* times data parts of 32 bytes each, the last one being
+the sentinel, with the following data:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Type
+      - Data part type.
+      - ``\0\0`` for the cells, ``\x17\xFF`` for the sentinel.
+    * - 2 (0x02)
+      - 10 B
+      - X value
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 12 (0x0C)
+      - 10 B
+      - Y value
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 22 (0x16)
+      - 10 B
+      - f value
+      -
+      - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
 
 .. _casiolink-cas40-ss:
 
 ``SS`` CAS40 Single Variable Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: Describe this.
+Type-specific data is the following:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Reserved
+      -
+      - Set to ``"RA"``.
+    * - 2 (0x02)
+      - 2 B
+      - Count (*C*)
+      - Number of elements, including the sentinel.
+      - Big endian 16-bit integer.
+
+There are *C* + 1 data parts of 22 bytes each, the last one being
+the sentinel, with the following data:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Type
+      - Data part type.
+      - ``\0\0`` for the cells, ``\x17\xFF`` for the sentinel.
+    * - 2 (0x02)
+      - 10 B
+      - X value
+      -
+      - :ref:`number-format-casiolink-bcd`
+    * - 12 (0x0C)
+      - 10 B
+      - f value
+      -
+      - :ref:`number-format-casiolink-bcd`
+
+This data type is final.
 
 .. _casiolink-cas50:
 

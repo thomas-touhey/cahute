@@ -112,9 +112,9 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
     cahute_u8 *buf = link->data_buffer;
     size_t buf_capacity = link->data_buffer_capacity;
     size_t buf_size, part_count = 1, part_repeat = 1;
-    size_t part_sizes[2];
+    size_t part_sizes[5];
     int packet_type, err, variant = 0, checksum, checksum_alt;
-    int log_part_data = 1, is_end = 0, is_final = 0;
+    int log_part_data = 1, is_al_end = 0, is_end = 0, is_final = 0;
 
     part_sizes[0] = 0;
 
@@ -265,31 +265,55 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
      * NOTE: These sections can either define:
      *
      * - 'part_sizes[0]' only, if there's only one part.
-     * - 'part_sizes[...]' and 'part_count' if there's multiple parts,
-     *   and/or with 'part_repeat' set if the number of repetitions is
-     *   arbitrary.
+     * - 'part_sizes[...]' and 'part_count' if there's multiple parts.
      * - 'part_count' to 0 if there's no data part associated with the
-     *    header. */
+     *    header.
+     *
+     * Note that if 'part_repeat' is set, it represents how much times the
+     * last data size is read. */
     switch (variant) {
     case CAHUTE_CASIOLINK_VARIANT_CAS40:
-        if (!memcmp(&buf[1], "\x17\xFF", 2)) {
+        if (!memcmp(&buf[1], "\x17\x17", 2)) {
+            /* CAS40 AL End */
+            part_count = 0;
+            is_al_end = 1;
+        } else if (!memcmp(&buf[1], "\x17\xFF", 2)) {
             /* CAS40 End */
             part_count = 0;
             is_end = 1;
+        } else if (!memcmp(&buf[1], "A1", 2)) {
+            /* CAS40 Dynamic Graph */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]);
+            if (part_sizes[0] > 2)
+                part_sizes[0] -= 2;
+
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "AA", 2)) {
+            /* CAS40 Dynamic Graph in Bulk */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]);
+            if (part_sizes[0] > 2)
+                part_sizes[0] -= 2;
+        } else if (!memcmp(&buf[1], "AD", 2)) {
+            /* CAS40 All Memories */
+            part_repeat = (buf[5] << 8) | buf[6];
+            part_sizes[0] = 22;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "AL", 2)) {
+            /* CAS40 All */
+            part_count = 0;
+            link->flags |= CAHUTE_LINK_FLAG_ALMODE;
+        } else if (!memcmp(&buf[1], "AM", 2)) {
+            /* CAS40 Variable Memories */
+            part_repeat = (buf[5] << 8) | buf[6];
+            part_sizes[0] = 22;
+            is_final = 1;
         } else if (!memcmp(&buf[1], "BU", 2)) {
             /* CAS40 Backup */
             if (!memcmp(&buf[3], "TYPEA00", 7))
                 part_sizes[0] = 32768;
+            else if (!memcmp(&buf[3], "TYPEA02", 7))
+                part_sizes[0] = 32768;
 
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "DD", 2)) {
-            /* CAS40 Monochrome Screenshot. */
-            int width = buf[3], height = buf[4];
-
-            if (!memcmp(&buf[5], "\x10\x44WF", 4))
-                part_sizes[0] = ((width >> 3) + !!(width & 7)) * height;
-
-            log_part_data = 0;
             is_final = 1;
         } else if (!memcmp(&buf[1], "DC", 2)) {
             /* CAS40 Color Screenshot. */
@@ -301,6 +325,20 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
             }
 
             log_part_data = 0;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "DD", 2)) {
+            /* CAS40 Monochrome Screenshot. */
+            int width = buf[3], height = buf[4];
+
+            if (!memcmp(&buf[5], "\x10\x44WF", 4))
+                part_sizes[0] = ((width >> 3) + !!(width & 7)) * height;
+
+            log_part_data = 0;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "DM", 2)) {
+            /* CAS40 Defined Memories */
+            part_repeat = (buf[5] << 8) | buf[6];
+            part_sizes[0] = 22;
             is_final = 1;
         } else if (!memcmp(&buf[1], "EN", 2)) {
             /* CAS40 Single Editor Program */
@@ -324,6 +362,29 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
         } else if (!memcmp(&buf[1], "FP", 2)) {
             /* CAS40 Single Password Protected Editor Program in Bulk */
             part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+        } else if (!memcmp(&buf[1], "G1", 2)) {
+            /* CAS40 Graph Function */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "GA", 2)) {
+            /* CAS40 Graph Function in Bulk */
+            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+        } else if (!memcmp(&buf[1], "GF", 2)) {
+            /* CAS40 Factor */
+            part_sizes[0] = 2 + buf[6] * 10;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "GR", 2)) {
+            /* CAS40 Range */
+            part_sizes[0] = 92;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "GT", 2)) {
+            /* CAS40 Function Table */
+            part_count = 3;
+            part_repeat = (buf[7] << 8) | buf[8];
+            part_sizes[0] = buf[6] - 2;
+            part_sizes[1] = 32;
+            part_sizes[2] = 22;
+            is_final = 1;
         } else if (!memcmp(&buf[1], "M1", 2)) {
             /* CAS40 Single Matrix */
             int width = buf[5], height = buf[6];
@@ -341,11 +402,38 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
             /* CAS40 Single Numbered Program. */
             part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
             is_final = 1;
+        } else if (!memcmp(&buf[1], "PD", 2)) {
+            /* CAS40 Polynomial Equation */
+            part_sizes[0] = buf[6] * 10 + 12;
+            is_final = 1;
         } else if (!memcmp(&buf[1], "PZ", 2)) {
             /* CAS40 Multiple Numbered Programs */
             part_count = 2;
             part_sizes[0] = 190;
             part_sizes[1] = ((buf[4] << 8) | buf[5]) - 2;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "RT", 2)) {
+            /* CAS40 Recursion Table */
+            part_count = 3;
+            part_repeat = (buf[7] << 8) | buf[8];
+            part_sizes[0] = buf[6] - 2;
+            part_sizes[1] = 22;
+            part_sizes[2] = 32;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "SD", 2)) {
+            /* CAS40 Simultaneous Equations */
+            part_repeat = buf[5] * buf[6] + 1;
+            part_sizes[0] = 14;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "SR", 2)) {
+            /* CAS40 Paired Variable Data */
+            part_repeat = (buf[5] << 8) | buf[6];
+            part_sizes[0] = 32;
+            is_final = 1;
+        } else if (!memcmp(&buf[1], "SS", 2)) {
+            /* CAS40 Single Variable Data */
+            part_repeat = (buf[5] << 8) | buf[6];
+            part_sizes[0] = 22;
             is_final = 1;
         }
 
@@ -452,7 +540,7 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
 
     if (part_count) {
         cahute_u8 tmp_buf[2];
-        size_t part_i, part_j, index, total;
+        size_t part_i, index, total;
 
         /* There is data to be read.
          * The method to transfer data here varies depending on the variant:
@@ -467,61 +555,63 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
             buf = &buf[buf_size];
 
             index = 1;
-            total = part_count * part_repeat;
-            for (part_j = 0; part_j < part_repeat; part_j++) {
-                for (part_i = 0; part_i < part_count; part_i++, index++) {
-                    size_t part_size = part_sizes[part_i];
+            total = part_count - 1 + part_repeat;
+            for (part_i = 0; part_i < total; part_i++, index++) {
+                size_t part_size =
+                    part_sizes[part_i >= part_count ? part_count - 1 : part_i];
 
-                    err = cahute_read_from_link(
-                        link,
-                        tmp_buf,
-                        1,
-                        TIMEOUT_PACKET_CONTENTS,
-                        TIMEOUT_PACKET_CONTENTS
-                    );
-                    if (err == CAHUTE_ERROR_TIMEOUT_START)
-                        return CAHUTE_ERROR_TIMEOUT;
-                    if (err)
-                        return err;
+                msg(ll_info,
+                    "Reading data part %d/%d (%" CAHUTE_PRIuSIZE "o).",
+                    index,
+                    total,
+                    part_size);
 
-                    if (tmp_buf[0] != PACKET_TYPE_HEADER) {
-                        msg(ll_error,
-                            "Expected 0x3A (':') packet type, got 0x%02X.",
-                            buf[0]);
-                        return CAHUTE_ERROR_UNKNOWN;
+                err = cahute_read_from_link(
+                    link,
+                    tmp_buf,
+                    1,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
+                if (err)
+                    return err;
+
+                if (tmp_buf[0] != PACKET_TYPE_HEADER) {
+                    msg(ll_error,
+                        "Expected 0x3A (':') packet type, got 0x%02X.",
+                        buf[0]);
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
+
+                if (part_size) {
+                    size_t part_size_left = part_size;
+                    cahute_u8 *p = buf;
+
+                    /* Use a loop to be able to follow the transfer progress
+                     * using logs. */
+                    while (part_size_left) {
+                        size_t to_read = part_size > 512 ? 512 : part_size;
+
+                        err = cahute_read_from_link(
+                            link,
+                            p,
+                            to_read,
+                            TIMEOUT_PACKET_CONTENTS,
+                            TIMEOUT_PACKET_CONTENTS
+                        );
+                        if (err == CAHUTE_ERROR_TIMEOUT_START)
+                            return CAHUTE_ERROR_TIMEOUT;
+                        if (err)
+                            return err;
+
+                        part_size_left -= to_read;
+                        p += to_read;
                     }
+                }
 
-                    msg(ll_info,
-                        "Reading data part %d/%d (%" CAHUTE_PRIuSIZE "o).",
-                        index,
-                        total,
-                        part_size);
-
-                    err = cahute_read_from_link(
-                        link,
-                        buf,
-                        part_size,
-                        TIMEOUT_PACKET_CONTENTS,
-                        TIMEOUT_PACKET_CONTENTS
-                    );
-                    if (err == CAHUTE_ERROR_TIMEOUT_START)
-                        return CAHUTE_ERROR_TIMEOUT;
-                    if (err)
-                        return err;
-
-                    /* Read and check the checksum. */
-                    err = cahute_read_from_link(
-                        link,
-                        tmp_buf + 1,
-                        1,
-                        TIMEOUT_PACKET_CONTENTS,
-                        TIMEOUT_PACKET_CONTENTS
-                    );
-                    if (err == CAHUTE_ERROR_TIMEOUT_START)
-                        return CAHUTE_ERROR_TIMEOUT;
-                    if (err)
-                        return err;
-
+                if (part_size) {
                     /* For color screenshots, sometimes the first byte is not
                      * taken into account in the checksum calculation, as it's
                      * metadata for the sheet and not the "actual data" of the
@@ -531,47 +621,62 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
                     checksum = cahute_casiolink_checksum(buf, part_size);
                     checksum_alt =
                         cahute_casiolink_checksum(buf + 1, part_size - 1);
-
-                    if (checksum != tmp_buf[1] && checksum_alt != tmp_buf[1]) {
-                        cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA
-                        };
-
-                        msg(ll_warn,
-                            "Invalid checksum (expected: 0x%02X, computed: "
-                            "0x%02X).",
-                            tmp_buf[1],
-                            checksum);
-                        mem(ll_info, buf, part_size);
-
-                        msg(ll_error, "Transfer will abort.");
-                        link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
-
-                        err = cahute_write_to_link(link, send_buf, 1);
-                        if (err)
-                            return err;
-
-                        return CAHUTE_ERROR_CORRUPT;
-                    }
-
-                    /* Acknowledge the data. */
-                    {
-                        cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
-
-                        err = cahute_write_to_link(link, send_buf, 1);
-                        if (err)
-                            return err;
-                    }
-
-                    msg(ll_info,
-                        "Data part %d/%d received and acknowledged.",
-                        index,
-                        total);
-                    if (log_part_data)
-                        mem(ll_info, buf, part_size);
-
-                    buf += part_size;
-                    buf_size += part_size;
+                } else {
+                    checksum = 0;
+                    checksum_alt = 0;
                 }
+
+                /* Read and check the checksum. */
+                err = cahute_read_from_link(
+                    link,
+                    tmp_buf + 1,
+                    1,
+                    TIMEOUT_PACKET_CONTENTS,
+                    TIMEOUT_PACKET_CONTENTS
+                );
+                if (err == CAHUTE_ERROR_TIMEOUT_START)
+                    return CAHUTE_ERROR_TIMEOUT;
+                if (err)
+                    return err;
+
+                if (checksum != tmp_buf[1] && checksum_alt != tmp_buf[1]) {
+                    cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA};
+
+                    msg(ll_warn,
+                        "Invalid checksum (expected: 0x%02X, computed: "
+                        "0x%02X).",
+                        tmp_buf[1],
+                        checksum);
+                    mem(ll_info, buf, part_size);
+
+                    msg(ll_error, "Transfer will abort.");
+                    link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+
+                    err = cahute_write_to_link(link, send_buf, 1);
+                    if (err)
+                        return err;
+
+                    return CAHUTE_ERROR_CORRUPT;
+                }
+
+                /* Acknowledge the data. */
+                {
+                    cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
+
+                    err = cahute_write_to_link(link, send_buf, 1);
+                    if (err)
+                        return err;
+                }
+
+                msg(ll_info,
+                    "Data part %d/%d received and acknowledged.",
+                    index,
+                    total);
+                if (log_part_data)
+                    mem(ll_info, buf, part_size);
+
+                buf += part_size;
+                buf_size += part_size;
             }
             break;
 
@@ -586,14 +691,14 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
     link->protocol_state.casiolink.last_variant = variant;
     link->data_buffer_size = buf_size;
 
-    if (is_end) {
+    if (is_al_end || (is_end && (~link->flags & CAHUTE_LINK_FLAG_ALMODE))) {
         /* The packet was an end packet. */
         link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
         msg(ll_info, "Received data was a sentinel!");
         return CAHUTE_ERROR_TERMINATED;
     }
 
-    if (is_final) {
+    if (is_final && (~link->flags & CAHUTE_LINK_FLAG_ALMODE)) {
         /* The packet was a final one in the communication. */
         link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
         msg(ll_info, "Received data was final!");

@@ -182,6 +182,7 @@ cahute__log_win_error(
 #define CAHUTE_LINK_FLAG_GONE          0x00000100 /* Underlying medium gone. */
 #define CAHUTE_LINK_FLAG_TERMINATED    0x00000200 /* Was terminated! */
 #define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000400 /* Cannot recover. */
+#define CAHUTE_LINK_FLAG_ALMODE        0x00000800 /* CAS40 AL data received. */
 
 /* Medium types allowed. */
 #if POSIX_ENABLED
