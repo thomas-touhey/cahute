@@ -5,7 +5,7 @@
 # from the environment for the first two.
 SPHINXOPTS ?=
 SPHINXBUILD ?= sphinx-build
-SPHINXAUTOOPTS ?= --ignore "*.kate-swp" --ignore "**/openapi.json" --watch ../teapots_identity
+SPHINXAUTOOPTS ?= --ignore "*.kate-swp" --ignore "**/openapi.json"
 SPHINXAUTOBUILD ?= sphinx-autobuild
 SOURCEDIR = .
 BUILDDIR = _build
