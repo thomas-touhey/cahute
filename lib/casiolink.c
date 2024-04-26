@@ -38,7 +38,7 @@ pz_program_names =
 /* TIMEOUT_PACKET_TYPE is the timeout before reading the packet type, i.e.
  * the first byte, while TIMEOUT_PACKET_CONTENTS is the timeout before
  * reading any of the following bytes. */
-#define TIMEOUT_PACKET_CONTENTS 1000
+#define TIMEOUT_PACKET_CONTENTS 2000
 
 #define PACKET_TYPE_ACK          0x06
 #define PACKET_TYPE_ESTABLISHED  0x13
@@ -592,7 +592,8 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
                     /* Use a loop to be able to follow the transfer progress
                      * using logs. */
                     while (part_size_left) {
-                        size_t to_read = part_size > 512 ? 512 : part_size;
+                        size_t to_read =
+                            part_size_left > 512 ? 512 : part_size_left;
 
                         err = cahute_read_from_link(
                             link,
