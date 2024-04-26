@@ -235,7 +235,9 @@ if(ENABLE_CLI)
     install(TARGETS p7os RUNTIME)
     install(TARGETS p7screen RUNTIME)
     install(TARGETS xfer9860 RUNTIME)
-    install(TARGETS CaS RUNTIME)
+    # TODO: CaS is in its very early stages and supports too few features
+    # as of today to be useful installed on a target system.
+    #install(TARGETS CaS RUNTIME)
 endif()
 
 if(ENABLE_UDEV)
