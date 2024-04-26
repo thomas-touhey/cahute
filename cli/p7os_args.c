@@ -152,7 +152,7 @@ read_file_contents(char const *path, cahute_u8 **datap, size_t *sizep) {
     size_t size;
     FILE *fp;
 
-    fp = fopen(path, "r");
+    fp = fopen(path, "rb");
     if (!fp) {
         fprintf(stderr, "Unable to open the file: %s\n", strerror(errno));
         goto fail;
@@ -337,7 +337,7 @@ int parse_args(int argc, char **argv, struct args *args) {
         }
 
         args->command = COMMAND_BACKUP;
-        args->output_fp = fopen(output_path, "w");
+        args->output_fp = fopen(output_path, "wb");
         args->upload_uexe = 0;
         if (!args->output_fp) {
             fprintf(

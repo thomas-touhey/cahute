@@ -101,6 +101,24 @@ are available:
   :c:func:`cahute_be32toh`, :c:func:`cahute_le32toh`, :c:func:`cahute_htobe16`,
   :c:func:`cahute_htole16`, :c:func:`cahute_htobe32`, :c:func:`cahute_htole32`.
 
+.. warning::
+
+    When ``fopen()`` is used, the ``b`` flag **must** be used to ensure that
+    platforms don't operate conversions by default:
+
+    .. code-block:: c
+
+        /* WRONG. */
+        FILE *fp = fopen("myfile.txt", "r");
+
+        /* Correct! */
+        FILE *fp = fopen("myfile.txt", "rb");
+
+    This is notably useful for platforms such as Windows, that operates
+    conversions by default (i.e. use ``rt`` instead of ``rb`` by default),
+    except on seeking / telling, which could cause problems where the
+    computed file size does not match with the size of the actually read data.
+
 .. _pre-commit: https://pre-commit.com/
 .. _clang-format: https://clang.llvm.org/docs/ClangFormat.html
 .. _Black: https://github.com/psf/black

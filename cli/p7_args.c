@@ -723,7 +723,7 @@ int parse_args(int argc, char **argv, struct args *args) {
 
     /* Open the local source path if a path is given. */
     if (args->local_source_path && !args->local_source_fp) {
-        args->local_source_fp = fopen(args->local_source_path, "r");
+        args->local_source_fp = fopen(args->local_source_path, "rb");
         if (!args->local_source_fp) {
             fprintf(
                 stderr,
@@ -737,7 +737,7 @@ int parse_args(int argc, char **argv, struct args *args) {
 
     /* Open the local target path if a path is given. */
     if (args->local_target_path && !args->local_target_fp) {
-        args->local_target_fp = fopen(args->local_target_path, "w+");
+        args->local_target_fp = fopen(args->local_target_path, "wb+");
         if (!args->local_target_fp) {
             fprintf(
                 stderr,

@@ -247,7 +247,7 @@ process_params:
     }
 
     if (args->local_target_path) {
-        args->local_target_fp = fopen(args->local_target_path, "w");
+        args->local_target_fp = fopen(args->local_target_path, "wb");
         if (!args->local_target_fp) {
             fprintf(
                 stderr,

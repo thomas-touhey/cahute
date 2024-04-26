@@ -685,7 +685,7 @@ int load_default_casrc(struct casrc_database *db) {
                 pathbuf[len++] = '/';
             sprintf(&pathbuf[len], ".casrc");
 
-            filep = fopen(pathbuf, "r");
+            filep = fopen(pathbuf, "rb");
 
             if (filep) {
                 free(pathbuf);
@@ -697,7 +697,7 @@ int load_default_casrc(struct casrc_database *db) {
     }
 
     /* Read the system casrc next. */
-    filep = fopen("/etc/system.casrc", "r");
+    filep = fopen("/etc/system.casrc", "rb");
     if (filep)
         goto read;
 #endif
