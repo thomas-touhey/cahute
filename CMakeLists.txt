@@ -39,8 +39,9 @@ set(CPACK_SOURCE_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}")
 set(CPACK_SOURCE_GENERATOR "TGZ")
 set(
     CPACK_SOURCE_IGNORE_FILES
-    "\\.git" "build/" ".*~$" "\\.envrc" "\\.pre-commit-config\\.yaml"
-    "\\.clang-format" "__pycache__" "\\.gitlab-ci.yml" "_CPack"
+    "\\.git" "/build/" ".*~$" "\\.envrc" "\\.pre-commit-config\\.yaml"
+    "\\.tool-versions" "\\.clang-format" "__pycache__" "\\.gitlab-ci.yml"
+    "_CPack" "/docs/"
 )
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_DESCRIPTION "${PROJECT_DESCRIPTION}")
