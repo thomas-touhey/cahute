@@ -35,8 +35,9 @@ processes it.
 import argparse
 import re
 from datetime import datetime
-from os import linesep
+from os import linesep, makedirs
 from pathlib import Path
+import sys
 from typing import TextIO
 
 symbol_pattern = re.compile(r"[a-z0-9_]*")
@@ -100,27 +101,32 @@ def write_c_source(contents: bytes, fp: TextIO, /, *, symbol: str) -> None:
 
 argument_parser = argparse.ArgumentParser(
     prog=Path(__file__).name,
-    description="Process all binary files in a directory.",
+    description="Process a binary file.",
 )
-argument_parser.add_argument("path", type=Path)
+argument_parser.add_argument("output_path", type=Path)
+argument_parser.add_argument("source_path", type=Path)
 argument_parser.add_argument("--prefix", type=symbol_type, default="cahute_")
 
 if __name__ == "__main__":
     args = argument_parser.parse_args()
+    source_path = args.source_path
+    output_path = args.output_path
 
-    for source_path in args.path.rglob("*"):
-        if (
-            not source_path.is_file()
-            or source_path.name[-4:].casefold() != ".bin"
-        ):
-            continue
+    if not source_path.name.endswith(".bin"):
+        print("Expected a source path with a .bin extension!", file=sys.stderr)
+        exit(1)
 
-        base_name = source_path.name[:-4]
-        output_path = source_path.with_name(source_path.name + ".c")
+    if not output_path.name.endswith(".c"):
+        print("Expected an output path with a .c extension!", file=sys.stderr)
+        exit(1)
 
-        symbol = args.prefix + path_to_symbol(base_name)
-        with source_path.open("rb") as fp:
-            contents = fp.read()
+    base_name = source_path.name[:-4]
 
-        with output_path.open("w") as fp:
-            write_c_source(contents, fp, symbol=symbol)
+    makedirs(output_path.parent, exist_ok=True)
+
+    symbol = args.prefix + path_to_symbol(base_name)
+    with source_path.open("rb") as fp:
+        contents = fp.read()
+
+    with output_path.open("w") as fp:
+        write_c_source(contents, fp, symbol=symbol)

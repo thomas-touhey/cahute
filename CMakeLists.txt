@@ -142,6 +142,15 @@ add_compile_options(
 # ---
 
 add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/cli/fxremote-update.exe.bin.c"
+    COMMAND "${Python3_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/misc/process_bin.py
+        "${CMAKE_CURRENT_BINARY_DIR}/cli/fxremote-update.exe.bin.c"
+        "${CMAKE_SOURCE_DIR}/cli/fxremote-update.exe.bin"
+    DEPENDS cli/fxremote-update.exe.bin misc/process_bin.py
+    VERBATIM
+)
+
+add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/lib/chars.c"
     COMMAND "${Python3_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/chars/process_chars.py
         "${CMAKE_CURRENT_BINARY_DIR}/lib/chars.c"
@@ -196,7 +205,7 @@ if(ENABLE_CLI)
         cli/p7os_args.c
         cli/common.c
         cli/options.c
-        cli/fxremote-update.exe.bin.c
+        "${CMAKE_CURRENT_BINARY_DIR}/cli/fxremote-update.exe.bin.c"
     )
     target_link_libraries(p7os PRIVATE ${CLI_LIBRARIES})
     target_include_directories(p7os PRIVATE ${CLI_INCLUDE_DIRS})
