@@ -35,27 +35,80 @@ hexadecimal_alphabet = "0123456789ABCDEF";
 CAHUTE_LOCAL_DATA(int) current_log_level = CAHUTE_DEFAULT_LOGLEVEL;
 
 /**
- * Get the string corresponding to the given log level.
+ * Default logging callback for Cahute.
  *
- * @param loglevel Log level to get the string for.
- * @return String corresponding to the given loglevel.
+ * This default callback prints the logs on the standard error stream, with a
+ * format resembling the following output:
+ *
+ *     [2024-04-28 13:53:18    cahute info] Without a function.
+ *     [2024-04-28 13:53:18 cahute warning] user_func: With a user function.
+ *     [2024-04-28 13:53:18   cahute error] open_usb: With an int. function.
+ *
+ * @param cookie Cookie for the logging function (unused).
+ * @param level Log level for the given message.
+ * @param func Name of the function.
+ * @param message Formatted message.
  */
-CAHUTE_LOCAL(char const *) get_loglevel_string(int loglevel) {
-    switch (loglevel) {
+CAHUTE_LOCAL(void)
+default_cahute_log_func(
+    void *cookie,
+    int level,
+    char const *func,
+    char const *message
+) {
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    char timebuf[100];
+    char levelbuf[20];
+    char const *level_name;
+
+    switch (level) {
     case CAHUTE_LOGLEVEL_INFO:
-        return "info";
+        level_name = "info";
+        break;
     case CAHUTE_LOGLEVEL_WARNING:
-        return "warning";
+        level_name = "warning";
+        break;
     case CAHUTE_LOGLEVEL_ERROR:
-        return "error";
+        level_name = "error";
+        break;
     case CAHUTE_LOGLEVEL_FATAL:
-        return "fatal";
+        level_name = "fatal";
+        break;
     case CAHUTE_LOGLEVEL_NONE:
-        return "(none)";
+        level_name = "(none)";
+        break;
     default:
-        return "(unknown)";
+        level_name = "(unknown)";
     }
+
+    sprintf(
+        timebuf,
+        "%04d-%02d-%02d %02d:%02d:%02d",
+        1900 + tm->tm_year,
+        1 + tm->tm_mon,
+        tm->tm_mday,
+        tm->tm_hour,
+        tm->tm_min,
+        tm->tm_sec
+    );
+    sprintf(levelbuf, "cahute %s", level_name);
+
+    if (!func)
+        fprintf(stderr, "\r[%s %14s] ", timebuf, levelbuf);
+    else {
+        if (!strncmp(func, "cahute_", 7))
+            func = &func[7];
+
+        fprintf(stderr, "\r[%s %14s] %s: ", timebuf, levelbuf, func);
+    }
+
+    fprintf(stderr, "%s\n", message);
 }
+
+/* Callback configuration. */
+CAHUTE_LOCAL_DATA(cahute_log_func *) log_callback = &default_cahute_log_func;
+CAHUTE_LOCAL_DATA(void *) log_callback_cookie = NULL;
 
 /**
  * Get the current log level.
@@ -82,54 +135,35 @@ CAHUTE_EXTERN(void) cahute_set_log_level(int loglevel) {
 }
 
 /**
- * Put the logging prefix corresponding to the given logging level on
- * standard error, with the provided data.
+ * Set the current logging function.
  *
- * This produces an output alike the following:
- *
- *     [cahute info] This is a log without a function.
- *     [cahute info] user_func: This is a log with a user function.
- *     [cahute info] open_usb: This is a log with an internal function.
- *
- * Note that in the case of Cahute functions, we remove the "cahute_" prefix
- * for easier reading.
- *
- * @param loglevel Logging level at which to put the prefix.
- * @param func Optional name of the function for which the log is emitted.
+ * @param func Pointer to define as the current logging function.
+ * @param cookie Cookie to define.
+ * @return Cahute error.
  */
-CAHUTE_LOCAL(void) put_log_prefix(int loglevel, char const *func) {
-    time_t t = time(NULL);
-    struct tm *tm = localtime(&t);
-    char timebuf[100];
-    char levelbuf[20];
+CAHUTE_EXTERN(int) cahute_set_log_func(cahute_log_func *func, void *cookie) {
+    if (!func)
+        CAHUTE_RETURN_IMPL(
+            "Setting the logging function to NULL is not supported."
+        );
 
-    sprintf(
-        timebuf,
-        "%04d-%02d-%02d %02d:%02d:%02d",
-        1900 + tm->tm_year,
-        1 + tm->tm_mon,
-        tm->tm_mday,
-        tm->tm_hour,
-        tm->tm_min,
-        tm->tm_sec
-    );
-    sprintf(levelbuf, "cahute %s", get_loglevel_string(loglevel));
+    log_callback = func;
+    log_callback_cookie = cookie;
+    return CAHUTE_OK;
+}
 
-    if (!func) {
-        fprintf(stderr, "\r[%s %14s] ", timebuf, levelbuf);
-        return;
-    }
-
-    if (!strncmp(func, "cahute_", 7))
-        func = &func[7];
-
-    fprintf(stderr, "\r[%s %14s] %s: ", timebuf, levelbuf, func);
+/**
+ * Reset the current logging function.
+ */
+CAHUTE_EXTERN(void) cahute_reset_log_func(void) {
+    log_callback = &default_cahute_log_func;
+    log_callback_cookie = NULL;
 }
 
 /**
  * Output a log message with parameters for a given log level.
  *
- * This is the function called behind the "msg((fmt, ...))" macro defined
+ * This is the function called behind the "msg(ll_*, fmt, ...)" macro defined
  * in the common internals for the library.
  *
  * @param loglevel Logging level at which to emit the message.
@@ -139,13 +173,21 @@ CAHUTE_LOCAL(void) put_log_prefix(int loglevel, char const *func) {
  */
 CAHUTE_EXTERN(void)
 cahute_log_message(int loglevel, char const *func, char const *format, ...) {
+    char buf[512];
+    char const *msg;
     va_list va;
+    int ret;
 
     va_start(va, format);
     if (current_log_level <= loglevel) {
-        put_log_prefix(loglevel, func);
-        vfprintf(stderr, format, va);
-        fputc('\n', stderr);
+        ret = vsnprintf(buf, sizeof(buf), format, va);
+
+        if (ret >= 0 && (size_t)ret <= sizeof(buf) - 1)
+            msg = buf;
+        else
+            msg = "(message too large)";
+
+        (*log_callback)(log_callback_cookie, loglevel, func, msg);
     }
     va_end(va);
 }
@@ -176,8 +218,7 @@ cahute_log_memory(
         return;
 
     if (!size) {
-        put_log_prefix(loglevel, func);
-        fprintf(stderr, "(nothing)\n");
+        (*log_callback)(log_callback_cookie, loglevel, func, "(nothing)");
         return;
     }
 
@@ -231,10 +272,8 @@ cahute_log_memory(
             }
         }
 
-        *s++ = '\n';
         *s = '\0';
 
-        put_log_prefix(loglevel, func);
-        fputs(linebuf, stderr);
+        (*log_callback)(log_callback_cookie, loglevel, func, linebuf);
     }
 }

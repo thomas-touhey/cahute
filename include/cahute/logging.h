@@ -33,8 +33,19 @@
 CAHUTE_BEGIN_NAMESPACE
 CAHUTE_BEGIN_DECLS
 
+typedef void(cahute_log_func)(
+    void *cahute__cookie,
+    int cahute__level,
+    char const *cahute__func,
+    char const *cahute__message
+);
+
 CAHUTE_EXTERN(int) cahute_get_log_level(void);
 CAHUTE_EXTERN(void) cahute_set_log_level(int cahute__level);
+
+CAHUTE_EXTERN(int)
+cahute_set_log_func(cahute_log_func *cahute__func, void *cahute__cookie);
+CAHUTE_EXTERN(void) cahute_reset_log_func(void);
 
 CAHUTE_END_DECLS
 CAHUTE_END_NAMESPACE
