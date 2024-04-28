@@ -23,6 +23,11 @@ cmake_dependent_option(ENABLE_LIBUSB "Whether to use libusb or not."
     ON "NOT DEFINED FXSDK_PLATFORM" OFF)
 set(LOGLEVEL $ENV{LOGLEVEL} CACHE STRING "Default logging level")
 
+# TODO: CaS is in its very early stages and supports too few features
+# as of today to be useful installed on a target system. Once this is no
+# longer the case, this option will be ineffective.
+option(ENABLE_INCOMPLETE_CAS "Whether to build incomplete CaS or not." OFF)
+
 if(NOT "${LOGLEVEL}" MATCHES "|none|info|warning|error|fatal")
     message(SEND_ERROR "LOGLEVEL should be one of [info, warning, error, fatal, none]")
 endif()
@@ -182,15 +187,17 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_compile_definitions(${PROJECT_NAME} PRIVATE ${LIB_COMPILE_DEFS})
 
 if(ENABLE_CLI)
-    add_executable(CaS
-        cli/cas.c
-        cli/cas_args.c
-        cli/casrc.c
-        cli/common.c
-        cli/options.c
-    )
-    target_link_libraries(CaS PRIVATE ${CLI_LIBRARIES})
-    target_include_directories(CaS PRIVATE ${CLI_INCLUDE_DIRS})
+    if(ENABLE_INCOMPLETE_CAS)
+        add_executable(CaS
+            cli/cas.c
+            cli/cas_args.c
+            cli/casrc.c
+            cli/common.c
+            cli/options.c
+        )
+        target_link_libraries(CaS PRIVATE ${CLI_LIBRARIES})
+        target_include_directories(CaS PRIVATE ${CLI_INCLUDE_DIRS})
+    endif()
 
     add_executable(p7
         cli/p7.c
@@ -258,9 +265,10 @@ if(ENABLE_CLI)
     install(TARGETS p7os RUNTIME)
     install(TARGETS p7screen RUNTIME)
     install(TARGETS xfer9860 RUNTIME)
-    # TODO: CaS is in its very early stages and supports too few features
-    # as of today to be useful installed on a target system.
-    #install(TARGETS CaS RUNTIME)
+
+    if(ENABLE_INCOMPLETE_CAS)
+        install(TARGETS CaS RUNTIME)
+    endif()
 endif()
 
 if(ENABLE_UDEV)
