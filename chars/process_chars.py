@@ -124,20 +124,34 @@ class Character:
     opcode: list[int] | None = None
     """Characters to resolve the character as for display purposes."""
 
-    unicode: list[list[int]] = property(_get_unicode, _set_unicode)
+    unicode: list[list[int]] = field(default_factory=list)
     """Unicode character sequences."""
 
-    cat: list[str] = property(_get_cat, _set_cat)
+    cat: list[str] = field(default_factory=list)
     """CAT sequences equivalent to the character."""
 
-    symbol: str = property(_get_symbol, None)
+    symbol: str = ""
     """Symbol defined for the class."""
 
+    def __getattribute__(self, key):
+        if key == "unicode":
+            return self._get_unicode()
+        elif key == "cat":
+            return self._get_cat()
+        elif key == "symbol":
+            return self._get_symbol()
+
+        return super().__getattribute__(key)
+
     def __setattr__(self, key, value):
-        if key == "symbol":
+        if key == "unicode":
+            return self._set_unicode(value)
+        elif key == "cat":
+            return self._set_cat(value)
+        elif key == "symbol":
             return
 
-        super().__setattr__(key, value)
+        return super().__setattr__(key, value)
 
 
 @dataclass
@@ -287,9 +301,9 @@ class CharacterReference:
 
         raw_chars = []
         for raw_char_data in raw_data['chars']:
-            raw_char = Character(**raw_char_data)
+            raw_chars.append(Character(**raw_char_data))
 
-        raw_ref = RawCharacterReference(raw_chars)
+        raw_ref = RawCharacterReference(chars=raw_chars)
         for char in raw_ref.chars:
             for table_key in ("legacy", "9860"):
                 if char.table is not None and char.table != table_key:
