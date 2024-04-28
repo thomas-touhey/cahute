@@ -229,6 +229,7 @@ struct conversion {
  * @property pager Whether a terminal pager should be used.
  * @property in_type Input medium type.
  * @property out_type Output medium type.
+ * @property debug_fp File pointer to the debug file.
  */
 struct args {
     int model;
@@ -241,6 +242,7 @@ struct args {
     struct medium out;
     struct list_formats list;
     struct conversion *conversions;
+    FILE *debug_fp;
 };
 
 extern int parse_args(int argc, char **argv, struct args *args);

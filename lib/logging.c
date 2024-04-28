@@ -30,15 +30,11 @@
 #include <stdarg.h>
 #include <time.h>
 
-CAHUTE_LOCAL_DATA(char const * const)
-hexadecimal_alphabet = "0123456789ABCDEF";
-CAHUTE_LOCAL_DATA(int) current_log_level = CAHUTE_DEFAULT_LOGLEVEL;
-
 /**
  * Default logging callback for Cahute.
  *
- * This default callback prints the logs on the standard error stream, with a
- * format resembling the following output:
+ * This default callback prints the logs on the file pointer provided as the
+ * cookie, with a format resembling the following output:
  *
  *     [2024-04-28 13:53:18    cahute info] Without a function.
  *     [2024-04-28 13:53:18 cahute warning] user_func: With a user function.
@@ -50,7 +46,7 @@ CAHUTE_LOCAL_DATA(int) current_log_level = CAHUTE_DEFAULT_LOGLEVEL;
  * @param message Formatted message.
  */
 CAHUTE_LOCAL(void)
-default_cahute_log_func(
+cahute_log_to_file(
     void *cookie,
     int level,
     char const *func,
@@ -106,8 +102,12 @@ default_cahute_log_func(
     fprintf(stderr, "%s\n", message);
 }
 
+CAHUTE_LOCAL_DATA(char const * const)
+hexadecimal_alphabet = "0123456789ABCDEF";
+CAHUTE_LOCAL_DATA(int) current_log_level = CAHUTE_DEFAULT_LOGLEVEL;
+
 /* Callback configuration. */
-CAHUTE_LOCAL_DATA(cahute_log_func *) log_callback = &default_cahute_log_func;
+CAHUTE_LOCAL_DATA(cahute_log_func *) log_callback = &cahute_log_to_file;
 CAHUTE_LOCAL_DATA(void *) log_callback_cookie = NULL;
 
 /**
@@ -156,7 +156,7 @@ CAHUTE_EXTERN(int) cahute_set_log_func(cahute_log_func *func, void *cookie) {
  * Reset the current logging function.
  */
 CAHUTE_EXTERN(void) cahute_reset_log_func(void) {
-    log_callback = &default_cahute_log_func;
+    log_callback = &cahute_log_to_file;
     log_callback_cookie = NULL;
 }
 

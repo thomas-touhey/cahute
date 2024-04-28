@@ -29,7 +29,9 @@
 #include "cas.h"
 #include "casrc.h"
 #include "options.h"
+#include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -138,6 +140,52 @@ static struct long_option const long_options[] = {
 
     LONG_OPTION_SENTINEL
 };
+
+/**
+ * Logging function used when a debug file is set.
+ *
+ * This callback prints the logs on the file pointer provided as the
+ * cookie, with a format resembling the following output:
+ *
+ *     info: Without a function.
+ *     warning: With a user function.
+ *     error: With an int. function.
+ *
+ * @param filep File pointer.
+ * @param level Log level for the given message.
+ * @param func Name of the function.
+ * @param message Formatted message.
+ */
+static void log_to_debug_file(
+    FILE *filep,
+    int level,
+    char const *func,
+    char const *message
+) {
+    char const *level_name;
+
+    switch (level) {
+    case CAHUTE_LOGLEVEL_INFO:
+        level_name = "info";
+        break;
+    case CAHUTE_LOGLEVEL_WARNING:
+        level_name = "warning";
+        break;
+    case CAHUTE_LOGLEVEL_ERROR:
+        level_name = "error";
+        break;
+    case CAHUTE_LOGLEVEL_FATAL:
+        level_name = "fatal";
+        break;
+    case CAHUTE_LOGLEVEL_NONE:
+        level_name = "(none)";
+        break;
+    default:
+        level_name = "(unknown)";
+    }
+
+    fprintf(filep, "%s: %s\n", level_name, message);
+}
 
 /**
  * Decode a file type.
@@ -498,6 +546,7 @@ int parse_args(int argc, char **argv, struct args *args) {
     char *optarg, *optattr;
     int option, optopt, help = 0, version = 0;
     char const *command = argv[0];
+    char const *debug_path = NULL;
     char *raw_input_attr = NULL;
     char *raw_output_attr = NULL;
     char *raw_list_attr = NULL;
@@ -512,6 +561,7 @@ int parse_args(int argc, char **argv, struct args *args) {
     args->conversions = NULL;
     args->in.type = MEDIUM_UNKNOWN;
     args->out.type = MEDIUM_UNKNOWN;
+    args->debug_fp = NULL;
 
     cahute_set_log_level(CAHUTE_LOGLEVEL_FATAL);
 
@@ -618,7 +668,7 @@ int parse_args(int argc, char **argv, struct args *args) {
         case 'd':
             cahute_set_log_level(CAHUTE_LOGLEVEL_INFO);
             if (optattr)
-                fprintf(stderr, "Cannot set the debug output file name.\n");
+                debug_path = optattr;
             break;
 
         case 'e':
@@ -671,6 +721,23 @@ int parse_args(int argc, char **argv, struct args *args) {
 
     if (args->verbose)
         fprintf(stderr, BANNER ".\n");
+
+    if (debug_path) {
+        args->debug_fp = fopen(debug_path, "wb");
+        if (!args->debug_fp) {
+            fprintf(
+                stderr,
+                "Could not open debug file: %s\n",
+                strerror(errno)
+            );
+            goto fail;
+        }
+
+        cahute_set_log_func(
+            (cahute_log_func *)&log_to_debug_file,
+            args->debug_fp
+        );
+    }
 
     if (create_casrc_database(&db)) {
         fprintf(stderr, "Could not create the casrc database.\n");
@@ -815,6 +882,11 @@ fail:
  */
 void free_args(struct args *args) {
     struct conversion *conv;
+
+    if (args->debug_fp) {
+        cahute_reset_log_func();
+        fclose(args->debug_fp);
+    }
 
     for (conv = args->conversions; conv;) {
         struct conversion *conv_to_free = conv;
