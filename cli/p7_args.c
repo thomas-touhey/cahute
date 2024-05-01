@@ -338,7 +338,7 @@ static inline int check_directory_name(char const *name) {
         return 1;
 
     n = strnlen(name, 9);
-    if (n > 8)
+    if (!n || n > 8)
         return 0;
 
     for (; n--; name++)
@@ -362,7 +362,7 @@ static inline int check_file_name(char const *name) {
         return 1;
 
     n = strnlen(name, 13);
-    if (n > 12)
+    if (!n || n > 12)
         return 0;
 
     for (; n--; name++)
@@ -597,6 +597,8 @@ int parse_args(int argc, char **argv, struct args *args) {
             o_output = strrchr(params[0], '/');
             if (!o_output)
                 o_output = params[0];
+            else
+                o_output++;
         }
 
         args->command = COMMAND_SEND;
