@@ -32,6 +32,17 @@
 #include <string.h>
 #include <errno.h>
 
+/* On some platforms, for directories, ftell() returns an insanely high
+ * number that may be platform-specific, e.g. 9223372036854775807 (2^63 - 1),
+ * which would correspond to the highest positive value of a long if defined
+ * on 64 bits. In order to detect such cases in a reasonably
+ * platform-independent manner, we want to cap the size of any file that
+ * gets stored into memory.
+ *
+ * See ``read_file_contents()`` for more details on the usage of this
+ * constant. */
+#define REASONABLE_FILE_CONTENT_LIMIT 134217728 /* 128 MiB */
+
 /**
  * Get the current logging level as a string.
  *
@@ -120,6 +131,84 @@ extern void print_content(
     }
 
     fprintf(stdout, "<CONVERSION FAILED: 0x%04X>", err);
+}
+
+/**
+ * Read file contents into a buffer.
+ *
+ * @param path Path to the file to read.
+ * @param datap Pointer to the data to allocate and populate.
+ * @param sizep Pointer to the data size to populate.
+ * @return 0 if ok, other otherwise.
+ */
+extern int
+read_file_contents(char const *path, cahute_u8 **datap, size_t *sizep) {
+    cahute_u8 *data = NULL;
+    size_t size;
+    FILE *fp;
+
+    fp = fopen(path, "rb");
+    if (!fp) {
+        fprintf(stderr, "Unable to open the file: %s\n", strerror(errno));
+        goto fail;
+    }
+
+    if (fseek(fp, 0, SEEK_END)) {
+        fprintf(
+            stderr,
+            "Unable to seek to the end of the file: %s\n",
+            strerror(errno)
+        );
+        goto fail;
+    }
+
+    size = ftell(fp);
+    if (size > REASONABLE_FILE_CONTENT_LIMIT) {
+        fprintf(
+            stderr,
+            "Unable to open the file: file too big (over 128MiB) or "
+            "unsupported file type (e.g. directory)\n"
+        );
+        goto fail;
+    }
+
+    if (fseek(fp, 0, SEEK_SET)) {
+        fprintf(
+            stderr,
+            "Unable to seek to the start of the file: %s\n",
+            strerror(errno)
+        );
+        goto fail;
+    }
+
+    if (!size) {
+        fprintf(stderr, "File cannot be empty!\n");
+        goto fail;
+    }
+
+    data = malloc(size);
+    if (!data) {
+        fprintf(stderr, "malloc() failed.\n");
+        goto fail;
+    }
+
+    if (!fread(data, size, 1, fp)) {
+        fprintf(stderr, "Could not read file data: %s\n", strerror(errno));
+        goto fail;
+    }
+
+    fclose(fp);
+
+    *datap = data;
+    *sizep = size;
+    return 0;
+
+fail:
+    if (fp)
+        fclose(fp);
+    if (data)
+        free(data);
+    return 1;
 }
 
 /**

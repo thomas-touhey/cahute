@@ -40,6 +40,9 @@ extern void print_content(
     int dest_encoding
 );
 
+extern int
+read_file_contents(char const *path, cahute_u8 **datap, size_t *sizep);
+
 /* Portable getdelim() implementation. */
 extern ssize_t
 portable_getdelim(char **sp, size_t *np, int delim, FILE *filep);
