@@ -16,6 +16,7 @@ For more information, consult the following links:
 The project is also talked about on the following communities:
 
 * `Planète Casio <Planète Casio topic_>`_ (*in French*);
+* `TI-Planet <TI-Planet topic_>`_ (*in French*);
 * `Casiopeia <Casiopeia topic_>`_;
 * `Universal Casio Forum <UCF topic_>`_.
 
@@ -29,6 +30,8 @@ The project is also talked about on the following communities:
 .. _Planète Casio topic:
     https://www.planet-casio.com/Fr/forums/topic17699-1-cahute-pour-
     communiquer-efficacement-avec-sa-calculatrice-casio-sous-linux.html
+.. _TI-Planet topic:
+    https://tiplanet.org/forum/viewtopic.php?t=26656
 .. _Casiopeia topic:
     https://www.casiopeia.net/forum/viewtopic.php?f=19&t=8102
 .. _UCF topic:
