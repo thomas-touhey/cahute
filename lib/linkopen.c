@@ -342,6 +342,7 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
             return CAHUTE_ERROR_UNKNOWN;
         }
 
+        casiolink_state->flags = 0;
         casiolink_state->variant = casiolink_variant;
 
         if (~flags & PROTOCOL_FLAG_NOCHECK) {
@@ -1267,11 +1268,8 @@ cahute_open_serial_link(
     link->medium_state.windows.overlapped.hEvent = overlapped_event_handle;
 #endif
 
-    link->serial_flags = flags
-                         & (CAHUTE_SERIAL_STOP_MASK | CAHUTE_SERIAL_PARITY_MASK
-                            | CAHUTE_SERIAL_XONXOFF_MASK
-                            | CAHUTE_SERIAL_DTR_MASK | CAHUTE_SERIAL_RTS_MASK);
-    link->serial_speed = speed;
+    link->serial_flags = 0;
+    link->serial_speed = 0;
     link->protocol = protocol;
     link->medium_read_start = 0;
     link->medium_read_size = 0;
@@ -1290,7 +1288,14 @@ cahute_open_serial_link(
 
     /* The link is now considered opened, with protocol uninitialized.
      * We want to set the serial parameters to the medium now. */
-    err = cahute_set_serial_params_to_link(link, link->serial_flags, speed);
+    err = cahute_set_serial_params_to_link(
+        link,
+        flags
+            & (CAHUTE_SERIAL_STOP_MASK | CAHUTE_SERIAL_PARITY_MASK
+               | CAHUTE_SERIAL_XONXOFF_MASK | CAHUTE_SERIAL_DTR_MASK
+               | CAHUTE_SERIAL_RTS_MASK),
+        speed
+    );
     if (err) {
         cahute_close_link(link);
         return err;

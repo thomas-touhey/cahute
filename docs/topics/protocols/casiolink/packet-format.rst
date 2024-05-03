@@ -119,6 +119,8 @@ The format of such headers is the following:
       - Checksum for the packet.
       -
 
+.. _casiolink-cas100-adn1:
+
 ``ADN1`` headers
 ~~~~~~~~~~~~~~~~
 
@@ -153,6 +155,8 @@ These packets seem to be used to send data.
       -
       - Integer (little endian), e.g. ``0x200`` (512).
 
+.. _casiolink-cas100-adn2:
+
 ``ADN2`` headers
 ~~~~~~~~~~~~~~~~
 
@@ -182,12 +186,42 @@ Unknown purpose.
       -
       - Integer (little endian), e.g. ``0x100`` (256).
 
+.. _casiolink-cas100-bku1:
+
+``BKU1`` headers
+~~~~~~~~~~~~~~~~
+
+Unknown purpose.
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 4 B
+      - Data Type (*DT*)
+      -
+      - ``RAMS``, ``RAMI``, ``RAM1``
+    * - 4 (0x04)
+      - 4 B
+      - ?
+      -
+      - Big endian 32-bit integer, e.g. ``0xE000``.
+
+.. _casiolink-cas100-end1:
+
 ``END1`` headers
 ~~~~~~~~~~~~~~~~
 
 These packets are sent at the end of the communication.
 
 They do not use additional data.
+
+.. _casiolink-cas100-fcl1:
 
 ``FCL1`` headers
 ~~~~~~~~~~~~~~~~
@@ -207,6 +241,8 @@ Unknown purpose.
       - Data Type (*DT*)
       -
       - ``S000``
+
+.. _casiolink-cas100-fmv1:
 
 ``FMV1`` headers
 ~~~~~~~~~~~~~~~~
@@ -232,10 +268,62 @@ Unknown purpose.
       -
       - ``FR00`` (sic.)
 
+.. _casiolink-cas100-mcs1:
+
+``MCS1`` headers
+~~~~~~~~~~~~~~~~
+
+These packets contain main memory data.
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 3 B
+      - Reserved
+      -
+      - Set to ``\0``.
+    * - 3 (0x03)
+      - 2 B
+      - File size
+      -
+      - Big-endian 16-bit integer (?).
+    * - 5 (0x05)
+      - 1 B
+      - Data type
+      -
+      - 8-bit integer, among the following:
+
+        .. list-table::
+            :header-rows: 1
+
+            * - Data type
+              - Description
+            * - ``0x01``
+              - Program
+    * - 6 (0x06)
+      - 8 B
+      - Data name
+      -
+      - ``0xFF`` optionally terminated string.
+    * - 14 (0x0E)
+      - 8 B
+      - Group name
+      -
+      - ``0xFF`` optionally terminated string.
+
+.. _casiolink-cas100-mdl1:
+
 ``MDL1`` headers
 ~~~~~~~~~~~~~~~~
 
-These packets seem to contain calculator model information.
+These packets contain initialization data for the CAS100 variant of the
+CASIOLINK protocol, with calculator model information.
 
 .. list-table::
     :header-rows: 1
@@ -287,6 +375,8 @@ These packets seem to contain calculator model information.
       - 4-char string, e.g. ``"0x07"`` (``0x30``, ``0x78``, ``0x30``,
         ``0x37``).
 
+.. _casiolink-cas100-req1:
+
 ``REQ1`` headers
 ~~~~~~~~~~~~~~~~
 
@@ -305,6 +395,8 @@ These packets seem to be used to request information.
       - *Data Type* (*DT*)
       -
       - ``INF1`` (System), ``FR00`` (Segment), ``MSG1`` (Language)
+
+.. _casiolink-cas100-req2:
 
 ``REQ2`` headers
 ~~~~~~~~~~~~~~~~
@@ -335,3 +427,29 @@ Unknown purpose.
       - ?
       -
       - Integer (little endian), e.g. ``0x20000000`` (512 * 1024 * 1024)
+
+.. _casiolink-cas100-set1:
+
+``SET1`` headers
+~~~~~~~~~~~~~~~~
+
+Unknown purpose.
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - ?
+      -
+      - ``\x30\x01``
+    * - 2 (0x02)
+      - 8 B
+      - ?
+      -
+      - ``0xFF`` optionally terminated string, e.g. ``Y=Data``.

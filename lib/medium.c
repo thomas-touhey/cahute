@@ -778,6 +778,29 @@ cahute_set_serial_params_to_link(
     unsigned long flags,
     unsigned long speed
 ) {
+    if (link->serial_flags == flags && link->serial_speed == speed)
+        return CAHUTE_OK;
+
+    msg(ll_info, "Setting the following serial settings:");
+    msg(ll_info,
+        "  baud=%lu, parity=%s, stop bits=%d,",
+        speed,
+        (flags & CAHUTE_SERIAL_PARITY_MASK) == CAHUTE_SERIAL_PARITY_ODD ? "odd"
+        : (flags & CAHUTE_SERIAL_PARITY_MASK) == CAHUTE_SERIAL_PARITY_EVEN
+            ? "even"
+            : "none",
+        (flags & CAHUTE_SERIAL_STOP_MASK) == CAHUTE_SERIAL_STOP_TWO ? 2 : 1);
+    msg(ll_info,
+        "  dtr=%s, rts=%s",
+        (flags & CAHUTE_SERIAL_DTR_MASK) == CAHUTE_SERIAL_DTR_HANDSHAKE
+            ? "handshake"
+        : (flags & CAHUTE_SERIAL_DTR_ENABLE) ? "enabled"
+                                             : "disabled",
+        (flags & CAHUTE_SERIAL_RTS_MASK) == CAHUTE_SERIAL_RTS_HANDSHAKE
+            ? "handshake"
+        : (flags & CAHUTE_SERIAL_RTS_ENABLE) ? "enabled"
+                                             : "disabled");
+
     switch (link->medium) {
 #ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
     case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
@@ -1052,6 +1075,8 @@ cahute_set_serial_params_to_link(
         CAHUTE_RETURN_IMPL("No method available for setting serial params.");
     }
 
+    link->serial_flags = flags;
+    link->serial_speed = speed;
     return CAHUTE_OK;
 }
 

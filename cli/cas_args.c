@@ -402,14 +402,15 @@ static int parse_medium_params(
         char const *raw_parity =
             get_casrc_setting_property(dstg, ostg, "parity");
 
-        medium->data.com.serial_speed = 9600;
-        medium->data.com.serial_flags = CAHUTE_SERIAL_STOP_TWO;
+        medium->data.com.serial_speed = 0;
+        medium->data.com.serial_flags = 0;
 
         if (raw_speed) {
             unsigned long speed = atol(raw_speed);
 
             if (speed != 1200 && speed != 2400 && speed != 4800
-                && speed != 9600) {
+                && speed != 9600 && speed != 19200 && speed != 38400
+                && speed != 57600 && speed != 115200) {
                 fprintf(
                     stderr,
                     "Invalid property baud=%s for %s.\n",
@@ -424,9 +425,9 @@ static int parse_medium_params(
 
         if (!raw_parity)
             medium->data.com.serial_flags |= CAHUTE_SERIAL_PARITY_OFF;
-        else if (!strcmp(raw_parity, "e"))
+        else if (raw_parity[0] == 'e' || raw_parity[0] == 'E')
             medium->data.com.serial_flags |= CAHUTE_SERIAL_PARITY_EVEN;
-        else if (!strcmp(raw_parity, "o"))
+        else if (raw_parity[0] == 'o' || raw_parity[0] == 'O')
             medium->data.com.serial_flags |= CAHUTE_SERIAL_PARITY_ODD;
         else
             medium->data.com.serial_flags |= CAHUTE_SERIAL_PARITY_OFF;
@@ -445,15 +446,18 @@ static int parse_medium_params(
             || get_casrc_setting_property(dstg, ostg, "9700")
             || get_casrc_setting_property(dstg, ostg, "9800"))
             medium->data.com.serial_flags |=
-                CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS40;
+                CAHUTE_SERIAL_PROTOCOL_CASIOLINK
+                | CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS40;
         else if (get_casrc_setting_property(dstg, ostg, "9750")
          || get_casrc_setting_property(dstg, ostg, "9850")
          || get_casrc_setting_property(dstg, ostg, "9950"))
             medium->data.com.serial_flags |=
-                CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS50;
-        else
+                CAHUTE_SERIAL_PROTOCOL_CASIOLINK
+                | CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS50;
+        else if (get_casrc_setting_property(dstg, ostg, "afx")) /* Extended */
             medium->data.com.serial_flags |=
-                CAHUTE_SERIAL_CASIOLINK_VARIANT_AUTO;
+                CAHUTE_SERIAL_PROTOCOL_CASIOLINK
+                | CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS100;
 
         medium->data.com.pause =
             get_casrc_setting_property(dstg, ostg, "pause") != NULL;

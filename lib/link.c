@@ -218,9 +218,6 @@ cahute_negotiate_serial_params(
         CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 
-    link->serial_flags = new_serial_flags;
-    link->serial_speed = speed;
-
     err = cahute_set_serial_params_to_link(link, new_serial_flags, speed);
     if (err) {
         /* We have successfully negociated with the device to switch
@@ -267,6 +264,18 @@ cahute_get_device_info(cahute_link *link, cahute_device_info **infop) {
             return err;
 
         switch (link->protocol) {
+        case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+            /* With CASIOLINK, we may have received device information at
+             * some point. */
+            err = cahute_casiolink_make_device_info(
+                link,
+                &link->cached_device_info
+            );
+            if (err)
+                return err;
+
+            break;
+
         case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
         case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
             /* With Protocol 7.00, we may already have device information
@@ -276,6 +285,7 @@ cahute_get_device_info(cahute_link *link, cahute_device_info **infop) {
                 cahute_seven_make_device_info(link, &link->cached_device_info);
             if (err)
                 return err;
+
             break;
 
         default:

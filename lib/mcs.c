@@ -78,7 +78,7 @@ cahute_mcs_decode_data(
     }
 
     /* TODO */
-    msg(ll_info, "Data Type: %02X", data_type);
+    msg(ll_info, "Data Type: 0x%02X", data_type);
     msg(ll_info, "Directory Name: %.*s", directory_size, directory);
     msg(ll_info, "Data Name: %.*s", name_size, name);
     msg(ll_info, "Group Name: %.*s", group_size, group);

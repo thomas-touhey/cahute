@@ -295,6 +295,13 @@ union cahute_link_medium_state {
 /* Absolute minimum buffer size for CASIOLINK. */
 #define CASIOLINK_MINIMUM_BUFFER_SIZE 50
 
+/* Raw device information size for CASIOLINK, most specifically the
+ * CAS100 variant. */
+#define CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE 33
+
+/* Flags to describe whether device information was obtained or not. */
+#define CASIOLINK_FLAG_DEVICE_INFO_OBTAINED 0x00000001
+
 /* Maximum size of raw data that can come from an extended packet.
  * Calculators support data packets with up to 256 raw bytes (512 encoded
  * bytes), but fxRemote uses payloads that go up to 1028 raw bytes
@@ -314,12 +321,19 @@ union cahute_link_medium_state {
 /**
  * CASIOLINK peer state.
  *
+ * @property flags Flags for the CASIOLINK peer state.
  * @property variant Variant with which to force data frame interpretation.
  * @property last_variant Variant for the last data frame.
+ * @property raw_device_info Raw device information buffer, so that data
+ *           can be extracted later if actual device information is requested.
  */
 struct cahute_casiolink_state {
+    unsigned long flags;
+
     int variant;
     int last_variant;
+
+    cahute_u8 raw_device_info[CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE];
 };
 
 /**
@@ -533,6 +547,12 @@ cahute_casiolink_receive_screen(
     cahute_link *link,
     cahute_frame *frame,
     unsigned long timeout
+);
+
+CAHUTE_EXTERN(int)
+cahute_casiolink_make_device_info(
+    cahute_link *link,
+    cahute_device_info **infop
 );
 
 /* ---

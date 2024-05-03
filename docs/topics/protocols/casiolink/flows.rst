@@ -8,10 +8,11 @@ Both sides are defined in advance, and do not exchange roles during transfer.
 In no cases can the receiver request a resource from the sender, as it
 must only respond to requests and receive what the sender chooses to send.
 
-Initiate the connection
------------------------
+Initiate the connection using the CAS40 or CAS50 variant
+--------------------------------------------------------
 
-In order to initiate the connection, the communication schema is the following:
+In order to initiate the connection with the CAS40 and CAS50 variants,
+the communication schema is the following:
 
 .. mermaid::
 
@@ -21,6 +22,44 @@ In order to initiate the connection, the communication schema is the following:
 
         sender->>receiver: Send a 0x16 (START)
         receiver->>sender: Send a 0x13 (ESTABLISHED)
+
+See :ref:`casiolink-packet-format` for more information.
+
+Initiate the connection using the CAS100 variant
+------------------------------------------------
+
+The CAS100 initiation flow is more complete than the CAS40 and CAS50 variants:
+
+.. mermaid::
+
+    sequenceDiagram
+        Participant sender as Sender
+        Participant receiver as Receiver
+
+        sender->>receiver: Send a 0x16 (START)
+        receiver->>sender: Send a 0x13 (ESTABLISHED)
+
+        sender->>receiver: Send an MDL1 header (0x3A)
+        receiver->>sender: Answer with an MDL1 header (0x3A)
+        sender->>receiver: Acknowledge (0x06)
+        receiver->>sender: Acknowledge (0x06)
+
+.. note::
+
+    On cross-variant CASIOLINK reception, since the MDL1 header is received
+    in the place any other data would be received in the CAS40 and CAS50
+    variants, the MDL1 header and acknowledgement reactions must be
+    managed in the data reception utilities rather than in the
+    communication initialization.
+
+    However, when the CAS100 variant is selected explicitely by the user,
+    the MDL1 header can and should be managed in the communication
+    initialization directly, so that device information can be exploited.
+
+See the following for more information:
+
+* :ref:`casiolink-packet-format`;
+* :ref:`casiolink-cas100-mdl1`.
 
 Send or receive data using the CAS40 or CAS50 variant
 -----------------------------------------------------

@@ -2147,9 +2147,6 @@ cahute_seven_receive_data(
             if (err)
                 return err;
 
-            link->serial_flags = new_serial_flags;
-            link->serial_speed = new_serial_speed;
-
             /* We introduce an artificial sleep to make the device believe
              * that we may be slow. Otherwise, the transfer may crash right
              * after we have changed the properties of our link. */
@@ -2170,8 +2167,7 @@ cahute_seven_receive_data(
                  * Therefore, we consider the link to be irrecoverable. */
                 msg(ll_error,
                     "Could not set the serial params; that makes our "
-                    "connection "
-                    "irrecoverable!");
+                    "connection irrecoverable!");
                 link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
                 return err;
             }

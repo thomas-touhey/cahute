@@ -35,6 +35,15 @@ CAHUTE_LOCAL_DATA(cahute_u8 const *)
 pz_program_names =
     (cahute_u8 const *)"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ\xCD\xCE";
 
+/* The MDL1 command for Graph 100 / AFX used for initialization when
+ * in sender / control mode. The speed and parity are inserted into the
+ * copy of this buffer before the checksum is recomputed and placed into
+ * the last byte. */
+CAHUTE_LOCAL_DATA(cahute_u8 const *)
+default_mdl1_payload =
+    (cahute_u8 const *)":MDL1GY351\xFF" "000000N1.03\0\0\x01\0\0\0\x04\0\0\0"
+    "\x01\0\x03\xFF\xFF\xFF\xFF\0";
+
 /* TIMEOUT_PACKET_TYPE is the timeout before reading the packet type, i.e.
  * the first byte, while TIMEOUT_PACKET_CONTENTS is the timeout before
  * reading any of the following bytes. */
@@ -66,30 +75,115 @@ cahute_casiolink_checksum(cahute_u8 const *data, size_t size) {
 }
 
 /**
- * Check if the last received data for a link is an end packet.
+ * Answer a received CAS100 MDL1 header with the appropriate header,
+ * then apply the serial settings provided within the header, then
+ * handle the mutual acknowledgement.
  *
- * @param link Link to check.
- * @return 1 if the last received data is an end data, 0 otherwise.
+ * This flow is described in "Initiate the connection using the CAS100
+ * header", assuming the link is in receive mode, and is currently in the
+ * state where it has received the initial MDL1 header in the link's
+ * data buffer.
+ *
+ * Note that we actually answer with the same MDL1 to make the calculator
+ * believe we are compatible with them.
+ *
+ * @param link Link for which to handle the exchange.
+ * @return Cahute error.
  */
-CAHUTE_INLINE(int) cahute_casiolink_is_end(cahute_link *link) {
-    switch (link->protocol_state.casiolink.variant) {
-    case CAHUTE_CASIOLINK_VARIANT_CAS40:
-        if (!memcmp(&link->data_buffer[1], "\x17\xFF", 2))
-            return 1;
-        break;
+CAHUTE_LOCAL(int) cahute_casiolink_handle_mdl1(cahute_link *link) {
+    unsigned long new_serial_speed = 0;
+    unsigned long new_serial_flags = link->serial_flags;
+    int mdl_correct = 1;
+    cahute_u8 *buf = link->data_buffer;
+    int err;
 
-    case CAHUTE_CASIOLINK_VARIANT_CAS50:
-        if (!memcmp(&link->data_buffer[1], "END", 4))
-            return 1;
-        break;
+    /* We want to store the provided information. */
+    memcpy(
+        link->protocol_state.casiolink.raw_device_info,
+        &buf[5],
+        CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE
+    );
+    link->protocol_state.casiolink.flags |=
+        CASIOLINK_FLAG_DEVICE_INFO_OBTAINED;
 
-    case CAHUTE_CASIOLINK_VARIANT_CAS100:
-        if (!memcmp(&link->data_buffer[1], "END1", 4))
-            return 1;
-        break;
+    /* Send the MDL1 answer now. */
+    err = cahute_write_to_link(link, buf, 40);
+    if (err)
+        return err;
+
+    /* We should actually be receiving an acknowledgement, since we are
+     * sending the same packet the calculator sent. */
+    err = cahute_read_from_link(link, buf, 1, 0, 0);
+    if (err)
+        return err;
+
+    if (buf[0] != PACKET_TYPE_ACK) {
+        cahute_u8 const send_buf[] = {PACKET_TYPE_CORRUPTED};
+
+        err = cahute_write_to_link(link, send_buf, 1);
+        if (err)
+            return err;
+
+        return CAHUTE_ERROR_UNKNOWN;
     }
 
-    return 0;
+    /* We want to decode the serial parameters, to ensure that we
+     * can actually decode them. */
+    new_serial_flags = link->serial_flags;
+    new_serial_flags &= ~CAHUTE_SERIAL_PARITY_MASK;
+
+    if (!memcmp(&buf[11], "038400", 6))
+        new_serial_speed = 38400;
+    else {
+        msg(ll_error, "Unsupported new serial speed:");
+        mem(ll_error, &buf[11], 6);
+        mdl_correct = 0;
+    }
+
+    if (buf[17] == 'N')
+        new_serial_flags |= CAHUTE_SERIAL_PARITY_OFF;
+    else if (buf[17] == 'E')
+        new_serial_flags |= CAHUTE_SERIAL_PARITY_EVEN;
+    else if (buf[17] == 'O')
+        new_serial_flags |= CAHUTE_SERIAL_PARITY_ODD;
+    else {
+        msg(ll_error, "Unsupported new serial parity:");
+        mem(ll_error, &buf[17], 1);
+        mdl_correct = 0;
+    }
+
+    if (!mdl_correct) {
+        cahute_u8 const send_buf[] = {PACKET_TYPE_CORRUPTED};
+
+        err = cahute_write_to_link(link, send_buf, 1);
+        if (err)
+            return err;
+
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    /* We are ok with the sent MDL1, we can now send an acknowledgement.
+     * The acknowledgement is already in our buffer, we can use that. */
+    err = cahute_write_to_link(link, buf, 1);
+    if (err)
+        return err;
+
+    /* Only now that the exchange has taken place, we want to set
+     * the serial params. */
+    err = cahute_set_serial_params_to_link(
+        link,
+        new_serial_flags,
+        new_serial_speed
+    );
+    if (err) {
+        msg(ll_error,
+            "Could not set the serial params; that makes our "
+            "connection irrecoverable!");
+        link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+        return err;
+    }
+
+    return CAHUTE_OK;
 }
 
 /**
@@ -115,7 +209,9 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
     size_t part_sizes[5];
     int packet_type, err, variant = 0, checksum, checksum_alt;
     int log_part_data = 1, is_al_end = 0, is_end = 0, is_final = 0;
+    int expected_data_packet_type = PACKET_TYPE_HEADER;
 
+restart_reception:
     part_sizes[0] = 0;
 
     do {
@@ -177,13 +273,18 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
     if (link->protocol_state.casiolink.variant
         != CAHUTE_CASIOLINK_VARIANT_AUTO) {
         variant = link->protocol_state.casiolink.variant;
+
+        msg(ll_info, "Received the following header:");
+        mem(ll_info, buf, buf_size);
     } else {
         /* We want to try to determine the currently selected variant based
          * on the header's content. */
         if (!memcmp(&buf[1], "ADN1", 4) || !memcmp(&buf[1], "ADN2", 4)
-            || !memcmp(&buf[1], "END1", 4) || !memcmp(&buf[1], "FCL1", 4)
-            || !memcmp(&buf[1], "FMV1", 4) || !memcmp(&buf[1], "MDL1", 4)
-            || !memcmp(&buf[1], "REQ1", 4) || !memcmp(&buf[1], "REQ2", 4)) {
+            || !memcmp(&buf[1], "BKU1", 4) || !memcmp(&buf[1], "END1", 4)
+            || !memcmp(&buf[1], "FCL1", 4) || !memcmp(&buf[1], "FMV1", 4)
+            || !memcmp(&buf[1], "MCS1", 4) || !memcmp(&buf[1], "MDL1", 4)
+            || !memcmp(&buf[1], "REQ1", 4) || !memcmp(&buf[1], "REQ2", 4)
+            || !memcmp(&buf[1], "SET1", 4)) {
             /* The type seems to be a CAS100 header type we can use. */
             variant = CAHUTE_CASIOLINK_VARIANT_CAS100;
 
@@ -474,13 +575,32 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
         break;
 
     case CAHUTE_CASIOLINK_VARIANT_CAS100:
-        if (!memcmp(&buf[1], "END1", 4)) {
+        if (!memcmp(&buf[1], "BKU1", 4)) {
+            /* Backup packet for CAS100. */
+            part_sizes[0] =
+                (buf[9] << 24) | (buf[10] << 16) | (buf[11] << 8) | buf[12];
+        } else if (!memcmp(&buf[1], "END1", 4)) {
             /* End packet for CAS100. */
             part_count = 0;
             is_end = 1;
+        } else if (!memcmp(&buf[1], "MCS1", 4)) {
+            /* Main memory packet for CAS100. */
+            part_sizes[0] = (buf[8] << 8) | buf[9];
+            if (!part_sizes[0])
+                part_count = 0;
+        } else if (!memcmp(&buf[1], "MDL1", 4)) {
+            /* Initialization packet for CAS100. */
+            err = cahute_casiolink_handle_mdl1(link);
+            if (err)
+                return err;
+
+            /* From here, we go back to the beginning. */
+            goto restart_reception;
+        } else if (!memcmp(&buf[1], "SET1", 4)) {
+            /* TODO */
+            part_count = 0;
         }
 
-        /* TODO */
         break;
     }
 
@@ -549,143 +669,133 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
          *   depending on the part count & size using PACKET_TYPE_HEADER.
          * - For CAS100, the data is provided in multiple packets containing
          *   1024 bytes of data each, using PACKET_TYPE_DATA. */
-        switch (variant) {
-        case CAHUTE_CASIOLINK_VARIANT_CAS40:
-        case CAHUTE_CASIOLINK_VARIANT_CAS50:
-            buf = &buf[buf_size];
+        buf = &buf[buf_size];
 
-            index = 1;
-            total = part_count - 1 + part_repeat;
-            for (part_i = 0; part_i < total; part_i++, index++) {
-                size_t part_size =
-                    part_sizes[part_i >= part_count ? part_count - 1 : part_i];
+        index = 1;
+        total = part_count - 1 + part_repeat;
+        for (part_i = 0; part_i < total; part_i++, index++) {
+            size_t part_size =
+                part_sizes[part_i >= part_count ? part_count - 1 : part_i];
 
-                msg(ll_info,
-                    "Reading data part %d/%d (%" CAHUTE_PRIuSIZE "o).",
-                    index,
-                    total,
-                    part_size);
+            msg(ll_info,
+                "Reading data part %d/%d (%" CAHUTE_PRIuSIZE "o).",
+                index,
+                total,
+                part_size);
 
-                err = cahute_read_from_link(
-                    link,
-                    tmp_buf,
-                    1,
-                    TIMEOUT_PACKET_CONTENTS,
-                    TIMEOUT_PACKET_CONTENTS
-                );
-                if (err == CAHUTE_ERROR_TIMEOUT_START)
-                    return CAHUTE_ERROR_TIMEOUT;
-                if (err)
-                    return err;
-
-                if (tmp_buf[0] != PACKET_TYPE_HEADER) {
-                    msg(ll_error,
-                        "Expected 0x3A (':') packet type, got 0x%02X.",
-                        buf[0]);
-                    return CAHUTE_ERROR_UNKNOWN;
-                }
-
-                if (part_size) {
-                    size_t part_size_left = part_size;
-                    cahute_u8 *p = buf;
-
-                    /* Use a loop to be able to follow the transfer progress
-                     * using logs. */
-                    while (part_size_left) {
-                        size_t to_read =
-                            part_size_left > 512 ? 512 : part_size_left;
-
-                        err = cahute_read_from_link(
-                            link,
-                            p,
-                            to_read,
-                            TIMEOUT_PACKET_CONTENTS,
-                            TIMEOUT_PACKET_CONTENTS
-                        );
-                        if (err == CAHUTE_ERROR_TIMEOUT_START)
-                            return CAHUTE_ERROR_TIMEOUT;
-                        if (err)
-                            return err;
-
-                        part_size_left -= to_read;
-                        p += to_read;
-                    }
-                }
-
-                if (part_size) {
-                    /* For color screenshots, sometimes the first byte is not
-                     * taken into account in the checksum calculation, as it's
-                     * metadata for the sheet and not the "actual data" of the
-                     * sheet. But sometimes it also gets the checksum right!
-                     * In any case, we want to compute and check both checksums
-                     * to see if at least one matches. */
-                    checksum = cahute_casiolink_checksum(buf, part_size);
-                    checksum_alt =
-                        cahute_casiolink_checksum(buf + 1, part_size - 1);
-                } else {
-                    checksum = 0;
-                    checksum_alt = 0;
-                }
-
-                /* Read and check the checksum. */
-                err = cahute_read_from_link(
-                    link,
-                    tmp_buf + 1,
-                    1,
-                    TIMEOUT_PACKET_CONTENTS,
-                    TIMEOUT_PACKET_CONTENTS
-                );
-                if (err == CAHUTE_ERROR_TIMEOUT_START)
-                    return CAHUTE_ERROR_TIMEOUT;
-                if (err)
-                    return err;
-
-                if (checksum != tmp_buf[1] && checksum_alt != tmp_buf[1]) {
-                    cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA};
-
-                    msg(ll_warn,
-                        "Invalid checksum (expected: 0x%02X, computed: "
-                        "0x%02X).",
-                        tmp_buf[1],
-                        checksum);
-                    mem(ll_info, buf, part_size);
-
-                    msg(ll_error, "Transfer will abort.");
-                    link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
-
-                    err = cahute_write_to_link(link, send_buf, 1);
-                    if (err)
-                        return err;
-
-                    return CAHUTE_ERROR_CORRUPT;
-                }
-
-                /* Acknowledge the data. */
-                {
-                    cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
-
-                    err = cahute_write_to_link(link, send_buf, 1);
-                    if (err)
-                        return err;
-                }
-
-                msg(ll_info,
-                    "Data part %d/%d received and acknowledged.",
-                    index,
-                    total);
-                if (log_part_data)
-                    mem(ll_info, buf, part_size);
-
-                buf += part_size;
-                buf_size += part_size;
-            }
-            break;
-
-        default:
-            /* TODO */
-            CAHUTE_RETURN_IMPL(
-                "CASIOLINK data exchange was not implemented for CAS50."
+            err = cahute_read_from_link(
+                link,
+                tmp_buf,
+                1,
+                TIMEOUT_PACKET_CONTENTS,
+                TIMEOUT_PACKET_CONTENTS
             );
+            if (err == CAHUTE_ERROR_TIMEOUT_START)
+                return CAHUTE_ERROR_TIMEOUT;
+            if (err)
+                return err;
+
+            if (tmp_buf[0] != expected_data_packet_type) {
+                msg(ll_error,
+                    "Expected 0x3A (':') packet type, got 0x%02X.",
+                    buf[0]);
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+
+            if (part_size) {
+                size_t part_size_left = part_size;
+                cahute_u8 *p = buf;
+
+                /* Use a loop to be able to follow the transfer progress
+                 * using logs. */
+                while (part_size_left) {
+                    size_t to_read =
+                        part_size_left > 512 ? 512 : part_size_left;
+
+                    err = cahute_read_from_link(
+                        link,
+                        p,
+                        to_read,
+                        TIMEOUT_PACKET_CONTENTS,
+                        TIMEOUT_PACKET_CONTENTS
+                    );
+                    if (err == CAHUTE_ERROR_TIMEOUT_START)
+                        return CAHUTE_ERROR_TIMEOUT;
+                    if (err)
+                        return err;
+
+                    part_size_left -= to_read;
+                    p += to_read;
+                }
+            }
+
+            if (part_size) {
+                /* For color screenshots, sometimes the first byte is not
+                 * taken into account in the checksum calculation, as it's
+                 * metadata for the sheet and not the "actual data" of the
+                 * sheet. But sometimes it also gets the checksum right!
+                 * In any case, we want to compute and check both checksums
+                 * to see if at least one matches. */
+                checksum = cahute_casiolink_checksum(buf, part_size);
+                checksum_alt =
+                    cahute_casiolink_checksum(buf + 1, part_size - 1);
+            } else {
+                checksum = 0;
+                checksum_alt = 0;
+            }
+
+            /* Read and check the checksum. */
+            err = cahute_read_from_link(
+                link,
+                tmp_buf + 1,
+                1,
+                TIMEOUT_PACKET_CONTENTS,
+                TIMEOUT_PACKET_CONTENTS
+            );
+            if (err == CAHUTE_ERROR_TIMEOUT_START)
+                return CAHUTE_ERROR_TIMEOUT;
+            if (err)
+                return err;
+
+            if (checksum != tmp_buf[1] && checksum_alt != tmp_buf[1]) {
+                cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA};
+
+                msg(ll_warn,
+                    "Invalid checksum (expected: 0x%02X, computed: "
+                    "0x%02X).",
+                    tmp_buf[1],
+                    checksum);
+                mem(ll_info, buf, part_size);
+
+                msg(ll_error, "Transfer will abort.");
+                link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+
+                err = cahute_write_to_link(link, send_buf, 1);
+                if (err)
+                    return err;
+
+                return CAHUTE_ERROR_CORRUPT;
+            }
+
+            /* Acknowledge the data. */
+            {
+                cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
+
+                err = cahute_write_to_link(link, send_buf, 1);
+                if (err)
+                    return err;
+            }
+
+            msg(ll_info,
+                "Data part %d/%d received and acknowledged.",
+                index,
+                total);
+            if (log_part_data
+                && part_size <= 4096) /* Let's not flood the terminal. */
+                mem(ll_info, buf, part_size);
+
+            buf += part_size;
+            buf_size += part_size;
         }
     }
 
@@ -718,8 +828,8 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
  * @return Cahute error.
  */
 CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
-    cahute_u8 buf[1];
-    int err;
+    cahute_u8 *buf = link->data_buffer;
+    int checksum, err;
 
     if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
         /* Expect an initiation flow. */
@@ -740,6 +850,51 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
         err = cahute_write_to_link(link, buf, 1);
         if (err)
             return err;
+
+        /* In the CAS100 variant, we actually expect an additional flow here,
+         * being the MDL1 flow. */
+        if (link->protocol_state.casiolink.variant
+            == CAHUTE_CASIOLINK_VARIANT_CAS100) {
+            err = cahute_read_from_link(
+                link,
+                buf,
+                40,
+                0,
+                TIMEOUT_PACKET_CONTENTS
+            );
+            if (err)
+                return err;
+
+            msg(ll_info, "Received data for MDL1 is the following:");
+            mem(ll_info, buf, 40);
+
+            if (memcmp(buf, "\x3AMDL1", 5))
+                err = CAHUTE_ERROR_UNKNOWN;
+
+            if (!err) {
+                checksum = cahute_casiolink_checksum(buf + 1, 38);
+                if (buf[39] != checksum)
+                    err = CAHUTE_ERROR_CORRUPT;
+            }
+
+            if (err) {
+                cahute_u8 send_buf[1] = {PACKET_TYPE_CORRUPTED};
+
+                msg(ll_error,
+                    "Unknown or invalid packet when MDL1 was expected:");
+                mem(ll_error, buf, 40);
+
+                err = cahute_write_to_link(link, send_buf, 1);
+                if (err)
+                    return err;
+
+                return err;
+            }
+
+            err = cahute_casiolink_handle_mdl1(link);
+            if (err)
+                return err;
+        }
     } else {
         /* Make the initiation flow. */
         buf[0] = PACKET_TYPE_START;
@@ -758,6 +913,102 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
                 buf[0]);
 
             return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        /* In the CAS100 variant, we actually need to initiate an additional
+         * flow here, being the MDL1 flow. */
+        if (link->protocol_state.casiolink.variant
+            == CAHUTE_CASIOLINK_VARIANT_CAS100) {
+            char serial_params[7];
+
+            memcpy(buf, default_mdl1_payload, 40);
+
+            /* NOTE: sprintf() adds a terminating zero, but we don't care,
+             * since we override buf[17] right after. */
+            sprintf(serial_params, "%06lu", link->serial_speed);
+            switch (link->serial_flags & CAHUTE_SERIAL_PARITY_MASK) {
+            case CAHUTE_SERIAL_PARITY_EVEN:
+                serial_params[6] = 'E';
+                break;
+
+            case CAHUTE_SERIAL_PARITY_ODD:
+                serial_params[6] = 'O';
+                break;
+
+            default:
+                serial_params[6] = 'N';
+            }
+
+            memcpy(&buf[11], serial_params, 7);
+
+            buf[39] = cahute_casiolink_checksum(&buf[1], 38);
+
+            err = cahute_write_to_link(link, buf, 40);
+            if (err)
+                return err;
+
+            err = cahute_read_from_link(
+                link,
+                buf,
+                40,
+                0,
+                TIMEOUT_PACKET_CONTENTS
+            );
+            if (err)
+                return err;
+
+            msg(ll_info, "Received data for MDL1 is the following:");
+            mem(ll_info, buf, 40);
+
+            err = 0;
+            if (memcmp(buf, "\x3AMDL1", 5)
+                || memcmp(&buf[11], serial_params, 7))
+                err = CAHUTE_ERROR_UNKNOWN;
+
+            if (!err) {
+                checksum = cahute_casiolink_checksum(buf + 1, 38);
+                if (buf[39] != checksum)
+                    err = CAHUTE_ERROR_CORRUPT;
+            }
+
+            if (err) {
+                cahute_u8 send_buf[1] = {PACKET_TYPE_CORRUPTED};
+
+                msg(ll_error,
+                    "Unknown or invalid packet when MDL1 was expected:");
+                mem(ll_error, buf, 40);
+
+                err = cahute_write_to_link(link, send_buf, 1);
+                if (err)
+                    return err;
+
+                return err;
+            }
+
+            /* We want to store the received MDL1 packet here.
+             * TODO: We may want to check the speed here. */
+            memcpy(
+                link->protocol_state.casiolink.raw_device_info,
+                &buf[5],
+                CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE
+            );
+            link->protocol_state.casiolink.flags |=
+                CASIOLINK_FLAG_DEVICE_INFO_OBTAINED;
+
+            /* Send the acknowledgement. */
+            buf[0] = PACKET_TYPE_ACK;
+
+            err = cahute_write_to_link(link, buf, 1);
+            if (err)
+                return err;
+
+            /* Receive the initial acknowledgement. */
+            err = cahute_read_from_link(link, buf, 1, 0, 0);
+            if (err)
+                return err;
+
+            if (buf[0] != PACKET_TYPE_ACK)
+                return CAHUTE_ERROR_UNKNOWN;
         }
     }
 
@@ -793,7 +1044,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
         buf[1] = 'E';
         buf[2] = 'N';
         buf[3] = 'D';
-        buf[4] = '\0';
+        buf[4] = '\xFF';
 
         buf_size = 50;
         break;
@@ -806,17 +1057,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
         break;
     }
 
-    /* Compute the checksum as well! */
-    {
-        cahute_u8 const *p = buf + 1;
-        size_t left = buf_size - 2;
-        int checksum = 0;
-
-        for (p = buf + 1, left = buf_size - 2; left; p++, left--)
-            checksum += *p;
-
-        buf[buf_size - 1] = checksum & 255;
-    }
+    buf[buf_size - 1] = cahute_casiolink_checksum(&buf[1], buf_size - 2);
 
     msg(ll_info, "Sending the following end packet:");
     mem(ll_info, buf, buf_size);
@@ -932,6 +1173,37 @@ cahute_casiolink_receive_data(
                     );
             }
             break;
+
+        case CAHUTE_CASIOLINK_VARIANT_CAS100:
+            if (!memcmp(&buf[1], "MCS1", 4)) {
+                cahute_u8 const *p;
+                size_t name_size, group_size;
+
+                for (p = &buf[11]; p < &buf[19] && *p != 0xFF; p++)
+                    ;
+                name_size = (size_t)(p - &buf[11]);
+
+                for (p = &buf[19]; p < &buf[27] && *p != 0xFF; p++)
+                    ;
+                group_size = (size_t)(p - &buf[19]);
+
+                err = cahute_mcs_decode_data(
+                    datap,
+                    &buf[19],
+                    group_size,
+                    NULL, /* MCS1 packet does not present a directory. */
+                    0,
+                    &buf[11],
+                    name_size,
+                    &buf[40],
+                    link->data_buffer_size - 40,
+                    buf[10]
+                );
+                if (err != CAHUTE_ERROR_IMPL)
+                    return err;
+            }
+            /* TODO */
+            break;
         }
 
         /* If the data was final, we still need to break here. */
@@ -1034,5 +1306,73 @@ cahute_casiolink_receive_screen(
      * every screen is actually its own exchange. */
     link->flags &= ~CAHUTE_LINK_FLAG_TERMINATED;
 
+    return CAHUTE_OK;
+}
+
+/**
+ * Produce generic device information using the optionally stored
+ * device information.
+ *
+ * @param link Link from which to get the cached EACK response.
+ * @param infop Pointer to set to the allocated device information structure.
+ * @return Cahute error, or 0 if no error has occurred.
+ */
+CAHUTE_EXTERN(int)
+cahute_casiolink_make_device_info(
+    cahute_link *link,
+    cahute_device_info **infop
+) {
+    cahute_device_info *info = NULL;
+    char *buf;
+    cahute_u8 const *raw_info;
+
+    if (~link->protocol_state.casiolink.flags
+        & CASIOLINK_FLAG_DEVICE_INFO_OBTAINED) {
+        /* We don't have a 'generic device information'. */
+        CAHUTE_RETURN_IMPL("No generic device with CASIOLINK.");
+    }
+
+    info = malloc(sizeof(cahute_device_info) + 20);
+    if (!info)
+        return CAHUTE_ERROR_ALLOC;
+
+    buf = (void *)(&info[1]);
+    raw_info = link->protocol_state.seven.raw_device_info;
+
+    info->cahute_device_info_flags = CAHUTE_DEVICE_INFO_FLAG_OS;
+    info->cahute_device_info_rom_capacity = 0;
+    info->cahute_device_info_rom_version = "";
+
+    info->cahute_device_info_flash_rom_capacity =
+        (raw_info[20] << 24) | (raw_info[19] << 16) | (raw_info[18] << 8)
+        | raw_info[17];
+    info->cahute_device_info_ram_capacity =
+        (raw_info[24] << 24) | (raw_info[23] << 16) | (raw_info[22] << 8)
+        | raw_info[21];
+
+    info->cahute_device_info_bootcode_version = "";
+    info->cahute_device_info_bootcode_offset = 0;
+    info->cahute_device_info_bootcode_size = 0;
+
+    memcpy(buf, &raw_info[13], 4);
+    buf[4] = 0;
+    info->cahute_device_info_os_version = buf;
+    buf += 5;
+
+    info->cahute_device_info_os_offset = 0;
+    info->cahute_device_info_os_size = 0;
+
+    info->cahute_device_info_product_id = "";
+    info->cahute_device_info_username = "";
+    info->cahute_device_info_organisation = "";
+
+    memcpy(buf, raw_info, 6);
+    buf[6] = 0;
+    info->cahute_device_info_hwid = buf;
+    buf += 7;
+
+    info->cahute_device_info_cpuid = "";
+
+    *infop = info;
     return CAHUTE_OK;
 }

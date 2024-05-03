@@ -289,6 +289,14 @@ selected input or output format is a serial port.
 ``9750``, ``9850``, ``9950``
     If set, use the fx-9750G header and payload format.
 
+``afx``
+    If set, use the AlgebraFX / Graph 100 header and payload format.
+
+    .. warning::
+
+        This is an extended option, that does not exist in the original
+        CaS source.
+
 ``raw``
     If set, use the raw header and payload format.
 
@@ -302,14 +310,14 @@ selected input or output format is a serial port.
     If none of the above are matched, the parity is set to even.
 
 ``baud``
-    Baud rate to set to the serial connection, as exact string matches:
+    Baud rate to set to the serial connection, from 1200 to 115200 bauds.
 
-    * ``1200``: 1200 bauds.
-    * ``2400``: 2400 bauds.
-    * ``4800``: 4800 bauds.
-    * ``9600``: 9600 bauds.
+    .. warning::
 
-    By default, the baud rate is set to 9600 bauds.
+        Baud rates from 19200 and above are not available in the original
+        CaS source.
+
+    By default, the baud rate depends on the selected model.
 
 ``dtr``
     If set, enable DTR on the serial connection.
