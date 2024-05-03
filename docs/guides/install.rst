@@ -27,10 +27,17 @@ instructions depends on the system you want to install it on.
 Cahute and its command-line utilities can be installed using
 |homebrew| Homebrew_.
 
-Once Homebrew is installed, you can install the `cahute formula
-<cahute homebrew formula_>`_::
+Once Homebrew is installed, **disconnect all calculators from your computer**
+and install the `cahute formula <cahute homebrew formula_>`_ with the
+following command::
 
     brew install cahute
+
+.. warning::
+
+    The installation requires that no calculator is currently connected
+    to your computer through USB; having one currently in receive mode may
+    result in the installation failing.
 
 |archlinux| Archlinux, |manjaro| Manjaro Linux
 ----------------------------------------------
