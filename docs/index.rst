@@ -3,7 +3,29 @@ Cahute |version|
 
 Cahute is a library and set of command-line utilities to handle serial
 and USB communication protocols and file formats related to CASIO calculators,
-dating from the 1990s to today.
+dating from the 1990s to today. It provides the following features:
+
+* **Transferring storage files** from and to fx-9860G compatible calculators,
+  over USB and serial links;
+* **Receiving programs from all CASIO calculators since 1991**, over USB and
+  serial links;
+* **Converting between character encodings**;
+* **Screenstreaming** from fx-9860G, fx-CG and compatible calculators, over
+  USB links;
+* **Flashing fx-9860G and compatible** using
+  :ref:`the fxRemote method <seven-fxremote-flash>`.
+
+Officially supported OSes are Archlinux_-based and macOS_.
+
+.. note::
+
+    For support for other platforms, see the following issues:
+
+    * `Windows XP and above
+      <https://gitlab.com/cahuteproject/cahute/-/issues/10>`_;
+    * `Debian-based distributions
+      <https://gitlab.com/cahuteproject/cahute/-/issues/8>`_;
+    * `AmigaOS <https://gitlab.com/cahuteproject/cahute/-/issues/26>`_.
 
 The project is being worked on `on Gitlab <Cahute on Gitlab_>`_.
 It is maintained by `Thomas Touhey`_.
@@ -100,6 +122,9 @@ is based on.
     :maxdepth: 3
 
     project
+
+.. _Archlinux: https://archlinux.org/
+.. _macOS: https://www.apple.com/macos/
 
 .. _Cahute on Gitlab: https://gitlab.com/cahuteproject/cahute
 .. _Thomas Touhey: https://thomas.touhey.fr/
