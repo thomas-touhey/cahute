@@ -30,6 +30,17 @@
 #define CHECK_SENDER   0x00000001 /* Check that a link is not a receiver. */
 #define CHECK_RECEIVER 0x00000002 /* Check that a link is a receiver. */
 
+/* On some platforms, for directories, ftell() returns an insanely high
+ * number that may be platform-specific, e.g. 9223372036854775807 (2^63 - 1),
+ * which would correspond to the highest positive value of a long if defined
+ * on 64 bits. In order to detect such cases in a reasonably
+ * platform-independent manner, we want to cap the size of any file that
+ * gets stored into memory.
+ *
+ * See ``read_file_contents()`` for more details on the usage of this
+ * constant. */
+#define REASONABLE_FILE_CONTENT_LIMIT 134217728 /* 128 MiB */
+
 /**
  * Check a link's state.
  *
@@ -384,6 +395,13 @@ cahute_send_file_to_storage(
     }
 
     file_size = (size_t)ftell(filep);
+    if (file_size > REASONABLE_FILE_CONTENT_LIMIT) {
+        msg(ll_error,
+            "file too big (over 128MiB) or unsupported file type (e.g. "
+            "directory)");
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
     rewind(filep);
 
     /* Send the file using the protocol. */
