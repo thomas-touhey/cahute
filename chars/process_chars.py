@@ -297,11 +297,52 @@ class CharacterReference:
             "9860": CharacterTable(),
         }
 
-        raw_data = toml.load(path)
+        try:
+            raw_data = toml.load(path)
+        except ValueError:
+            logger.exception("Could not load the TOML file")
+            raise
 
         raw_chars = []
-        for raw_char_data in raw_data['chars']:
-            raw_chars.append(Character(**raw_char_data))
+        for raw_char_data in raw_data["chars"]:
+            try:
+                char_data = Character(**raw_char_data)
+            except ValueError as exc:
+                code = raw_char_data.get("code")
+                table = raw_char_data.get("table")
+
+                if code is None:
+                    pass
+                elif table is None:
+                    logger.exception("Unable to load character 0x%04X", code)
+                else:
+                    logger.exception(
+                        "Unable to load character 0x%04X in table %s", code, table
+                    )
+
+                raise
+
+            if (
+                char_data.table is None or char_data.table == "legacy"
+            ) and char_data.code_legacy is not None:
+                logger.error(
+                    "Character 0x%04X defined in legacy table, code_legacy "
+                    "should not be defined.",
+                    char_data.code,
+                )
+                is_invalid = True
+
+            if (
+                char_data.table is None or char_data.table == "9860"
+            ) and char_data.code_9860 is not None:
+                logger.error(
+                    "Character 0x%04X defined in 9860 table, code_9860 "
+                    "should not be defined.",
+                    char_data.code,
+                )
+                is_invalid = True
+
+            raw_chars.append(char_data)
 
         raw_ref = RawCharacterReference(chars=raw_chars)
         for char in raw_ref.chars:
@@ -368,9 +409,52 @@ class CharacterReference:
                         )
                         is_invalid = True
 
+        for table_key, table in tables.items():
+            for char_code, char in table.characters.items():
+                if (
+                    char.code_legacy is not None
+                    and char.code_legacy not in tables["legacy"].characters
+                ):
+                    logger.error(
+                        "Character 0x%s in table %s references legacy "
+                        "character 0x%04X, which does not exist.",
+                        ("%04X" if char_code >= 0x100 else "%02X") % char_code,
+                        table_key,
+                        char.code_legacy,
+                    )
+                    is_invalid = True
+
+                if (
+                    char.code_9860 is not None
+                    and char.code_9860 not in tables["9860"].characters
+                ):
+                    logger.error(
+                        "Character 0x%s in table %s references fx-9860G "
+                        "character 0x%04X, which does not exist.",
+                        ("%04X" if char_code >= 0x100 else "%02X") % char_code,
+                        table_key,
+                        char.code_9860,
+                    )
+                    is_invalid = True
+
+                if not char.opcode:
+                    continue
+
+                for sub_char in char.opcode:
+                    if sub_char not in table.characters:
+                        logger.error(
+                            "Character 0x%s in table %s references "
+                            "character 0x%04X, which does not exist in this "
+                            "table.",
+                            ("%04X" if char_code >= 0x100 else "%02X") % char_code,
+                            table_key,
+                            sub_char,
+                        )
+                        is_invalid = True
+
         if is_invalid:
             logger.error(
-                "One or more errors have occurred while parsing the " "reference.",
+                "One or more errors have occurred while parsing the reference.",
             )
             raise ValueError()
 
@@ -460,7 +544,7 @@ def get_chars_c_lines(*, ref: CharacterReference) -> Iterator[str]:
     :param ref: Reference to produce the chars.c from.
     :param fp: Stream to which to output the file.
     """
-    yield '#include <chars.h>'
+    yield "#include <chars.h>"
     yield ""
 
     # ---

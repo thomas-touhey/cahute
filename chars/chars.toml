@@ -55,6 +55,16 @@ cat = "\\nano"
 
 [[chars]]
 code = 0x04
+table = "legacy"
+code_9860 = 0x04
+name = "Micro"
+unicode = [0x3BC]
+cat = "\\micro"
+
+[[chars]]
+code = 0x04
+table = "9860"
+code_legacy = 0x04
 name = "Micro"
 opcode = [0xE64B]
 cat = "\\micro"
@@ -115,6 +125,16 @@ cat = "\r\n"
 
 [[chars]]
 code = 0x0E
+table = "legacy"
+code_9860 = 0x0E
+name = "Rightwards Arrow"
+unicode = [0x2192]
+cat = "\\->"
+
+[[chars]]
+code = 0x0E
+table = "9860"
+code_legacy = 0x0E
 name = "Rightwards Arrow"
 opcode = [0xE691]
 cat = "\\->"
@@ -150,36 +170,96 @@ cat = "\\=>"
 
 [[chars]]
 code = 0x14
+table = "legacy"
+code_9860 = 0x14
+name = "Function Memory 1"
+unicode = [0x66, 0x2081]
+cat = "\\f1"
+
+[[chars]]
+code = 0x14
+table = "9860"
+code_legacy = 0x14
 name = "Function Memory 1"
 opcode = [0x66, 0xE5D1]
 cat = "\\f1"
 
 [[chars]]
 code = 0x15
+table = "legacy"
+code_9860 = 0x15
+name = "Function Memory 2"
+unicode = [0x66, 0x2082]
+cat = "\\f2"
+
+[[chars]]
+code = 0x15
+table = "9860"
+code_legacy = 0x15
 name = "Function Memory 2"
 opcode = [0x66, 0xE5D2]
 cat = "\\f2"
 
 [[chars]]
 code = 0x16
+table = "legacy"
+code_9860 = 0x16
+name = "Function Memory 3"
+unicode = [0x66, 0x2083]
+cat = "\\f3"
+
+[[chars]]
+code = 0x16
+table = "9860"
+code_legacy = 0x16
 name = "Function Memory 3"
 opcode = [0x66, 0xE5D3]
 cat = "\\f3"
 
 [[chars]]
 code = 0x17
+table = "legacy"
+code_9860 = 0x17
+name = "Function Memory 4"
+unicode = [0x66, 0x2084]
+cat = "\\f4"
+
+[[chars]]
+code = 0x17
+table = "9860"
+code_legacy = 0x17
 name = "Function Memory 4"
 opcode = [0x66, 0xE5D4]
 cat = "\\f4"
 
 [[chars]]
 code = 0x18
+table = "legacy"
+code_9860 = 0x18
+name = "Function Memory 5"
+unicode = [0x66, 0x2085]
+cat = "\\f5"
+
+[[chars]]
+code = 0x18
+table = "9860"
+code_legacy = 0x18
 name = "Function Memory 5"
 opcode = [0x66, 0xE5D5]
 cat = "\\f5"
 
 [[chars]]
 code = 0x19
+table = "legacy"
+code_9860 = 0x19
+name = "Function Memory 6"
+unicode = [0x66, 0x2086]
+cat = "\\f6"
+
+[[chars]]
+code = 0x19
+table = "9860"
+code_legacy = 0x19
 name = "Function Memory 6"
 opcode = [0x66, 0xE5D6]
 cat = "\\f6"
@@ -847,6 +927,16 @@ cat = "\\(-)"
 
 [[chars]]
 code = 0x88
+table = "legacy"
+code_9860 = 0x88
+name = "Permutations"
+unicode = [0x1D40F]
+cat = "\\nPr"
+
+[[chars]]
+code = 0x88
+table = "9860"
+code_legacy = 0x88
 name = "Permutations"
 opcode = [0xE5B1]
 cat = "\\nPr"
@@ -865,18 +955,48 @@ cat = "\\xnor"
 
 [[chars]]
 code = 0x8B
+table = "legacy"
+code_9860 = 0x8B
+name = "Square"
+unicode = [0xB2]
+cat = "\\x^2"
+
+[[chars]]
+code = 0x8B
+table = "9860"
+code_legacy = 0x8B
 name = "Square"
 opcode = [0xE5C2]
 cat = "\\x^2"
 
 [[chars]]
 code = 0x8C
+table = "legacy"
+code_9860 = 0x8C
+name = "Degrees Minutes Seconds"
+unicode = [0x1F892, 0x44, 0x4D, 0x53]
+cat = "\\Dms"
+
+[[chars]]
+code = 0x8C
+table = "9860"
+code_legacy = 0x8C
 name = "Degrees Minutes Seconds"
 opcode = [0xE69E, 0x44, 0x4D, 0x53]
 cat = "\\Dms"
 
 [[chars]]
 code = 0x8D
+table = "legacy"
+code_9860 = 0x8D
+name = "Integral"
+unicode = [0x222B, 0x28]
+cat = "\\Integral("
+
+[[chars]]
+code = 0x8D
+table = "9860"
+code_legacy = 0x8D
 name = "Integral"
 opcode = [0xE6BB, 0x28]
 cat = "\\Integral("
@@ -889,6 +1009,16 @@ cat = "\\Mo"
 
 [[chars]]
 code = 0x8F
+table = "legacy"
+code_9860 = 0x8F
+name = "X Square Sum"
+unicode = [0x3A3, 0x78, 0xB2]
+cat = "\\Sumx2"
+
+[[chars]]
+code = 0x8F
+table = "9860"
+code_legacy = 0x8F
 name = "X Square Sum"
 opcode = [0xE551, 0x78, 0xE5C2]
 cat = "\\Sumx2"
@@ -897,18 +1027,48 @@ cat = "\\Sumx2"
 
 [[chars]]
 code = 0x91
+table = "legacy"
+code_9860 = 0x91
+name = "Arcsine"
+unicode = [0x73, 0x69, 0x6E, 0x207B, 0xB9, 0x20]
+cat = "\\asin "
+
+[[chars]]
+code = 0x91
+table = "9860"
+code_legacy = 0x91
 name = "Arcsine"
 opcode = [0x73, 0x69, 0x6E, 0xE5CA, 0x20]
 cat = "\\asin "
 
 [[chars]]
 code = 0x92
+table = "legacy"
+code_9860 = 0x92
+name = "Arccosine"
+unicode = [0x63, 0x6F, 0x73, 0x207B, 0xB9, 0x20]
+cat = "\\acos "
+
+[[chars]]
+code = 0x92
+table = "9860"
+code_legacy = 0x92
 name = "Arccosine"
 opcode = [0x63, 0x6F, 0x73, 0xE5CA, 0x20]
 cat = "\\acos "
 
 [[chars]]
 code = 0x93
+table = "legacy"
+code_9860 = 0x93
+name = "Arctangent"
+unicode = [0x74, 0x61, 0x6E, 0x207B, 0xB9, 0x20]
+cat = "\\atan "
+
+[[chars]]
+code = 0x93
+table = "9860"
+code_legacy = 0x93
 name = "Arctangent"
 opcode = [0x74, 0x61, 0x6E, 0xE5CA, 0x20]
 cat = "\\atan "
@@ -927,6 +1087,16 @@ cat = "\\log "
 
 [[chars]]
 code = 0x96
+table = "legacy"
+code_9860 = 0x96
+name = "Cubic Root"
+unicode = [0x221B]
+cat = "\\curt"
+
+[[chars]]
+code = 0x96
+table = "9860"
+code_legacy = 0x96
 name = "Cubic Root"
 unicode = [0x221B]
 opcode = [0xE5DF, 0x86]
@@ -958,6 +1128,16 @@ cat = "\\xor"
 
 [[chars]]
 code = 0x9B
+table = "legacy"
+code_9860 = 0x9B
+name = "Reciprocal"
+unicode = [0x207B, 0xB9]
+cat = "\\x^-1"
+
+[[chars]]
+code = 0x9B
+table = "9860"
+code_legacy = 0x9B
 name = "Reciprocal"
 opcode = [0xE5CA]
 cat = "\\x^-1"
@@ -978,6 +1158,16 @@ cat = "\\Med"
 
 [[chars]]
 code = 0x9F
+table = "legacy"
+code_9860 = 0x9F
+name = "X Simple Sum"
+unicode = [0x3A3, 0x78]
+cat = "\\Sumx"
+
+[[chars]]
+code = 0x9F
+table = "9860"
+code_legacy = 0x9F
 name = "X Simple Sum"
 opcode = [0xE551, 0x78]
 cat = "\\Sumx"
@@ -1088,18 +1278,48 @@ name = "h (?)"
 
 [[chars]]
 code = 0xB1
+table = "legacy"
+code_9860 = 0xB1
+name = "Inverse Hyperbolic Sine"
+unicode = [0x73, 0x69, 0x6E, 0x68, 0x207B, 0xB9, 0x20]
+cat = "\\asinh "
+
+[[chars]]
+code = 0xB1
+table = "9860"
+code_legacy = 0xB1
 name = "Inverse Hyperbolic Sine"
 opcode = [0x73, 0x69, 0x6E, 0x68, 0xE5CA, 0x20]
 cat = "\\asinh "
 
 [[chars]]
 code = 0xB2
+table = "legacy"
+code_9860 = 0xB2
+name = "Inverse Hyperbolic Cosine"
+unicode = [0x63, 0x6F, 0x73, 0x68, 0x207B, 0xB9, 0x20]
+cat = "\\acosh "
+
+[[chars]]
+code = 0xB2
+table = "9860"
+code_legacy = 0xB2
 name = "Inverse Hyperbolic Cosine"
 opcode = [0x63, 0x6F, 0x73, 0x68, 0xE5CA, 0x20]
 cat = "\\acosh "
 
 [[chars]]
 code = 0xB3
+table = "legacy"
+code_9860 = 0xB3
+name = "Inverse Hyperbolic Tangent"
+unicode = [0x74, 0x61, 0x6E, 0x68, 0x207B, 0xB9, 0x20]
+cat = "\\atanh "
+
+[[chars]]
+code = 0xB3
+table = "9860"
+code_legacy = 0xB3
 name = "Inverse Hyperbolic Tangent"
 opcode = [0x74, 0x61, 0x6E, 0x68, 0xE5CA, 0x20]
 cat = "\\atanh "
@@ -1130,6 +1350,16 @@ cat = "\\Neg "
 
 [[chars]]
 code = 0xB8
+table = "legacy"
+code_9860 = 0xB8
+name = "Parametric Graph Function X"
+unicode = [0x20F0, 0x20, 0x221A]
+cat = "\\xrt"
+
+[[chars]]
+code = 0xB8
+table = "9860"
+code_legacy = 0xB8
 name = "Parametric Graph Function X"
 opcode = [0xE5DD, 0x86]
 cat = "\\xrt"
@@ -1172,6 +1402,16 @@ cat = "\\maxX"
 
 [[chars]]
 code = 0xBF
+table = "legacy"
+code_9860 = 0xBF
+name = "Y Square Sum"
+unicode = [0x3A3, 0x79, 0xB2]
+cat = "\\Sumy2"
+
+[[chars]]
+code = 0xBF
+table = "9860"
+code_legacy = 0xBF
 name = "Y Square Sum"
 opcode = [0xE551, 0x79, 0xE5C2]
 cat = "\\Sumy2"
@@ -1202,24 +1442,64 @@ cat = "\\Meany"
 
 [[chars]]
 code = 0xC4
+table = "legacy"
+code_9860 = 0xC4
+name = "x Rho n"
+unicode = [0x78, 0x3C1, 0x6E]
+cat = "\\Sdx"
+
+[[chars]]
+code = 0xC4
+table = "9860"
+code_legacy = 0xC4
 name = "x Rho n"
 opcode = [0x78, 0xE651, 0x6E]
 cat = "\\Sdx"
 
 [[chars]]
 code = 0xC5
+table = "legacy"
+code_9860 = 0xC5
+name = "x Rho n_-1"
+unicode = [0x78, 0x3C1, 0x6E, 0x208B, 0x2081]
+cat = "\\Sdxn"
+
+[[chars]]
+code = 0xC5
+table = "9860"
+code_legacy = 0xC5
 name = "x Rho n_-1"
 opcode = [0x78, 0xE651, 0x6E, 0xE5DA]
 cat = "\\Sdxn"
 
 [[chars]]
 code = 0xC6
+table = "legacy"
+code_9860 = 0xC6
+name = "y Rho n"
+unicode = [0x79, 0x3C1, 0x6E]
+cat = "\\Sdy"
+
+[[chars]]
+code = 0xC6
+table = "9860"
+code_legacy = 0xC6
 name = "y Rho n"
 opcode = [0x79, 0xE651, 0x6E]
 cat = "\\Sdy"
 
 [[chars]]
 code = 0xC7
+table = "legacy"
+code_9860 = 0xC7
+name = "y Rho n_-1"
+unicode = [0x79, 0x3C1, 0x6E, 0x208B, 0x2081]
+cat = "\\Sdyn"
+
+[[chars]]
+code = 0xC7
+table = "9860"
+code_legacy = 0xC7
 name = "y Rho n_-1"
 opcode = [0x79, 0xE651, 0x6E, 0xE5DA]
 cat = "\\Sdyn"
@@ -1276,12 +1556,32 @@ cat = "\\theta"
 
 [[chars]]
 code = 0xCF
+table = "legacy"
+code_9860 = 0xCF
+name = "Y Simple Sum"
+unicode = [0x3A3, 0x79]
+cat = "\\Sumy"
+
+[[chars]]
+code = 0xCF
+table = "9860"
+code_legacy = 0xCF
 name = "Y Simple Sum"
 opcode = [0xE551, 0x79]
 cat = "\\Sumy"
 
 [[chars]]
 code = 0xD0
+table = "legacy"
+code_9860 = 0xD0
+name = "Pi"
+unicode = [0x3C0]
+cat = "\\Pi"
+
+[[chars]]
+code = 0xD0
+table = "9860"
+code_legacy = 0xD0
 name = "Pi"
 opcode = [0xE64F]
 cat = "\\Pi"
@@ -1374,6 +1674,16 @@ cat = ["\\Intg ", "\\Intg"] # CasEmul says without space, Casetta says with
 
 [[chars]]
 code = 0xDF
+table = "legacy"
+code_9860 = 0xDF
+name = "Sigma x y"
+unicode = [0x3A3, 0x78, 0x79]
+cat = "\\Sumxy"
+
+[[chars]]
+code = 0xDF
+table = "9860"
+code_legacy = 0xDF
 name = "Sigma x y"
 opcode = [0xE551, 0x78, 0x79]
 cat = "\\Sumxy"
@@ -1477,6 +1787,17 @@ cat = "\\Graph Y="
 
 [[chars]]
 code = 0xEF
+table = "legacy"
+code_9860 = 0xEF
+name = "Graph Intg"
+unicode = [0x47, 0x72, 0x61, 0x70, 0x68, 0x20, 0x222B]
+# CasEmul says without space, Casetta says with
+cat = ["\\Graph Integral ", "\\Graph Integral"]
+
+[[chars]]
+code = 0xEF
+table = "9860"
+code_legacy = 0xEF
 name = "Graph Intg"
 opcode = [0x47, 0x72, 0x61, 0x70, 0x68, 0x20, 0xE6BB]
 # CasEmul says without space, Casetta says with
@@ -1605,18 +1926,48 @@ cat = "\\Yscl"
 
 [[chars]]
 code = 0x7F08
+table = "legacy"
+code_9860 = 0x7F08
+name = "View-Window T-Theta-min Parameter"
+unicode = [0x54, 0x3B8, 0x6D, 0x69, 0x6E]
+cat = "\\Tmin"
+
+[[chars]]
+code = 0x7F08
+table = "9860"
+code_legacy = 0x7F08
 name = "View-Window T-Theta-min Parameter"
 opcode = [0x54, 0xE647, 0x6D, 0x69, 0x6E]
 cat = "\\Tmin"
 
 [[chars]]
 code = 0x7F09
+table = "legacy"
+code_9860 = 0x7F09
+name = "View-Window T-Theta-max Parameter"
+unicode = [0x54, 0x3B8, 0x6D, 0x61, 0x78]
+cat = "\\Tmax"
+
+[[chars]]
+code = 0x7F09
+table = "9860"
+code_legacy = 0x7F09
 name = "View-Window T-Theta-max Parameter"
 opcode = [0x54, 0xE647, 0x6D, 0x61, 0x78]
 cat = "\\Tmax"
 
 [[chars]]
 code = 0x7F0A
+table = "legacy"
+code_9860 = 0x7F0A
+name = "View-Window T-Theta-pitch Parameter"
+unicode = [0x54, 0x3B8, 0x70, 0x74, 0x63, 0x68]
+cat = "\\Tptch"
+
+[[chars]]
+code = 0x7F0A
+table = "9860"
+code_legacy = 0x7F0A
 name = "View-Window T-Theta-pitch Parameter"
 opcode = [0x54, 0xE647, 0x70, 0x74, 0x63, 0x68]
 cat = "\\Tptch"
@@ -1698,18 +2049,48 @@ name = "DTx"
 
 [[chars]]
 code = 0x7F18
+table = "legacy"
+code_9860 = 0x7F18
+name = "View-Window Right T-Theta-min Parameter"
+unicode = [0x52, 0x69, 0x67, 0x68, 0x74, 0x54, 0x3B8, 0x6D, 0x69, 0x6E]
+cat = "\\RightTmin"
+
+[[chars]]
+code = 0x7F18
+table = "9860"
+code_legacy = 0x7F18
 name = "View-Window Right T-Theta-min Parameter"
 opcode = [0x52, 0x69, 0x67, 0x68, 0x74, 0x54, 0xE647, 0x6D, 0x69, 0x6E]
 cat = "\\RightTmin"
 
 [[chars]]
 code = 0x7F19
+table = "legacy"
+code_9860 = 0x7F19
+name = "View-Window Right T-Theta-max Parameter"
+unicode = [0x52, 0x69, 0x67, 0x68, 0x74, 0x54, 0x3B8, 0x6D, 0x61, 0x78]
+cat = "\\RightTmax"
+
+[[chars]]
+code = 0x7F19
+table = "9860"
+code_legacy = 0x7F19
 name = "View-Window Right T-Theta-max Parameter"
 opcode = [0x52, 0x69, 0x67, 0x68, 0x74, 0x54, 0xE647, 0x6D, 0x61, 0x78]
 cat = "\\RightTmax"
 
 [[chars]]
 code = 0x7F1A
+table = "legacy"
+code_9860 = 0x7F1A
+name = "View-Window Right T-Theta-pitch Parameter"
+unicode = [0x52, 0x69, 0x67, 0x68, 0x74, 0x54, 0x3B8, 0x70, 0x74, 0x63, 0x68]
+cat = "\\RightTptch"
+
+[[chars]]
+code = 0x7F1A
+table = "9860"
+code_legacy = 0x7F1A
 name = "View-Window Right T-Theta-pitch Parameter"
 opcode = [0x52, 0x69, 0x67, 0x68, 0x74, 0x54, 0xE647, 0x70, 0x74, 0x63, 0x68]
 cat = "\\RightTptch"
@@ -1779,6 +2160,17 @@ cat = "\\d/dx("
 
 [[chars]]
 code = 0x7F27
+table = "legacy"
+code_9860 = 0x7F27
+name = "Second Derivative"
+unicode = [0x64, 0xB2, 0x2F, 0x64, 0x78, 0xB2, 0x28]
+# Casetta says "d2/dxc", CasEmul says "d2/dx2"
+cat = ["\\d2/dxc(", "\\d2/dx2("]
+
+[[chars]]
+code = 0x7F27
+table = "9860"
+code_legacy = 0x7F27
 name = "Second Derivative"
 opcode = [0x64, 0xE5C2, 0x2F, 0x64, 0x78, 0xE5C2, 0x28]
 # Casetta says "d2/dxc", CasEmul says "d2/dx2"
@@ -1792,7 +2184,17 @@ cat = "\\Solve("
 
 [[chars]]
 code = 0x7F29
-name = "Sigma"
+table = "legacy"
+code_9860 = 0x7F29
+name = "Sum"
+unicode = [0x3A3, 0x28]
+cat = "\\Sum("
+
+[[chars]]
+code = 0x7F29
+table = "9860"
+code_legacy = 0x7F29
+name = "Sum"
 opcode = [0xE551, 0x28]
 cat = "\\Sum("
 
@@ -1994,12 +2396,33 @@ cat = "\\Augment("
 
 [[chars]]
 code = 0x7F4A
+table = "legacy"
+code_9860 = 0x7F4A
+name = "List To Matrix Conversion"
+unicode = [0x4C, 0x69, 0x73, 0x74, 0x2192, 0x4D, 0x61, 0x74, 0x28]
+cat = "\\List->Mat("
+
+[[chars]]
+code = 0x7F4A
+table = "9860"
+code_legacy = 0x7F4A
 name = "List To Matrix Conversion"
 opcode = [0x4C, 0x69, 0x73, 0x74, 0xE691, 0x4D, 0x61, 0x74, 0x28]
 cat = "\\List->Mat("
 
 [[chars]]
 code = 0x7F4B
+table = "legacy"
+code_9860 = 0x7F4B
+name = "Matrix To List Conversion"
+unicode = [0x4D, 0x61, 0x74, 0x2192, 0x4C, 0x69, 0x73, 0x74, 0x28]
+# Casetta says "\Mat->List(", CasEmul says "\Mat->List"
+cat = ["\\Mat->List(", "\\Mat->List"]
+
+[[chars]]
+code = 0x7F4B
+table = "9860"
+code_legacy = 0x7F4B
 name = "Matrix To List Conversion"
 opcode = [0x4D, 0x61, 0x74, 0xE691, 0x4C, 0x69, 0x73, 0x74, 0x28]
 # Casetta says "\Mat->List(", CasEmul says "\Mat->List"
@@ -2062,7 +2485,7 @@ unicode = [0x2220]
 code = 0x7F55
 table = "legacy"
 name = "Angle Operation"
-opcode = [0x7F54]
+unicode = [0x2220]
 
 [[chars]]
 code = 0x7F55
@@ -2211,48 +2634,128 @@ cat = "\\Sim V"
 
 [[chars]]
 code = 0x7F76
+table = "legacy"
+code_9860 = 0x7F76
+name = "Statistical Data First Quartile"
+unicode = [0x51, 0x2081]
+cat = "\\Q1"
+
+[[chars]]
+code = 0x7F76
+table = "9860"
+code_legacy = 0x7F76
 name = "Statistical Data First Quartile"
 opcode = [0x51, 0xE5D1]
 cat = "\\Q1"
 
 [[chars]]
 code = 0x7F77
+table = "legacy"
+code_9860 = 0x7F77
+name = "Statistical Data Third Quartile"
+unicode = [0x51, 0x2083]
+cat = "\\Q3"
+
+[[chars]]
+code = 0x7F77
+table = "9860"
+code_legacy = 0x7F77
 name = "Statistical Data Third Quartile"
 opcode = [0x51, 0xE5D3]
 cat = "\\Q3"
 
 [[chars]]
 code = 0x7F78
+table = "legacy"
+code_9860 = 0x7F78
+name = "Summary Point X-Coordinate 1"
+unicode = [0x78, 0x2081]
+cat = "\\x1"
+
+[[chars]]
+code = 0x7F78
+table = "9860"
+code_legacy = 0x7F78
 name = "Summary Point X-Coordinate 1"
 opcode = [0x78, 0xE5D1]
 cat = "\\x1"
 
 [[chars]]
 code = 0x7F79
+table = "legacy"
+code_9860 = 0x7F79
+name = "Summary Point Y-Coordinate 1"
+unicode = [0x79, 0x2081]
+cat = "\\y1"
+
+[[chars]]
+code = 0x7F79
+table = "9860"
+code_legacy = 0x7F79
 name = "Summary Point Y-Coordinate 1"
 opcode = [0x79, 0xE5D1]
 cat = "\\y1"
 
 [[chars]]
 code = 0x7F7A
+table = "legacy"
+code_9860 = 0x7F7A
+name = "Summary Point X-Coordinate 2"
+unicode = [0x78, 0x2082]
+cat = "\\x2"
+
+[[chars]]
+code = 0x7F7A
+table = "9860"
+code_legacy = 0x7F7A
 name = "Summary Point X-Coordinate 2"
 opcode = [0x78, 0xE5D2]
 cat = "\\x2"
 
 [[chars]]
 code = 0x7F7B
+table = "legacy"
+code_9860 = 0x7F7B
+name = "Summary Point Y-Coordinate 2"
+unicode = [0x79, 0x2082]
+cat = "\\y2"
+
+[[chars]]
+code = 0x7F7B
+table = "9860"
+code_legacy = 0x7F7B
 name = "Summary Point Y-Coordinate 2"
 opcode = [0x79, 0xE5D2]
 cat = "\\y2"
 
 [[chars]]
 code = 0x7F7C
+table = "legacy"
+code_9860 = 0x7F7C
+name = "Summary Point X-Coordinate 3"
+unicode = [0x78, 0x2083]
+cat = "\\x3"
+
+[[chars]]
+code = 0x7F7C
+table = "9860"
+code_legacy = 0x7F7C
 name = "Summary Point X-Coordinate 3"
 opcode = [0x78, 0xE5D3]
 cat = "\\x3"
 
 [[chars]]
 code = 0x7F7D
+table = "legacy"
+code_9860 = 0x7F7D
+name = "Summary Point Y-Coordinate 3"
+unicode = [0x79, 0x2083]
+cat = "\\y3"
+
+[[chars]]
+code = 0x7F7D
+table = "9860"
+code_legacy = 0x7F7D
 name = "Summary Point Y-Coordinate 3"
 opcode = [0x79, 0xE5D3]
 cat = "\\y3"
@@ -2429,6 +2932,17 @@ opcode = [0xE69E, 0x53, 0x69, 0x6D, 0x70, 0x20]
 
 [[chars]]
 code = 0x7FA0
+table = "legacy"
+code_9860 = 0x7FA0
+name = "Recursion Formula Variable an"
+unicode = [0x61, 0x2099]
+# According to Casetta, then CasEmul.
+cat = ["a\\R n", "\\R an"]
+
+[[chars]]
+code = 0x7FA0
+table = "9860"
+code_legacy = 0x7FA0
 name = "Recursion Formula Variable an"
 opcode = [0x61, 0xE5DE]
 # According to Casetta, then CasEmul.
@@ -2436,6 +2950,17 @@ cat = ["a\\R n", "\\R an"]
 
 [[chars]]
 code = 0x7FA1
+table = "legacy"
+code_9860 = 0x7FA1
+name = "Recursion Formula Variable an+1"
+# NOTE: No Unicode translation for 0xE5CE currently, so none here.
+# According to Casetta, then CasEmul.
+cat = ["a\\R n+", "\\R an1"]
+
+[[chars]]
+code = 0x7FA1
+table = "9860"
+code_legacy = 0x7FA1
 name = "Recursion Formula Variable an+1"
 opcode = [0x61, 0xE5DE, 0xE5DB, 0xE5CE]
 # According to Casetta, then CasEmul.
@@ -2443,36 +2968,97 @@ cat = ["a\\R n+", "\\R an1"]
 
 [[chars]]
 code = 0x7FA2
+table = "legacy"
+code_9860 = 0x7FA2
+name = "Recursion Formula Variable an+2"
+# NOTE: No Unicode translation for 0xE5CF currently, so none here.
+cat = "\\R an2"
+
+[[chars]]
+code = 0x7FA2
+table = "9860"
+code_legacy = 0x7FA2
 name = "Recursion Formula Variable an+2"
 opcode = [0x61, 0xE5DE, 0xE5DB, 0xE5CF]
 cat = "\\R an2"
 
 [[chars]]
 code = 0x7FA3
+table = "legacy"
+code_9860 = 0x7FA3
+name = "Recursion Formula Variable n"
+unicode = [0x2099]
+cat = "\\R n"
+
+[[chars]]
+code = 0x7FA3
+table = "9860"
+code_legacy = 0x7FA3
 name = "Recursion Formula Variable n"
 opcode = [0xE5DE]
 cat = "\\R n"
 
 [[chars]]
 code = 0x7FA4
+table = "legacy"
+code_9860 = 0x7FA4
+name = "Recursion Formula Variable a0"
+# NOTE: No Unicode translation for 0xE5CD currently, so none here.
+cat = "\\R a0"
+
+[[chars]]
+code = 0x7FA4
+table = "9860"
+code_legacy = 0x7FA4
 name = "Recursion Formula Variable a0"
 opcode = [0x61, 0xE5CD]
 cat = "\\R a0"
 
 [[chars]]
 code = 0x7FA5
+table = "legacy"
+code_9860 = 0x7FA5
+name = "Recursion Formula Variable a1"
+# NOTE: No Unicode translation for 0xE5CE currently, so none here.
+cat = "\\R a1"
+
+[[chars]]
+code = 0x7FA5
+table = "9860"
+code_legacy = 0x7FA5
 name = "Recursion Formula Variable a1"
 opcode = [0x61, 0xE5CE]
 cat = "\\R a1"
 
 [[chars]]
 code = 0x7FA6
+table = "legacy"
+code_9860 = 0x7FA6
+name = "Recursion Formula Variable a2"
+# NOTE: No Unicode translation for 0xE5CF currently, so none here.
+cat = "\\R a2"
+
+[[chars]]
+code = 0x7FA6
+table = "9860"
+code_legacy = 0x7FA6
 name = "Recursion Formula Variable a2"
 opcode = [0x61, 0xE5CF]
 cat = "\\R a2"
 
 [[chars]]
 code = 0x7FA7
+table = "legacy"
+code_9860 = 0x7FA7
+name = "Recursion Formula Variable bn"
+unicode = [0x62, 0x208A]
+# According to Casetta, then CasEmul.
+cat = ["b\\R n", "\\R bn"]
+
+[[chars]]
+code = 0x7FA7
+table = "9860"
+code_legacy = 0x7FA7
 name = "Recursion Formula Variable bn"
 opcode = [0x62, 0xE5DE]
 # According to Casetta, then CasEmul.
@@ -2480,6 +3066,17 @@ cat = ["b\\R n", "\\R bn"]
 
 [[chars]]
 code = 0x7FA8
+table = "legacy"
+code_9860 = 0x7FA8
+name = "Recursion Formula Variable bn+1"
+# NOTE: No Unicode translation for 0xE5CE currently, so none here.
+# According to Casetta, then CasEmul.
+cat = ["b\\R n+", "\\R bn1"]
+
+[[chars]]
+code = 0x7FA8
+table = "9860"
+code_legacy = 0x7FA8
 name = "Recursion Formula Variable bn+1"
 opcode = [0x62, 0xE5DE, 0xE5DB, 0xE5CE]
 # According to Casetta, then CasEmul.
@@ -2487,30 +3084,81 @@ cat = ["b\\R n+", "\\R bn1"]
 
 [[chars]]
 code = 0x7FA9
+table = "legacy"
+code_9860 = 0x7FA9
+name = "Recursion Formula Variable bn+2"
+# NOTE: No Unicode translation for 0xE5CF currently, so none here.
+cat = "\\R bn2"
+
+[[chars]]
+code = 0x7FA9
+table = "9860"
+code_legacy = 0x7FA9
 name = "Recursion Formula Variable bn+2"
 opcode = [0x62, 0xE5DE, 0xE5DB, 0xE5CF]
 cat = "\\R bn2"
 
 [[chars]]
 code = 0x7FAA
+table = "legacy"
+code_9860 = 0x7FAA
+name = "Recursion Formula Variable b0"
+# NOTE: No Unicode translation for 0xE5CD currently, so none here.
+cat = "\\R b0"
+
+[[chars]]
+code = 0x7FAA
+table = "9860"
+code_legacy = 0x7FAA
 name = "Recursion Formula Variable b0"
 opcode = [0x62, 0xE5CD]
 cat = "\\R b0"
 
 [[chars]]
 code = 0x7FAB
+table = "legacy"
+code_9860 = 0x7FAB
+name = "Recursion Formula Variable b1"
+# NOTE: No Unicode translation for 0xE5CE currently, so none here.
+cat = "\\R b1"
+
+[[chars]]
+code = 0x7FAB
+table = "9860"
+code_legacy = 0x7FAB
 name = "Recursion Formula Variable b1"
 opcode = [0x62, 0xE5CE]
 cat = "\\R b1"
 
 [[chars]]
 code = 0x7FAC
+table = "legacy"
+code_9860 = 0x7FAC
+name = "Recursion Formula Variable b2"
+# NOTE: No Unicode translation for 0xE5CF currently, so none here.
+cat = "\\R b2"
+
+[[chars]]
+code = 0x7FAC
+table = "9860"
+code_legacy = 0x7FAC
 name = "Recursion Formula Variable b2"
 opcode = [0x62, 0xE5CF]
 cat = "\\R b2"
 
 [[chars]]
 code = 0x7FAD
+table = "legacy"
+code_9860 = 0x7FAD
+name = "Recursion Formula Origin Setting anStart"
+unicode = [0x61, 0x2099, 0x53, 0x74, 0x61, 0x72, 0x74]
+# According to Casetta, then CasEmul.
+cat = ["a\\R nStart", "\\anStart"]
+
+[[chars]]
+code = 0x7FAD
+table = "9860"
+code_legacy = 0x7FAD
 name = "Recursion Formula Origin Setting anStart"
 opcode = [0x61, 0xE5DE, 0x53, 0x74, 0x61, 0x72, 0x74]
 # According to Casetta, then CasEmul.
@@ -2518,6 +3166,17 @@ cat = ["a\\R nStart", "\\anStart"]
 
 [[chars]]
 code = 0x7FAE
+table = "legacy"
+code_9860 = 0x7FAE
+name = "Recursion Formula Origin Setting bnStart"
+unicode = [0x62, 0x2099, 0x53, 0x74, 0x61, 0x72, 0x74]
+# According to Casetta, then CasEmul.
+cat = ["b\\R nStart", "\\bnStart"]
+
+[[chars]]
+code = 0x7FAE
+table = "9860"
+code_legacy = 0x7FAE
 name = "Recursion Formula Origin Setting bnStart"
 opcode = [0x62, 0xE5DE, 0x53, 0x74, 0x61, 0x72, 0x74]
 # According to Casetta, then CasEmul.
@@ -2906,30 +3565,80 @@ opcode = [0x43, 0x65, 0x6C, 0x6C, 0x49, 0x66, 0x28]
 
 [[chars]]
 code = 0x7FF0
+table = "legacy"
+code_9860 = 0x7FF0
+name = "Rectangular Coordinates Graph Y Function Recall"
+# NOTE: No Unicode translation for 0xE5B4 currently, so none here.
+cat = "\\Y "
+
+[[chars]]
+code = 0x7FF0
+table = "9860"
+code_legacy = 0x7FF0
 name = "Rectangular Coordinates Graph Y Function Recall"
 opcode = [0xE5B4]
 cat = "\\Y "
 
 [[chars]]
 code = 0x7FF1
+table = "legacy"
+code_9860 = 0x7FF1
+name = "Polar Coordinates Graph r Function Recall"
+unicode = [0x1D42B]
+cat = "\\{r} "
+
+[[chars]]
+code = 0x7FF1
+table = "9860"
+code_legacy = 0x7FF1
 name = "Polar Coordinates Graph r Function Recall"
 opcode = [0xE5B2]
 cat = "\\{r} "
 
 [[chars]]
 code = 0x7FF2
+table = "legacy"
+code_9860 = 0x7FF2
+name = "Parametric Coordinates Graph X Function Recall"
+# NOTE: No Unicode translation for 0xE5B3 currently, so none here.
+cat = "\\Xt "
+
+[[chars]]
+code = 0x7FF2
+table = "9860"
+code_legacy = 0x7FF2
 name = "Parametric Coordinates Graph X Function Recall"
 opcode = [0xE5B3, 0x74]
 cat = "\\Xt "
 
 [[chars]]
 code = 0x7FF3
+table = "legacy"
+code_9860 = 0x7FF3
+name = "Parametric Coordinates Graph Y Function Recall"
+# NOTE: No Unicode translation for 0xE5B4 currently, so none here.
+cat = "\\Yt "
+
+[[chars]]
+code = 0x7FF3
+table = "9860"
+code_legacy = 0x7FF3
 name = "Parametric Coordinates Graph Y Function Recall"
 opcode = [0xE5B4, 0x74]
 cat = "\\Yt "
 
 [[chars]]
 code = 0x7FF4
+table = "legacy"
+code_9860 = 0x7FF4
+name = "Rectangular Coordinates Graph X Function Recall"
+# NOTE: No Unicode translation for 0xE5B3 currently, so none here.
+cat = "\\X "
+
+[[chars]]
+code = 0x7FF4
+table = "9860"
+code_legacy = 0x7FF4
 name = "Rectangular Coordinates Graph X Function Recall"
 opcode = [0xE5B3]
 cat = "\\X "
@@ -3786,7 +4495,7 @@ unicode = [0xB7]
 code = 0xE5B0
 table = "9860"
 name = "Euler constant"
-opcode = [0x2107]
+unicode = [0x2107]
 
 [[chars]]
 code = 0xE5B1
@@ -4045,12 +4754,14 @@ unicode = [0x208B]
 [[chars]]
 code = 0xE5DD
 table = "9860"
-name = "Little star"
+name = "Superscript Asterisk"
+unicode = [0x20F0, 0x20]
 
 [[chars]]
 code = 0xE5DE
 table = "9860"
-name = "Little n"
+name = "Latin Subscript Small Letter N"
+unicode = [0x2099]
 
 [[chars]]
 code = 0xE5DF
@@ -4479,23 +5190,24 @@ unicode = [0x3BF]
 code = 0xE64F
 table = "9860"
 name = "Greek Small Letter Pi"
-
-[[chars]]
-code = 0xE650
-table = "9860"
-name = "Greek Small Letter Pi"
 unicode = [0x3C0]
 
 [[chars]]
-code = 0xE651
+code = 0xE650
 table = "9860"
 name = "Greek Small Letter Rho"
 unicode = [0x3C1]
 
 [[chars]]
-code = 0xE652
+code = 0xE651
 table = "9860"
 name = "Greek Small Letter Sigma"
+unicode = [0x3C3]
+
+[[chars]]
+code = 0xE652
+table = "9860"
+name = "Greek Small Letter Final Sigma"
 unicode = [0x3C2]
 
 [[chars]]
@@ -6617,6 +7329,17 @@ cat = "\\DrawR-Plt"
 
 [[chars]]
 code = 0xF728
+table = "legacy"
+code_9860 = 0xF728
+name = "DrawRSigma-Con Statement"
+unicode = [0x44, 0x72, 0x61, 0x77, 0x52, 0x3A3, 0x2D, 0x43, 0x6F, 0x6E]
+# Casetta uses the first, CasEmul the second.
+cat = ["\\DrawR-SumCon", "\\DrawRSum-Con"]
+
+[[chars]]
+code = 0xF728
+table = "9860"
+code_legacy = 0xF728
 name = "DrawRSigma-Con Statement"
 opcode = [0x44, 0x72, 0x61, 0x77, 0x52, 0xE551, 0x2D, 0x43, 0x6F, 0x6E]
 # Casetta uses the first, CasEmul the second.
@@ -6624,6 +7347,17 @@ cat = ["\\DrawR-SumCon", "\\DrawRSum-Con"]
 
 [[chars]]
 code = 0xF729
+table = "legacy"
+code_9860 = 0xF729
+name = "DrawRSigma-Plt Statement"
+unicode = [0x44, 0x72, 0x61, 0x77, 0x52, 0x3A3, 0x2D, 0x50, 0x6C, 0x74]
+# Casetta uses the first, CasEmul the second.
+cat = ["\\DrawR-SumPlt", "\\DrawRSum-Plt"]
+
+[[chars]]
+code = 0xF729
+table = "9860"
+code_legacy = 0xF729
 name = "DrawRSigma-Plt Statement"
 opcode = [0x44, 0x72, 0x61, 0x77, 0x52, 0xE551, 0x2D, 0x50, 0x6C, 0x74]
 # Casetta uses the first, CasEmul the second.
@@ -7223,12 +7957,33 @@ opcode = [0x53, 0x6B, 0x65, 0x74, 0x63, 0x68, 0x44, 0x6F, 0x74, 0x20]
 
 [[chars]]
 code = 0xF790
+table = "legacy"
+code_9860 = 0xF790
+name = "anType"
+unicode = [0x61, 0x2099, 0x54, 0x79, 0x70, 0x65]
+cat = "\\aRanType"
+
+[[chars]]
+code = 0xF790
+table = "9860"
+code_legacy = 0xF790
 name = "anType"
 opcode = [0x61, 0xE5DE, 0x54, 0x79, 0x70, 0x65]
 cat = "\\aRanType"
 
 [[chars]]
 code = 0xF791
+table = "legacy"
+code_9860 = 0xF791
+name = "an+1Type"
+# NOTE: No Unicode translation for 0xE5CE currently, so none here.
+# Casetta defines the first, CasEmul the second.
+cat = ["a\\R n+Type", "\\aRan1Type"]
+
+[[chars]]
+code = 0xF791
+table = "9860"
+code_legacy = 0xF791
 name = "an+1Type"
 opcode = [0x61, 0xE5DE, 0xE5DB, 0xE5CE, 0x54, 0x79, 0x70, 0x65]
 # Casetta defines the first, CasEmul the second.
@@ -7236,6 +7991,16 @@ cat = ["a\\R n+Type", "\\aRan1Type"]
 
 [[chars]]
 code = 0xF792
+table = "legacy"
+code_9860 = 0xF792
+name = "an+2Type"
+# NOTE: No Unicode translation for 0xE5CF currently, so none here.
+cat = "\\aRan2Type"
+
+[[chars]]
+code = 0xF792
+table = "9860"
+code_legacy = 0xF792
 name = "an+2Type"
 opcode = [0x61, 0xE5DE, 0xE5DB, 0xE5CF, 0x54, 0x79, 0x70, 0x65]
 cat = "\\aRan2Type"
@@ -7534,6 +8299,16 @@ cat = "\\LocusOn"
 
 [[chars]]
 code = 0xF7C7
+table = "legacy"
+code_9860 = 0xF7C7
+name = "Sigma disp on"
+unicode = [0x3A3, 0x64, 0x69, 0x73, 0x70, 0x4F, 0x6E]
+cat = "\\SumDispOn"
+
+[[chars]]
+code = 0xF7C7
+table = "9860"
+code_legacy = 0xF7C7
 name = "Sigma disp on"
 opcode = [0xE551, 0x64, 0x69, 0x73, 0x70, 0x4F, 0x6E]
 cat = "\\SumDispOn"
@@ -7626,6 +8401,16 @@ cat = "\\LocusOff"
 
 [[chars]]
 code = 0xF7D7
+table = "legacy"
+code_9860 = 0xF7D7
+name = "Sigma disp off"
+unicode = [0x3A3, 0x64, 0x69, 0x73, 0x70, 0x4F, 0x66, 0x66]
+cat = "\\SumDispOff"
+
+[[chars]]
+code = 0xF7D7
+table = "9860"
+code_legacy = 0xF7D7
 name = "Sigma disp off"
 opcode = [0xE551, 0x64, 0x69, 0x73, 0x70, 0x4F, 0x66, 0x66]
 cat = "\\SumDispOff"
