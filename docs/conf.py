@@ -61,13 +61,12 @@ todo_include_todos = True
 mermaid_output_format = "raw"
 mermaid_init_js = """
 function isDarkMode() {
-    const theme = document.body.getAttribute("data-theme");
     const color = (
         getComputedStyle(document.body)
-        .getPropertyValue("--color-foreground-primary")
+        .getPropertyValue("--color-code-foreground")
     );
 
-    if (theme == "dark" || color == "#ffffffcc")
+    if (color == "#d0d0d0")
         return true;
 
     return false;
