@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent / "_ext"))
 
 project = "Cahute"
-version = "0.3"
+version = "0.4"
 copyright = "2024, Thomas Touhey"
 author = "Thomas Touhey"
 
