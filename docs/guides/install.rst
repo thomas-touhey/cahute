@@ -118,9 +118,9 @@ it, and install from it, by running the following commands:
 
 .. parsed-literal::
 
-    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr
+    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
     cmake --build build
-    sudo cmake --install build
+    sudo cmake --install build --strip
 
 .. warning::
 

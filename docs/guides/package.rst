@@ -56,16 +56,61 @@ commands:
 
 .. parsed-literal::
 
-    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr
+    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
     cmake --build build
 
 Once this is done, you can produce the distribution directory ``dist/``
 using the following command::
 
-    DESTDIR=./dist cmake --install build
+    DESTDIR=./dist cmake --install build --strip
 
 Your distribution directory is ready; from there, the instructions are
 specific to your distribution.
+
+.. warning::
+
+    If your packaging system provides stripping out of the box, it is
+    recommended to disable it, as it may strip the symbols out of the
+    static library, rendering it unusable.
+
+    For example, in the ``PKGBUILD`` file for Archlinux_ and
+    derivatives, the ``strip`` option must be explicitely disabled,
+    i.e. the PKGBUILD should have the following line::
+
+        options=(!strip)
+
+.. note::
+
+    Cahute provides udev rules by default, which make the following
+    assumptions:
+
+    * Your distribution uses udev_;
+    * Your distribution provides a ``uucp`` group, as per
+      `Linux Standard Base Core Specification section 23.2`_;
+    * Your distribution uses said group as the owner for serial devices
+      (``/dev/ttyS*``, ``/dev/ttyUSB*``).
+
+    If any of these assumptions is incorrect in the case of your distribution,
+    it is recommended to:
+
+    * Disable the udev rules installation, by adding the following to the
+      initial command:
+
+      .. parsed-literal::
+
+          cmake -B build -S cahute-|version| ... -DENABLE_UDEV=OFF
+
+    * Take the appropriate measures to simplify user access to the devices.
+
+    Otherwise, if all of the assumptions are correct, it is recommended to:
+
+    * `Reload the udev rules`_ in post-installation, by running the
+      following command::
+
+          udevadm control --reload
+
+    * Prompt to the user to add their username to the ``uucp`` group,
+      e.g. using the ``usermod -a -G uucp <username>`` command.
 
 Getting informed when a new version is released
 -----------------------------------------------
@@ -92,6 +137,13 @@ following the steps in `Get notified when a release is created`_.
 .. _pkg-config: https://git.sr.ht/~kaniini/pkgconf
 .. _SDL: https://www.libsdl.org/
 .. _libusb: https://libusb.info/
+.. _Archlinux: https://archlinux.org/
+.. _udev: https://wiki.archlinux.org/title/Udev
+.. _reload the udev rules:
+    https://wiki.archlinux.org/title/Udev#Loading_new_rules
+.. _Linux Standard Base Core Specification section 23.2:
+    https://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/
+    LSB-Core-generic/usernames.html
 .. _Releases: https://gitlab.com/cahuteproject/cahute/-/releases
 .. _Get notified when a release is created:
     https://docs.gitlab.com/ee/user/project/releases/
