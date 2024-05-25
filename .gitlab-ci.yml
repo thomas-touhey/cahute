@@ -85,4 +85,5 @@ publish tarball:
         - cpack --config build/CPackSourceConfig.cmake
         - export RELEASE_FILE=$(ls cahute-*.tar.gz)
         - sha256sum $RELEASE_FILE >$RELEASE_FILE.sha256
-        - scp $RELEASE_FILE $RELEASE_FILE.sha256 gitlab-cahute@cahuteproject.org:/var/www/cahuteproject/ftp/releases
+        - b2sum $RELEASE_FILE >$RELEASE_FILE.b2
+        - scp $RELEASE_FILE $RELEASE_FILE.sha256 $RELEASE_FILE.b2 gitlab-cahute@cahuteproject.org:/var/www/cahuteproject/ftp/releases
