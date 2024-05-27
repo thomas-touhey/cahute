@@ -37,6 +37,6 @@ Available options are the following:
 Invalid options are ignored by p7screen. If an option is provided several time,
 only the latest occurrence will be taken into account.
 
-.. _libp7: https://p7.planet-casio.com/
+.. _libp7: https://web.archive.org/web/20230401210038/https://p7.planet-casio.com/en.html
 .. _Thomas Touhey: https://thomas.touhey.fr/
 .. _SDL: https://www.libsdl.org/

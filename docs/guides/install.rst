@@ -72,8 +72,8 @@ through GiteaPC_, by running the following command:
 
 .. _build-cahute:
 
-|linux| Other Linux distributions
----------------------------------
+Other systems
+-------------
 
 .. note::
 
@@ -84,80 +84,7 @@ through GiteaPC_, by running the following command:
 If no package exists for your distribution, or you are to package Cahute for
 your distribution, you can build the command-line utilities yourself.
 
-First, you need to install the build and runtime dependencies for Cahute:
-
-* cmake_ >= 3.16;
-* Python_ >= 3.8;
-* `toml module for Python <python-toml_>`_, either installed through pip
-  or as a native package such as ``python-toml`` or ``python3-toml``;
-* `GNU Make`_, `pkg-config`_, and other C compilation and linking utilities;
-* SDL_ >= 2.0 (for ``p7screen``);
-* libusb_.
-
-For getting the source, you have the following options:
-
-* You can download the latest source package at
-  https://ftp.cahuteproject.org/releases\ :
-
-  .. parsed-literal::
-
-      curl -o cahute-|version|.tar.gz https\://ftp.cahuteproject.org/releases/cahute-|version|.tar.gz
-      tar xvaf cahute-|version|.tar.gz
-
-* You can clone the repository and checkout the tag corresponding to the
-  release:
-
-  .. parsed-literal::
-
-      git clone https\://gitlab.com/cahuteproject/cahute.git cahute-|version|
-      (cd cahute-|version| && git checkout -f |version|)
-
-The project is present in the "cahute-|version|" directory.
-In the parent directory, we are to create the ``build`` directory aside
-it, and install from it, by running the following commands:
-
-.. parsed-literal::
-
-    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
-    cmake --build build
-    sudo cmake --install build --strip
-
-.. warning::
-
-    For communicating with calculators over USB and serial, Cahute library
-    and command-line utilities require access to such devices.
-
-    For serial devices, this is traditionally represented by being a member
-    of the ``uucp`` group, defined as the group owner on ``/dev/ttyS*``
-    devices; you can check this by running ``ls -l /dev/ttyS*``.
-    However, by default, USB devices don't have such rules.
-
-    CMake automatically installs the udev rules, which means you need to
-    do the following:
-
-    * Reload the udev daemon reload to apply the newly installed rules
-      on the running system without a reboot, with this command **as root**::
-
-          udevadm control --reload
-
-    * Adding your user to the ``uucp`` group, then restarting your session::
-
-          usermod -a -G uucp <your-username>
-
-That's it! You should be able to run the following command::
-
-    p7 --version
-
-.. note::
-
-    Since you are not using a packaged version of Cahute, the project won't
-    be automatically updated when updating the rest of the system, which
-    means you need to do it manually, especially if a security update is
-    made.
-
-    You can subscribe to releases by creating a Gitlab.com account, and
-    following the steps in `Get notified when a release is created`_.
-    You can check your notification settings at any time in Notifications_.
+See :ref:`guide-build` for more information.
 
 .. _Homebrew: https://brew.sh/
 .. _cahute homebrew formula: https://formulae.brew.sh/formula/cahute
@@ -169,22 +96,8 @@ That's it! You should be able to run the following command::
 .. _pikaur: https://github.com/actionless/pikaur
 .. _GiteaPC: https://git.planet-casio.com/Lephenixnoir/giteapc
 
-.. _cmake: https://cmake.org/
-.. _Python: https://www.python.org/
-.. _python-toml: https://pypi.org/project/toml/
-.. _GNU Make: https://www.gnu.org/software/make/
-.. _pkg-config: https://git.sr.ht/~kaniini/pkgconf
-.. _SDL: https://www.libsdl.org/
-.. _libusb: https://libusb.info/
-
-.. _Get notified when a release is created:
-    https://docs.gitlab.com/ee/user/project/releases/
-    #get-notified-when-a-release-is-created
-.. _Notifications: https://gitlab.com/-/profile/notifications
-
 .. |apple| image:: apple.svg
 .. |homebrew| image:: homebrew.svg
 .. |archlinux| image:: arch.svg
 .. |manjaro| image:: manjaro.svg
 .. |lephe| image:: lephe.png
-.. |linux| image:: linux.svg

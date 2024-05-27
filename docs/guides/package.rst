@@ -13,59 +13,16 @@ only the following package organisations are available:
 For more about the rationale behind this document, consult the
 `Archlinux CMake packaging guidelines`_.
 
-Preparing the dependencies
---------------------------
+Preparing the installer or distribution
+---------------------------------------
 
-Cahute depends on the following, build-only dependencies:
+The build dependencies and method for Cahute, as well as the way to obtain
+a distribution directory or installer, are described in detail
+in :ref:`guide-build`. It is recommended to use the tarballs rather than
+the git repository, as they run on a simpler and less prone to fail service.
 
-* cmake_ >= 3.16;
-* Python_ >= 3.8;
-* `toml module for Python <python-toml_>`_, either installed through pip
-  or as a native package such as ``python-toml`` or ``python3-toml``;
-* `GNU Make`_, `pkg-config`_, and other C compilation and linking utilities.
-
-It also depends on the following build and runtime dependencies:
-
-* libusb_;
-* SDL_ >= 2.0 (for ``p7screen``).
-
-Producing the distribution directory
-------------------------------------
-
-You first need to retrieve the source directory, named "cahute-|version|",
-using one of the following methods:
-
-* You can download the latest source package at
-  https://ftp.cahuteproject.org/releases\ :
-
-  .. parsed-literal::
-
-      curl -o cahute-|version|.tar.gz https\://ftp.cahuteproject.org/releases/cahute-|version|.tar.gz
-      tar xvaf cahute-|version|.tar.gz
-
-* You can clone the repository and checkout the tag corresponding to the
-  release:
-
-  .. parsed-literal::
-
-      git clone https\://gitlab.com/cahuteproject/cahute.git cahute-|version|
-      (cd cahute-|version| && git checkout -f |version|)
-
-Now that you have the source directory, you can build it using the following
-commands:
-
-.. parsed-literal::
-
-    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
-    cmake --build build
-
-Once this is done, you can produce the distribution directory ``dist/``
-using the following command::
-
-    DESTDIR=./dist cmake --install build --strip
-
-Your distribution directory is ready; from there, the instructions are
-specific to your distribution.
+If need be, you can take inspiration from the `cahute PKGBUILD for Archlinux`_
+or the `Cahute formula for Homebrew`_.
 
 .. warning::
 
@@ -81,8 +38,8 @@ specific to your distribution.
 
 .. note::
 
-    Cahute provides udev rules by default, which make the following
-    assumptions:
+    For Linux distributions, Cahute provides udev rules by default, which make
+    the following assumptions:
 
     * Your distribution uses udev_;
     * Your distribution provides a ``uucp`` group, as per
@@ -112,6 +69,47 @@ specific to your distribution.
     * Prompt to the user to add their username to the ``uucp`` group,
       e.g. using the ``usermod -a -G uucp <username>`` command.
 
+Testing your package
+--------------------
+
+As usually recommended for packagers, it is recommended to test your package
+or packages by installing them on a fresh, minimal system, and ensure that
+they installs the correct runtime repositories.
+
+A few tests that you can do regarding the command-line utilities are the
+following:
+
+* Ensure that both ``p7 --help`` and ``p7screen --help`` both display help
+  messages. This can help identifying issues regarding missing shared
+  libraries;
+* If your system supports USB, connect an fx-9860G calculator or compatible,
+  place it in reception mode, run ``p7 info`` and ensure that it displays the
+  correct information regarding your calculator. This ensures that:
+
+  - USB detection works correctly;
+  - User has access to the USB calculator;
+  - USB endpoints are reported correctly and are usable to run a full
+    communication.
+* If your system supports serial or USB-to-serial devices, and you have both
+  an fx-9860G calculator or compatible and the appropriate cable:
+
+  - Connect your serial or USB-to-serial cable to both the computer running
+    the system you're testing, and your calculator.
+  - Place your calculator in receive mode over 3-pin specifically.
+  - Run ``p7 list-devices`` and ensure that it displays the serial adapter.
+  - Run ``p7 info --com <serial_device>``, where ``<serial_device>`` is
+    the name of the serial device reported above. This ensures that serial
+    communications work correctly.
+
+A few tests that you can do regarding the library are the following:
+
+* Build and run the guides you have the hardware and system support for,
+  e.g. :ref:`guide-developer-detect-usb`. See :ref:`developer-guide-build`
+  for more information. This can help identify issues with overzealous
+  binary stripping, or missing dependencies using ``pkg-config``.
+* If you have nm_ or equivalent, run ``nm -CgU <path/to/libcahute.a>`` to
+  ensure that all exported symbols for your system start with ``cahute_``.
+
 Getting informed when a new version is released
 -----------------------------------------------
 
@@ -130,13 +128,10 @@ following the steps in `Get notified when a release is created`_.
 
 .. _Archlinux CMake packaging guidelines:
     https://wiki.archlinux.org/title/CMake_package_guidelines
-.. _cmake: https://cmake.org/
-.. _Python: https://www.python.org/
-.. _python-toml: https://pypi.org/project/toml/
-.. _GNU Make: https://www.gnu.org/software/make/
-.. _pkg-config: https://git.sr.ht/~kaniini/pkgconf
-.. _SDL: https://www.libsdl.org/
-.. _libusb: https://libusb.info/
+.. _Cahute PKGBUILD for Archlinux:
+    https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=cahute
+.. _Cahute formula for Homebrew:
+    https://github.com/Homebrew/homebrew-core/blob/master/Formula/c/cahute.rb
 .. _Archlinux: https://archlinux.org/
 .. _udev: https://wiki.archlinux.org/title/Udev
 .. _reload the udev rules:
@@ -144,6 +139,9 @@ following the steps in `Get notified when a release is created`_.
 .. _Linux Standard Base Core Specification section 23.2:
     https://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/
     LSB-Core-generic/usernames.html
+
+.. _nm: https://sourceware.org/binutils/docs/binutils/nm.html
+
 .. _Releases: https://gitlab.com/cahuteproject/cahute/-/releases
 .. _Get notified when a release is created:
     https://docs.gitlab.com/ee/user/project/releases/

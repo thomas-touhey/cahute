@@ -387,5 +387,5 @@ Available options are the following:
     However, this can be set to other storage device names, such as
     ``crd0`` (SD card) for calculators with an SD card slot.
 
-.. _libp7: https://p7.planet-casio.com/
+.. _libp7: https://web.archive.org/web/20230401210038/https://p7.planet-casio.com/en.html
 .. _Thomas Touhey: https://thomas.touhey.fr/

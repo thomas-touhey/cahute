@@ -17,10 +17,12 @@ help:
 install:
 	pip install sphinx sphinxcontrib-mermaid furo
 
-preview:
+livehtml:
 	@$(SPHINXAUTOBUILD) "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXAUTOOPTS) $(O)
 
-.PHONY: help preview Makefile
+preview: livehtml
+
+.PHONY: help preview livehtml Makefile
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).

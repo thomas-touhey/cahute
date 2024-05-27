@@ -1,3 +1,5 @@
+.. _developer-guide-build:
+
 Building with the Cahute library
 ================================
 
