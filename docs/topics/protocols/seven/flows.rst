@@ -117,6 +117,38 @@ the PC must initialize the link using this flow, which is the following:
         active->>passive: Initial check
         passive->>active: ACK
 
+.. warning::
+
+    On USB links, before sending an initial check, a USB control transfer
+    must be executed for Protocol 7.00 to work with some older fx-9860G
+    derivatives running OS 1.x.
+
+    This control transfer has the following properties:
+
+    * ``bmRequestType`` set to ``0x41``, to designate a vendor-specific
+      interface request with no incoming data transfer;
+    * ``bRequest`` set to ``0x01``, as it is the command that enables
+      Protocol 7.00 data transfers.
+    * Both ``wValue`` and ``wIndex`` set to ``0x0000``.
+    * No data transfer.
+    * Timeout set to around 250 to 300 milliseconds, verified
+      experimentally.
+
+    Using libusb_, this can be done using the following excerpt:
+
+    .. code-block:: c
+
+        libusb_control_transfer(
+            device_handle,
+            0x41,  /* bmRequestType */
+            0x01,  /* bRequest */
+            0x0000,  /* wValue */
+            0x0000,  /* wIndex */
+            NULL,
+            0,
+            300
+        );
+
 The initial check packet is a check packet of subtype ``00``; see
 :ref:`seven-check-packet` for more information.
 
@@ -378,3 +410,5 @@ The serial speeds are limited to the following speeds (or baud rates):
     Depending on the quality of the serial cable (or USB to serial cable
     / converter), higher speeds may cause more corruption to occur, causing
     a lot of resends and hence, being less efficient than lower baud rates.
+
+.. _libusb: https://libusb.info/

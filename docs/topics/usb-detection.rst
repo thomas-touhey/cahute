@@ -32,6 +32,12 @@ The interface class ``255`` is used when the device presents protocol 7.00
 directly, while the interface class ``8`` is used in "USB key" mode, i.e.
 when the file system and main memory are presented using SCSI.
 
+.. warning::
+
+    Some older fx-9860G derivatives using OS 1.x require a specific USB control
+    transfer to be run before Protocol 7.00 can be used; see
+    :ref:`seven-init-link` for more information.
+
 .. note::
 
     For reference, the following USB serial cables have also be encountered

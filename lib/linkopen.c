@@ -1632,6 +1632,37 @@ cahute_open_usb_link(
         goto fail;
     }
 
+    if (protocol == CAHUTE_LINK_PROTOCOL_USB_SEVEN) {
+        /* Calculators running 1.x OSes with Protocol 7.00 support may need a
+         * push to enable communicating using Protocol 7.00, in the form of
+         * a vendor-specific request documented in fxReverse. */
+
+        msg(ll_info, "Running vendor-specific interface request 0x01.");
+        libusberr = libusb_control_transfer(
+            device_handle,
+            0x41,   /* Vendor-specific interface request. */
+            0x01,   /* Request code 0x01 */
+            0x0000, /* wValue is unused */
+            0x0000, /* wIndex is unused also */
+            NULL,
+            0,  /* No data transfer. */
+            300 /* 300ms should be more than enough. */
+        );
+
+        switch (libusberr) {
+        case 0:
+            break;
+
+        default:
+            msg(ll_fatal,
+                "libusb_control_transfer with vendor-specific interface "
+                "request 0x01 caused error %d: %s",
+                libusberr,
+                libusb_error_name(libusberr));
+            goto fail;
+        }
+    }
+
     goto ready;
 
 ready:
