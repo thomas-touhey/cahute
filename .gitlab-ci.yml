@@ -36,6 +36,19 @@ build (x86_64-w64-mingw32):
         - x86_64-w64-mingw32-cmake -B build -S .
         - cmake --build build
 
+build tarball:
+    stage: build
+    image: debian:bookworm-slim
+    before_script:
+        - apt-get update -y
+        - apt-get install -y cmake pkg-config gcc libusb-1.0-0-dev libsdl2-dev
+    script:
+        - cmake -B build -S .
+        - cpack --config build/CPackSourceConfig.cmake
+    artifacts:
+        paths:
+            - cahute-*.tar.gz
+
 build docs:
     stage: build
     image: python:3.11
@@ -74,16 +87,16 @@ publish tarball:
     image: debian:bookworm-slim
     before_script:
         - apt-get update -y
-        - apt-get install -y cmake pkg-config gcc libusb-1.0-0-dev libsdl2-dev openssh-client
+        - apt-get install -y openssh-client
         - eval $(ssh-agent -s)
         - mkdir ~/.ssh && chmod 700 ~/.ssh
         - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" >~/.ssh/config
         - chmod 400 "$SSH_PRIVATE_KEY"
         - ssh-add "$SSH_PRIVATE_KEY"
     script:
-        - cmake -B build -S .
-        - cpack --config build/CPackSourceConfig.cmake
         - export RELEASE_FILE=$(ls cahute-*.tar.gz)
         - sha256sum $RELEASE_FILE >$RELEASE_FILE.sha256
         - b2sum $RELEASE_FILE >$RELEASE_FILE.b2
         - scp $RELEASE_FILE $RELEASE_FILE.sha256 $RELEASE_FILE.b2 gitlab-cahute@cahuteproject.org:/var/www/cahuteproject/ftp/releases
+    dependencies:
+        - build tarball

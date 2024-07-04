@@ -360,3 +360,4 @@ GitHub.sublime-settings
 /giteapc-config.make
 /lib/chars.c
 /cli/fxremote-update.exe.bin.c
+/.gitlab-ci-local
