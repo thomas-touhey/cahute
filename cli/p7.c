@@ -357,7 +357,8 @@ int main(int ac, char **av) {
     case COMMAND_SEND:
         flags = CAHUTE_SEND_FILE_FLAG_OPTIMIZE;
         if (args.force)
-            flags |= CAHUTE_SEND_FILE_FLAG_FORCE;
+            flags |=
+                CAHUTE_SEND_FILE_FLAG_FORCE | CAHUTE_SEND_FILE_FLAG_DELETE;
 
         err = cahute_send_file_to_storage(
             link,
