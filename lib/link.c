@@ -374,7 +374,8 @@ cahute_send_file_to_storage(
     size_t file_size;
     unsigned long unsupported_flags =
         (flags
-         & ~(CAHUTE_SEND_FILE_FLAG_FORCE | CAHUTE_SEND_FILE_FLAG_OPTIMIZE));
+         & ~(CAHUTE_SEND_FILE_FLAG_FORCE | CAHUTE_SEND_FILE_FLAG_OPTIMIZE
+             | CAHUTE_SEND_FILE_FLAG_DELETE));
     int err;
 
     if (unsupported_flags) {

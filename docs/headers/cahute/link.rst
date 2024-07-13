@@ -613,6 +613,16 @@ Link control related function declarations
         is requested. If it is not considered enough to store the file, an
         optimize command will be issued beforehand.
 
+    .. c:macro:: CAHUTE_SEND_FILE_FLAG_DELETE
+
+        If this flag is set and a file is already present in the destination
+        file name in the selected directory, the file is deleted before any
+        other command.
+
+        Combined with :c:macro:`CAHUTE_SEND_FILE_FLAG_OPTIMIZE`, this ensures
+        that the space occupied by an existing file is claimed back before
+        the new file is sent.
+
     See :ref:`seven-send-file-to-storage` for the use case with Protocol 7.00.
 
     :param link: Link to the device.

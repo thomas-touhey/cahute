@@ -228,6 +228,7 @@ cahute_request_storage_capacity(
 
 #define CAHUTE_SEND_FILE_FLAG_FORCE    0x00000001 /* Force overwrite. */
 #define CAHUTE_SEND_FILE_FLAG_OPTIMIZE 0x00000002 /* Automatically optimize. */
+#define CAHUTE_SEND_FILE_FLAG_DELETE   0x00000004 /* Delete first. */
 
 CAHUTE_EXTERN(int)
 cahute_send_file_to_storage(
