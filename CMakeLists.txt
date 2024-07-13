@@ -17,10 +17,12 @@ include(CMakeDependentOption)
 
 cmake_dependent_option(ENABLE_CLI "Whether to enable building the utilities or not."
     ON "NOT DEFINED FXSDK_PLATFORM" OFF)
+cmake_dependent_option(ENABLE_SDL "Whether to enable building SDL2 dependent utilities or not."
+    ON "NOT DEFINED AMIGA" OFF)
 cmake_dependent_option(ENABLE_UDEV "Whether to install the udev rule or not."
-    ON "NOT DEFINED FXSDK_PLATFORM" OFF)
+    ON "NOT DEFINED FXSDK_PLATFORM AND NOT DEFINED AMIGA" OFF)
 cmake_dependent_option(ENABLE_LIBUSB "Whether to use libusb or not."
-    ON "NOT DEFINED FXSDK_PLATFORM" OFF)
+    ON "NOT DEFINED FXSDK_PLATFORM AND NOT DEFINED AMIGA" OFF)
 set(LOGLEVEL $ENV{LOGLEVEL} CACHE STRING "Default logging level")
 
 # TODO: CaS is in its very early stages and supports too few features
@@ -110,7 +112,7 @@ if(WIN32 OR MINGW)
     set(SDL2_NO_MWINDOWS 1)
 endif()
 
-if(ENABLE_CLI)
+if(ENABLE_CLI AND ENABLE_SDL)
     find_package(SDL2 REQUIRED)
 endif()
 
@@ -226,20 +228,22 @@ if(ENABLE_CLI)
     target_link_libraries(p7os PRIVATE ${CLI_LIBRARIES})
     target_include_directories(p7os PRIVATE ${CLI_INCLUDE_DIRS})
 
-    add_executable(p7screen
-        cli/p7screen.c
-        cli/p7screen_args.c
-        cli/common.c
-        cli/options.c
-    )
-    target_link_libraries(p7screen PRIVATE
-        ${CLI_LIBRARIES}
-        ${SDL2_LIBRARIES}
-    )
-    target_include_directories(p7screen PRIVATE
-        ${CLI_INCLUDE_DIRS}
-        ${SDL2_INCLUDE_DIRS}
-    )
+    if(ENABLE_SDL)
+        add_executable(p7screen
+            cli/p7screen.c
+            cli/p7screen_args.c
+            cli/common.c
+            cli/options.c
+        )
+        target_link_libraries(p7screen PRIVATE
+            ${CLI_LIBRARIES}
+            ${SDL2_LIBRARIES}
+        )
+        target_include_directories(p7screen PRIVATE
+            ${CLI_INCLUDE_DIRS}
+            ${SDL2_INCLUDE_DIRS}
+        )
+    endif()
 
     add_executable(xfer9860
         cli/xfer9860.c
@@ -271,7 +275,11 @@ install(
 if(ENABLE_CLI)
     install(TARGETS p7 RUNTIME)
     install(TARGETS p7os RUNTIME)
-    install(TARGETS p7screen RUNTIME)
+
+    if(ENABLE_SDL)
+        install(TARGETS p7screen RUNTIME)
+    endif()
+
     install(TARGETS xfer9860 RUNTIME)
 
     if(ENABLE_INCOMPLETE_CAS)
