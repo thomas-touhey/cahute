@@ -48,10 +48,10 @@
  * @return Cahute error, or 0 if no error has occurred.
  */
 CAHUTE_LOCAL(int) cahute_check_link(cahute_link *link, unsigned long flags) {
+    if (link->medium.flags & CAHUTE_LINK_MEDIUM_FLAG_GONE)
+        return CAHUTE_ERROR_GONE;
     if (link->flags & CAHUTE_LINK_FLAG_IRRECOVERABLE)
         return CAHUTE_ERROR_IRRECOV;
-    if (link->flags & CAHUTE_LINK_FLAG_GONE)
-        return CAHUTE_ERROR_GONE;
     if (link->flags & CAHUTE_LINK_FLAG_TERMINATED)
         return CAHUTE_ERROR_TERMINATED;
 
@@ -157,7 +157,7 @@ cahute_negotiate_serial_params(
     int err;
 
     if (!speed)
-        speed = link->serial_speed;
+        speed = link->medium.serial_speed;
 
     switch (speed) {
     case 300:
@@ -188,7 +188,7 @@ cahute_negotiate_serial_params(
     if ((flags & CAHUTE_SERIAL_STOP_MASK) == 0) {
         /* For ease of use of the flags by the protocol-specific function,
          * we actually want to take the current parameters. */
-        flags |= link->serial_flags & CAHUTE_SERIAL_STOP_MASK;
+        flags |= link->medium.serial_flags & CAHUTE_SERIAL_STOP_MASK;
     } else if ((flags & CAHUTE_SERIAL_STOP_MASK) == CAHUTE_SERIAL_STOP_ONE) {
     } else if ((flags & CAHUTE_SERIAL_STOP_MASK) != CAHUTE_SERIAL_STOP_TWO)
         unsupported_flags |= flags & CAHUTE_SERIAL_STOP_MASK;
@@ -196,7 +196,7 @@ cahute_negotiate_serial_params(
     if ((flags & CAHUTE_SERIAL_PARITY_MASK) == 0) {
         /* For ease of use of the flags by the protocol-specific function,
          * we actually want to take the current parameters. */
-        flags |= link->serial_flags & CAHUTE_SERIAL_PARITY_MASK;
+        flags |= link->medium.serial_flags & CAHUTE_SERIAL_PARITY_MASK;
     } /* No possible invalid value, 3+1 value in 2 bits. */
 
     if (unsupported_flags)
@@ -207,7 +207,7 @@ cahute_negotiate_serial_params(
         return err;
 
     /* We want the complete serial flags here. */
-    new_serial_flags = link->serial_flags;
+    new_serial_flags = link->medium.serial_flags;
     new_serial_flags &= ~(CAHUTE_SERIAL_STOP_MASK | CAHUTE_SERIAL_PARITY_MASK);
     new_serial_flags |= flags;
 

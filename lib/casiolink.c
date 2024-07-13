@@ -92,7 +92,7 @@ cahute_casiolink_checksum(cahute_u8 const *data, size_t size) {
  */
 CAHUTE_LOCAL(int) cahute_casiolink_handle_mdl1(cahute_link *link) {
     unsigned long new_serial_speed = 0;
-    unsigned long new_serial_flags = link->serial_flags;
+    unsigned long new_serial_flags = link->medium.serial_flags;
     int mdl_correct = 1;
     cahute_u8 *buf = link->data_buffer;
     int err;
@@ -129,7 +129,7 @@ CAHUTE_LOCAL(int) cahute_casiolink_handle_mdl1(cahute_link *link) {
 
     /* We want to decode the serial parameters, to ensure that we
      * can actually decode them. */
-    new_serial_flags = link->serial_flags;
+    new_serial_flags = link->medium.serial_flags;
     new_serial_flags &= ~CAHUTE_SERIAL_PARITY_MASK;
 
     if (!memcmp(&buf[11], "038400", 6))
@@ -925,8 +925,8 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 
             /* NOTE: sprintf() adds a terminating zero, but we don't care,
              * since we override buf[17] right after. */
-            sprintf(serial_params, "%06lu", link->serial_speed);
-            switch (link->serial_flags & CAHUTE_SERIAL_PARITY_MASK) {
+            sprintf(serial_params, "%06lu", link->medium.serial_speed);
+            switch (link->medium.serial_flags & CAHUTE_SERIAL_PARITY_MASK) {
             case CAHUTE_SERIAL_PARITY_EVEN:
                 serial_params[6] = 'E';
                 break;

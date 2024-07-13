@@ -37,7 +37,7 @@
  * This function is guaranteed to skip exactly N bytes, or return an
  * error.
  *
- * @param link Link in which the medium data is defined.
+ * @param medium Link medium from which to skip data.
  * @param size Size of the area to skip.
  * @param first_timeout Timeout before the first byte is received,
  *        in milliseconds.
@@ -46,8 +46,8 @@
  * @return Error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_EXTERN(int)
-cahute_skip_from_link(
-    cahute_link *link,
+cahute_skip_from_link_medium(
+    cahute_link_medium *medium,
     size_t size,
     unsigned long first_timeout,
     unsigned long next_timeout
@@ -58,8 +58,8 @@ cahute_skip_from_link(
 
         if (size >= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE) {
             do {
-                err = cahute_read_from_link(
-                    link,
+                err = cahute_read_from_link_medium(
+                    medium,
                     buf,
                     CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE,
                     first_timeout,
@@ -73,8 +73,8 @@ cahute_skip_from_link(
         }
 
         if (size) {
-            err = cahute_read_from_link(
-                link,
+            err = cahute_read_from_link_medium(
+                medium,
                 buf,
                 size,
                 first_timeout,
@@ -97,7 +97,7 @@ cahute_skip_from_link(
  * If any timeout is provided as 0, the corresponding timeout will be
  * unlimited, i.e. the function will wait indefinitely.
  *
- * @param link Link in which the medium data is defined.
+ * @param medium Link medium from which to read.
  * @param buf Buffer in which to write the read data.
  * @param size Size to read into the buffer.
  * @param first_timeout Timeout before the first byte is received,
@@ -107,8 +107,8 @@ cahute_skip_from_link(
  * @return Error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_EXTERN(int)
-cahute_read_from_link(
-    cahute_link *link,
+cahute_read_from_link_medium(
+    cahute_link_medium *medium,
     cahute_u8 *buf,
     size_t size,
     unsigned long first_timeout,
@@ -125,34 +125,26 @@ cahute_read_from_link(
     if (!size)
         return CAHUTE_OK;
 
-    /* We first need to empty the link's read buffer.
+    /* We first need to empty the medium's read buffer.
      * Note that this may fully satisfy the need presented by the caller. */
     {
-        size_t left = link->medium_read_size - link->medium_read_start;
+        size_t left = medium->read_size - medium->read_start;
 
         if (size <= left) {
-            memcpy(
-                buf,
-                &link->medium_read_buffer[link->medium_read_start],
-                size
-            );
-            link->medium_read_start += size;
+            memcpy(buf, &medium->read_buffer[medium->read_start], size);
+            medium->read_start += size;
             return CAHUTE_OK;
         }
 
         if (left) {
-            memcpy(
-                buf,
-                &link->medium_read_buffer[link->medium_read_start],
-                left
-            );
+            memcpy(buf, &medium->read_buffer[medium->read_start], left);
             buf += left;
             size -= left;
         }
 
-        /* The link buffer is empty! We need to reset it. */
-        link->medium_read_start = 0;
-        link->medium_read_size = 0;
+        /* The medium buffer is empty! We need to reset it. */
+        medium->read_start = 0;
+        medium->read_size = 0;
     }
 
     /* Set ``bytes_read`` to 1 so the first round of the loop actually
@@ -175,11 +167,10 @@ cahute_read_from_link(
      *
      * In order to accomplish this, for each pass, we actually determine
      * whether we want to write in the caller's buffer directly or in
-     * the link's medium read buffer. */
+     * the medium's read buffer. */
     while (size) {
         cahute_u8 *dest;
         size_t target_size; /* Size to ask for, optimistically. */
-        int is_link_buffer;
 
         /* If no bytes have been read since last time, we actually need to
          * remove the difference using the monotonic clock! */
@@ -203,15 +194,14 @@ cahute_read_from_link(
          * destination buffer if the output was big enough. However, the
          * medium sometimes requires aligned buffers, and the medium read
          * buffer is guaranteed to be aligned at the 8-byte mark. */
-        is_link_buffer = 1;
-        dest = link->medium_read_buffer;
+        dest = medium->read_buffer;
         target_size = CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
 
         /* The implementation must read data in ``dest``, for up to
          * ``target_size`` (while the caller only requires ``size``).
          * It must set ``bytes_read`` to the actual number of bytes read
          * this pass. */
-        switch (link->medium) {
+        switch (medium->type) {
 #ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
         case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
             ssize_t ret;
@@ -225,13 +215,13 @@ cahute_read_from_link(
                 FD_ZERO(&read_fds);
                 FD_ZERO(&write_fds);
                 FD_ZERO(&except_fds);
-                FD_SET(link->medium_state.posix.fd, &read_fds);
+                FD_SET(medium->state.posix.fd, &read_fds);
 
                 timeout_tv.tv_sec = timeout / 1000;
                 timeout_tv.tv_usec = (timeout % 1000) * 1000;
 
                 select_ret = select(
-                    link->medium_state.posix.fd + 1,
+                    medium->state.posix.fd + 1,
                     &read_fds,
                     &write_fds,
                     &except_fds,
@@ -255,7 +245,7 @@ cahute_read_from_link(
                 }
             }
 
-            ret = read(link->medium_state.posix.fd, dest, target_size);
+            ret = read(medium->state.posix.fd, dest, target_size);
 
             if (ret < 0)
                 switch (errno) {
@@ -264,7 +254,7 @@ cahute_read_from_link(
 
                 case ENODEV:
                 case EIO:
-                    link->flags |= CAHUTE_LINK_FLAG_GONE;
+                    medium->flags |= CAHUTE_LINK_MEDIUM_FLAG_GONE;
                     return CAHUTE_ERROR_GONE;
 
                 default:
@@ -294,25 +284,25 @@ cahute_read_from_link(
             BOOL ret;
 
             ret = ReadFile(
-                link->medium_state.windows.handle,
+                medium->state.windows.handle,
                 dest,
                 target_size,
                 &received,
-                &link->medium_state.windows.overlapped
+                &medium->state.windows.overlapped
             );
             if (!ret) {
                 DWORD werr = GetLastError();
 
                 if (werr == ERROR_IO_PENDING) {
                     ret = WaitForSingleObject(
-                        link->medium_state.windows.overlapped.hEvent,
+                        medium->state.windows.overlapped.hEvent,
                         timeout ? timeout : INFINITE
                     );
                     switch (ret) {
                     case WAIT_OBJECT_0:
                         ret = GetOverlappedResult(
-                            link->medium_state.windows.handle,
-                            &link->medium_state.windows.overlapped,
+                            medium->state.windows.handle,
+                            &medium->state.windows.overlapped,
                             &received,
                             FALSE
                         );
@@ -328,7 +318,7 @@ cahute_read_from_link(
                         break;
 
                     case WAIT_TIMEOUT:
-                        if (!CancelIo(link->medium_state.windows.handle)) {
+                        if (!CancelIo(medium->state.windows.handle)) {
                             werr = GetLastError();
                             log_windows_error("CancelIo", werr);
                             return CAHUTE_ERROR_UNKNOWN;
@@ -342,7 +332,7 @@ cahute_read_from_link(
                             GetLastError()
                         );
 
-                        if (!CancelIo(link->medium_state.windows.handle)) {
+                        if (!CancelIo(medium->state.windows.handle)) {
                             werr = GetLastError();
                             log_windows_error("CancelIo", werr);
                         }
@@ -367,8 +357,8 @@ cahute_read_from_link(
             int received;
 
             libusberr = libusb_bulk_transfer(
-                link->medium_state.libusb.handle,
-                link->medium_state.libusb.bulk_in,
+                medium->state.libusb.handle,
+                medium->state.libusb.bulk_in,
                 dest,
                 target_size,
                 &received,
@@ -383,7 +373,7 @@ cahute_read_from_link(
             case LIBUSB_ERROR_NO_DEVICE:
             case LIBUSB_ERROR_IO:
                 msg(ll_error, "USB device is no longer available.");
-                link->flags |= CAHUTE_LINK_FLAG_GONE;
+                medium->flags |= CAHUTE_LINK_MEDIUM_FLAG_GONE;
                 return CAHUTE_ERROR_GONE;
 
             case LIBUSB_ERROR_TIMEOUT:
@@ -422,8 +412,8 @@ cahute_read_from_link(
              * Note that it may take time for the calculator to "recharge"
              * the buffer, so we want to try several times in a row before
              * declaring there is no data available yet. */
-            err = cahute_scsi_request_from_link(
-                link,
+            err = cahute_scsi_request_from_link_medium(
+                medium,
                 (cahute_u8 *)"\xC0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
                 16,
                 status_buf,
@@ -463,8 +453,8 @@ cahute_read_from_link(
             payload[6] = (avail >> 8) & 255;
             payload[7] = avail & 255;
 
-            err = cahute_scsi_request_from_link(
-                link,
+            err = cahute_scsi_request_from_link_medium(
+                medium,
                 payload,
                 16,
                 dest,
@@ -504,17 +494,14 @@ cahute_read_from_link(
         }
 
         if (bytes_read >= size) {
-            if (is_link_buffer) {
-                memcpy(buf, link->medium_read_buffer, size);
-                link->medium_read_start = size;
-                link->medium_read_size = bytes_read;
-            }
+            memcpy(buf, medium->read_buffer, size);
+            medium->read_start = size;
+            medium->read_size = bytes_read;
 
             break;
         }
 
-        if (is_link_buffer)
-            memcpy(buf, link->medium_read_buffer, bytes_read);
+        memcpy(buf, medium->read_buffer, bytes_read);
 
         buf += bytes_read;
         size -= bytes_read;
@@ -525,15 +512,13 @@ cahute_read_from_link(
             msg(ll_info,
                 "Read %" CAHUTE_PRIuSIZE
                 " bytes in %lums (after waiting %lums).",
-                original_size + link->medium_read_size
-                    - link->medium_read_start,
+                original_size + medium->read_size - medium->read_start,
                 last_time - first_time,
                 first_time - start_time);
         } else {
             msg(ll_info,
                 "Read %" CAHUTE_PRIuSIZE " bytes in %lums.",
-                original_size + link->medium_read_size
-                    - link->medium_read_start,
+                original_size + medium->read_size - medium->read_start,
                 last_time - start_time);
         }
     }
@@ -551,18 +536,22 @@ time_out:
 }
 
 /**
- * Write data synchronously to the medium associated with the given link.
+ * Write data synchronously to the medium associated with the given medium.
  *
  * There is no write buffering specific to Cahute: the buffer is directly
  * written to the underlying medium.
  *
- * @param link Link to the device.
- * @param buf Buffer to write to the link.
+ * @param medium Link medium to write data to.
+ * @param buf Buffer to write to the medium.
  * @param size Size of the buffer to write.
  * @return Error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_EXTERN(int)
-cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
+cahute_write_to_link_medium(
+    cahute_link_medium *medium,
+    cahute_u8 const *buf,
+    size_t size
+) {
     if (!size)
         return CAHUTE_OK;
 
@@ -575,16 +564,16 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
          *
          * This way, if only a partial write was achieved, the
          * implementation-specific write function can be called again. */
-        switch (link->medium) {
+        switch (medium->type) {
 #ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
         case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
             ssize_t ret;
 
-            ret = write(link->medium_state.posix.fd, buf, size);
+            ret = write(medium->state.posix.fd, buf, size);
             if (ret < 0)
                 switch (errno) {
                 case ENODEV:
-                    link->flags |= CAHUTE_LINK_FLAG_GONE;
+                    medium->flags |= CAHUTE_LINK_MEDIUM_FLAG_GONE;
                     return CAHUTE_ERROR_GONE;
 
                 default:
@@ -609,25 +598,25 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
             BOOL ret;
 
             ret = WriteFile(
-                link->medium_state.windows.handle,
+                medium->state.windows.handle,
                 buf,
                 size,
                 &sent,
-                &link->medium_state.windows.overlapped
+                &medium->state.windows.overlapped
             );
             if (!ret) {
                 DWORD werr = GetLastError();
 
                 if (werr == ERROR_IO_PENDING) {
                     ret = WaitForSingleObject(
-                        link->medium_state.windows.overlapped.hEvent,
+                        medium->state.windows.overlapped.hEvent,
                         INFINITE
                     );
                     switch (ret) {
                     case WAIT_OBJECT_0:
                         ret = GetOverlappedResult(
-                            link->medium_state.windows.handle,
-                            &link->medium_state.windows.overlapped,
+                            medium->state.windows.handle,
+                            &medium->state.windows.overlapped,
                             &sent,
                             FALSE
                         );
@@ -666,8 +655,8 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
             int sent;
 
             libusberr = libusb_bulk_transfer(
-                link->medium_state.libusb.handle,
-                link->medium_state.libusb.bulk_out,
+                medium->state.libusb.handle,
+                medium->state.libusb.bulk_out,
                 (cahute_u8 *)buf,
                 size,
                 &sent,
@@ -682,7 +671,7 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
             case LIBUSB_ERROR_NO_DEVICE:
             case LIBUSB_ERROR_IO:
                 msg(ll_error, "USB device is no longer available.");
-                link->flags |= CAHUTE_LINK_FLAG_GONE;
+                medium->flags |= CAHUTE_LINK_MEDIUM_FLAG_GONE;
                 return CAHUTE_ERROR_GONE;
 
             default:
@@ -714,8 +703,8 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
 
             /* We use custom command C0 to poll status and get avail. bytes.
              * See :ref:`ums-command-c0` for more information. */
-            err = cahute_scsi_request_from_link(
-                link,
+            err = cahute_scsi_request_from_link_medium(
+                medium,
                 (cahute_u8 *)"\xC0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
                 16,
                 status_buf,
@@ -735,8 +724,8 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
             payload[6] = (to_send >> 8) & 255;
             payload[7] = to_send & 255;
 
-            err = cahute_scsi_request_to_link(
-                link,
+            err = cahute_scsi_request_to_link_medium(
+                medium,
                 payload,
                 16,
                 buf,
@@ -767,18 +756,18 @@ cahute_write_to_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
 /**
  * Set serial parameters.
  *
- * @param link Link for which to set serial parameters.
+ * @param medium Link medium on which to set the serial parameters.
  * @param flags Serial parameters to set.
  * @param speed Speed to set.
  * @return Cahute error, or 0 if successful.
  */
 CAHUTE_EXTERN(int)
-cahute_set_serial_params_to_link(
-    cahute_link *link,
+cahute_set_serial_params_to_link_medium(
+    cahute_link_medium *medium,
     unsigned long flags,
     unsigned long speed
 ) {
-    if (link->serial_flags == flags && link->serial_speed == speed)
+    if (medium->serial_flags == flags && medium->serial_speed == speed)
         return CAHUTE_OK;
 
     msg(ll_info, "Setting the following serial settings:");
@@ -801,7 +790,7 @@ cahute_set_serial_params_to_link(
         : (flags & CAHUTE_SERIAL_RTS_ENABLE) ? "enabled"
                                              : "disabled");
 
-    switch (link->medium) {
+    switch (medium->type) {
 #ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
     case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
         struct termios term;
@@ -844,7 +833,7 @@ cahute_set_serial_params_to_link(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        if (tcdrain(link->medium_state.posix.fd)) {
+        if (tcdrain(medium->state.posix.fd)) {
             msg(ll_error,
                 "Could not wait until data has been written: %s (%d)",
                 strerror(errno),
@@ -852,7 +841,7 @@ cahute_set_serial_params_to_link(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        if (tcgetattr(link->medium_state.posix.fd, &term) < 0) {
+        if (tcgetattr(medium->state.posix.fd, &term) < 0) {
             msg(ll_error,
                 "Could not get serial attributes: %s (%d)",
                 strerror(errno),
@@ -895,7 +884,7 @@ cahute_set_serial_params_to_link(
         if ((flags & CAHUTE_SERIAL_STOP_MASK) == CAHUTE_SERIAL_STOP_TWO)
             term.c_cflag |= CSTOPB;
 
-        if (tcsetattr(link->medium_state.posix.fd, TCSANOW, &term)) {
+        if (tcsetattr(medium->state.posix.fd, TCSANOW, &term)) {
             msg(ll_error,
                 "Could not get serial attributes: %s (%d)",
                 strerror(errno),
@@ -904,7 +893,7 @@ cahute_set_serial_params_to_link(
         }
 
         /* Also set the DTR/RTS mode. */
-        if (ioctl(link->medium_state.posix.fd, TIOCMGET, &status) >= 0)
+        if (ioctl(medium->state.posix.fd, TIOCMGET, &status) >= 0)
             status = 0;
 
         original_status = status;
@@ -932,7 +921,7 @@ cahute_set_serial_params_to_link(
         }
 
         if (status != original_status
-            && ioctl(link->medium_state.posix.fd, TIOCMSET, &status) < 0) {
+            && ioctl(medium->state.posix.fd, TIOCMSET, &status) < 0) {
             msg(ll_error, "Could not set DTR/RTS mode.");
             return CAHUTE_ERROR_UNKNOWN;
         }
@@ -983,7 +972,7 @@ cahute_set_serial_params_to_link(
 
         SecureZeroMemory(&dcb, sizeof(DCB));
         dcb.DCBlength = sizeof(DCB);
-        if (!GetCommState(link->medium_state.windows.handle, &dcb)) {
+        if (!GetCommState(medium->state.windows.handle, &dcb)) {
             log_windows_error("GetCommState", GetLastError());
             return CAHUTE_ERROR_UNKNOWN;
         }
@@ -1064,7 +1053,7 @@ cahute_set_serial_params_to_link(
             dcb.fRtsControl = RTS_CONTROL_DISABLE;
         }
 
-        if (!SetCommState(link->medium_state.windows.handle, &dcb)) {
+        if (!SetCommState(medium->state.windows.handle, &dcb)) {
             log_windows_error("SetCommState", GetLastError());
             return CAHUTE_ERROR_UNKNOWN;
         }
@@ -1075,19 +1064,19 @@ cahute_set_serial_params_to_link(
         CAHUTE_RETURN_IMPL("No method available for setting serial params.");
     }
 
-    link->serial_flags = flags;
-    link->serial_speed = speed;
+    medium->serial_flags = flags;
+    medium->serial_speed = speed;
     return CAHUTE_OK;
 }
 
 /**
- * Emit an SCSI request to a link, while sending or receiving data.
+ * Emit an SCSI request to a link medium, while sending or receiving data.
  *
  * This is the internal function behind :c:func:`cahute_scsi_request_to_link`
  * and :c:func:`cahute_scsi_request_from_link`, however it must not be used
  * directly by any other function.
  *
- * @param link Link to which to emit the SCSI request.
+ * @param medium Link medium to which to emit the SCSI request.
  * @param command Command to emit to the link, of 6, 10, 12 or 16 bytes.
  * @param command_size Size of the command to emit to the link.
  * @param buf Optional data buffer to either send or receive.
@@ -1098,7 +1087,7 @@ cahute_set_serial_params_to_link(
  */
 CAHUTE_LOCAL(int)
 cahute_scsi_request(
-    cahute_link *link,
+    cahute_link_medium *medium,
     cahute_u8 const *command,
     size_t command_size,
     cahute_u8 *buf,
@@ -1115,7 +1104,7 @@ cahute_scsi_request(
 
     /* The medium-specific implementation must store the status in the
      * ``status`` variable (NOT ``*statusp``). */
-    switch (link->medium) {
+    switch (medium->type) {
 #ifdef CAHUTE_LINK_MEDIUM_WIN32_UMS
     case CAHUTE_LINK_MEDIUM_WIN32_UMS: {
         SCSI_PASS_THROUGH_DIRECT req;
@@ -1142,7 +1131,7 @@ cahute_scsi_request(
         }
 
         wret = DeviceIoControl(
-            link->medium_state.windows.handle,
+            medium->state.windows.handle,
             IOCTL_SCSI_PASS_THROUGH_DIRECT,
             &req,
             sizeof(req),
@@ -1186,8 +1175,8 @@ cahute_scsi_request(
             cbw_buf[12] |= 128;
 
         libusberr = libusb_bulk_transfer(
-            link->medium_state.libusb.handle,
-            link->medium_state.libusb.bulk_out,
+            medium->state.libusb.handle,
+            medium->state.libusb.bulk_out,
             (cahute_u8 *)cbw_buf,
             31,
             &sent,
@@ -1202,7 +1191,7 @@ cahute_scsi_request(
         case LIBUSB_ERROR_NO_DEVICE:
         case LIBUSB_ERROR_IO:
             msg(ll_error, "USB device is no longer available.");
-            link->flags |= CAHUTE_LINK_FLAG_GONE;
+            medium->flags |= CAHUTE_LINK_MEDIUM_FLAG_GONE;
             return CAHUTE_ERROR_GONE;
 
         default:
@@ -1220,8 +1209,8 @@ cahute_scsi_request(
             int libusberr, sent = 0;
 
             libusberr = libusb_bulk_transfer(
-                link->medium_state.libusb.handle,
-                link->medium_state.libusb.bulk_out,
+                medium->state.libusb.handle,
+                medium->state.libusb.bulk_out,
                 buf,
                 (int)buf_size,
                 &sent,
@@ -1236,7 +1225,7 @@ cahute_scsi_request(
             case LIBUSB_ERROR_NO_DEVICE:
             case LIBUSB_ERROR_IO:
                 msg(ll_error, "USB device is no longer available.");
-                link->flags |= CAHUTE_LINK_FLAG_GONE;
+                medium->flags |= CAHUTE_LINK_MEDIUM_FLAG_GONE;
                 return CAHUTE_ERROR_GONE;
 
             default:
@@ -1251,8 +1240,8 @@ cahute_scsi_request(
                 int libusberr, recv = 0;
 
                 libusberr = libusb_bulk_transfer(
-                    link->medium_state.libusb.handle,
-                    link->medium_state.libusb.bulk_in,
+                    medium->state.libusb.handle,
+                    medium->state.libusb.bulk_in,
                     buf,
                     (int)buf_size,
                     &recv,
@@ -1266,7 +1255,7 @@ cahute_scsi_request(
                 case LIBUSB_ERROR_NO_DEVICE:
                 case LIBUSB_ERROR_IO:
                     msg(ll_error, "USB device is no longer available.");
-                    link->flags |= CAHUTE_LINK_FLAG_GONE;
+                    medium->flags |= CAHUTE_LINK_MEDIUM_FLAG_GONE;
                     return CAHUTE_ERROR_GONE;
 
                 default:
@@ -1293,8 +1282,8 @@ cahute_scsi_request(
 
             do {
                 libusberr = libusb_bulk_transfer(
-                    link->medium_state.libusb.handle,
-                    link->medium_state.libusb.bulk_in,
+                    medium->state.libusb.handle,
+                    medium->state.libusb.bulk_in,
                     csw,
                     (int)csw_size,
                     &recv,
@@ -1308,7 +1297,7 @@ cahute_scsi_request(
                 case LIBUSB_ERROR_NO_DEVICE:
                 case LIBUSB_ERROR_IO:
                     msg(ll_error, "USB device is no longer available.");
-                    link->flags |= CAHUTE_LINK_FLAG_GONE;
+                    medium->flags |= CAHUTE_LINK_MEDIUM_FLAG_GONE;
                     return CAHUTE_ERROR_GONE;
 
                 default:
@@ -1344,20 +1333,20 @@ cahute_scsi_request(
 }
 
 /**
- * Emit an SCSI request to a link, with or without data.
+ * Emit an SCSI request to a link medium, with or without data.
  *
  * Note that ``*statusp`` may be NULL!
  *
- * @param link Link to which to emit the SCSI request.
- * @param command Command to emit to the link, of 6, 10, 12 or 16 bytes.
- * @param command_size Size of the command to emit to the link.
+ * @param medium Link medium to which to emit the SCSI request.
+ * @param command Command to emit to the medium, of 6, 10, 12 or 16 bytes.
+ * @param command_size Size of the command to emit to the medium.
  * @param data Optional data to append to the command.
  * @param data_size Size of the optional data to append to the command.
  * @param statusp Pointer to the SCSI status to set to the received one.
  */
 CAHUTE_EXTERN(int)
-cahute_scsi_request_to_link(
-    cahute_link *link,
+cahute_scsi_request_to_link_medium(
+    cahute_link_medium *medium,
     cahute_u8 const *command,
     size_t command_size,
     cahute_u8 const *data,
@@ -1365,7 +1354,7 @@ cahute_scsi_request_to_link(
     int *statusp
 ) {
     return cahute_scsi_request(
-        link,
+        medium,
         command,
         command_size,
         (cahute_u8 *)data, /* Explicit removal of const. */
@@ -1376,20 +1365,20 @@ cahute_scsi_request_to_link(
 }
 
 /**
- * Emit an SCSI request to a link, and receive data.
+ * Emit an SCSI request to a link medium, and receive data.
  *
  * NOTE: ``*statusp`` may be NULL.
  *
- * @param link Link to which to emit the SCSI request.
- * @param command Command to emit to the link, of 6, 10, 12 or 16 bytes.
- * @param command_size Size of the command to emit to the link.
+ * @param medium Link medium to which to emit the SCSI request.
+ * @param command Command to emit to the medium, of 6, 10, 12 or 16 bytes.
+ * @param command_size Size of the command to emit to the medium.
  * @param buf Buffer to fill with the command's result.
  * @param buf_size Buffer capacity to not go past.
  * @param statusp Pointer to the SCSI status to set to the received one.
  */
 CAHUTE_EXTERN(int)
-cahute_scsi_request_from_link(
-    cahute_link *link,
+cahute_scsi_request_from_link_medium(
+    cahute_link_medium *medium,
     cahute_u8 const *command,
     size_t command_size,
     cahute_u8 *buf,
@@ -1397,7 +1386,7 @@ cahute_scsi_request_from_link(
     int *statusp
 ) {
     return cahute_scsi_request(
-        link,
+        medium,
         command,
         command_size,
         buf,

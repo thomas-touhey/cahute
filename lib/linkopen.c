@@ -283,21 +283,138 @@ fail:
 }
 
 /**
- * Initialize a link's protocol state.
+ * Close a medium.
  *
- * @param link Link to initialize.
+ * @param type Medium type.
+ * @param state Medium state.
+ */
+CAHUTE_LOCAL(void)
+close_medium(int type, union cahute_link_medium_state *state) {
+    switch (type) {
+#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
+    case CAHUTE_LINK_MEDIUM_POSIX_SERIAL:
+        close(state->posix.fd);
+        break;
+#endif
+
+#if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG) \
+    || defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
+# if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
+    case CAHUTE_LINK_MEDIUM_WIN32_CESG:
+# endif
+# if defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
+    case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
+# endif
+        CancelIo(state->windows.handle);
+        CloseHandle(state->windows.overlapped.hEvent);
+        CloseHandle(state->windows.handle);
+        break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_WIN32_UMS
+    case CAHUTE_LINK_MEDIUM_WIN32_UMS:
+        CloseHandle(state->windows.handle);
+        break;
+#endif
+
+#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
+    case CAHUTE_LINK_MEDIUM_LIBUSB:
+        libusb_close(state->libusb.handle);
+        if (state->libusb.context)
+            libusb_exit(state->libusb.context);
+
+        break;
+#endif
+    }
+}
+
+/**
+ * Create a link out of a medium type and state.
+ *
+ * @param linkp Pointer to the link to initialize.
  * @param flags Flags to initialize the link's protocol state with.
+ * @param medium_type Medium type.
+ * @param medium_state Medium state.
+ * @param medium_serial_flags Initial serial flags to set to the medium.
+ * @param medium_serial_speed Initial serial speed to set to the medium.
  * @param protocol Protocol to select.
  * @param casiolink_variant CASIOLINK variant to use, if the protocol is either
  *        automatic or CASIOLINK.
  * @return Cahute error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_LOCAL(int)
-init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
+open_link_from_medium(
+    cahute_link **linkp,
+    unsigned long flags,
+    int medium_type,
+    union cahute_link_medium_state *medium_state,
+    unsigned long medium_serial_flags,
+    unsigned long medium_serial_speed,
+    int protocol,
+    int casiolink_variant
+) {
+    cahute_link *link = NULL;
     struct cahute_casiolink_state *casiolink_state;
     struct cahute_seven_state *seven_state;
     struct cahute_seven_ohp_state *seven_ohp_state;
-    int err, protocol = link->protocol;
+    int err = CAHUTE_ERROR_UNKNOWN;
+
+    if (!medium_type) {
+        msg(ll_error, "Undefined medium type, this is a bug!");
+        goto fail;
+    }
+
+    link = malloc(
+        sizeof(cahute_link) + 32 + CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE
+        + DEFAULT_DATA_BUFFER_SIZE
+    );
+    if (!link) {
+        err = CAHUTE_ERROR_ALLOC;
+        goto fail;
+    }
+
+    /* Initialize medium properties. */
+    link->medium.type = medium_type;
+    link->medium.flags = 0;
+    memcpy(
+        &link->medium.state,
+        medium_state,
+        sizeof(union cahute_link_medium_state)
+    );
+    link->medium.serial_flags = 0;
+    link->medium.serial_speed = 0;
+    link->medium.read_start = 0;
+    link->medium.read_size = 0;
+    link->medium.read_buffer = (cahute_u8 *)link + sizeof(cahute_link);
+
+    /* Ensure that the data buffer is aligned to 8 bytes, for sensitive
+     * mediums such as Win32 SCSI devices. */
+    link->medium.read_buffer +=
+        (~(uintptr_t)link->medium.read_buffer & 31) + 1;
+
+    /* Initialize other link properties. */
+    link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
+    link->data_buffer =
+        link->medium.read_buffer + CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
+    link->data_buffer_size = 0;
+    link->data_buffer_capacity = DEFAULT_DATA_BUFFER_SIZE;
+    link->cached_device_info = NULL;
+
+    /* If using a serial protocol, we want to set the serial flags and speed
+     * first. */
+    switch (protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_AUTO:
+    case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
+    case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
+        err = cahute_set_serial_params_to_link_medium(
+            &link->medium,
+            medium_serial_flags,
+            medium_serial_speed
+        );
+        if (err)
+            goto fail;
+    }
 
     if (~flags & PROTOCOL_FLAG_NOTERM)
         link->flags |= CAHUTE_LINK_FLAG_TERMINATE;
@@ -311,18 +428,19 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
             err = determine_protocol_as_sender(link, &protocol);
 
         if (err)
-            return err;
+            goto fail;
 
         /* The protocol has been found using automatic discovery, by tweaking
          * the check handshake! It should not be re-done. */
-        link->protocol = protocol;
         flags |= PROTOCOL_FLAG_NOCHECK;
     }
+
+    link->protocol = protocol;
 
     msg(ll_info,
         "Using %s over %s.",
         get_protocol_name(protocol),
-        get_medium_name(link->medium));
+        get_medium_name(link->medium.type));
     msg(ll_info,
         "Playing the role of %s.",
         flags & PROTOCOL_FLAG_RECEIVER ? "receiver / passive side"
@@ -339,7 +457,7 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
                 ", got %" CAHUTE_PRIuSIZE ".",
                 CASIOLINK_MINIMUM_BUFFER_SIZE,
                 link->data_buffer_capacity);
-            return CAHUTE_ERROR_UNKNOWN;
+            goto fail;
         }
 
         casiolink_state->flags = 0;
@@ -348,7 +466,7 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
         if (~flags & PROTOCOL_FLAG_NOCHECK) {
             err = cahute_casiolink_initiate(link);
             if (err)
-                return err;
+                goto fail;
         }
         break;
 
@@ -364,14 +482,14 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
         if (~flags & PROTOCOL_FLAG_NOCHECK) {
             err = cahute_seven_initiate(link);
             if (err)
-                return err;
+                goto fail;
         }
 
         if (~flags & PROTOCOL_FLAG_RECEIVER
             && (~flags & PROTOCOL_FLAG_NODISC)) {
             err = cahute_seven_discover(link);
             if (err)
-                return err;
+                goto fail;
         }
 
         break;
@@ -393,7 +511,15 @@ init_link(cahute_link *link, unsigned long flags, int casiolink_variant) {
         CAHUTE_RETURN_IMPL("No initialization routine for the protocol.");
     }
 
+    *linkp = link;
     return CAHUTE_OK;
+
+fail:
+    if (link)
+        free(link);
+
+    close_medium(medium_type, medium_state);
+    return err;
 }
 
 #if WIN32_ENABLED && LIBUSB_ENABLED
@@ -975,11 +1101,11 @@ cahute_open_serial_link(
     char const *name_or_path,
     unsigned long speed
 ) {
-    cahute_link *link = NULL;
-    unsigned long protocol_flags = 0;
+    union cahute_link_medium_state medium_state;
+    unsigned long open_flags = 0;
     unsigned long unsupported_flags;
-    int protocol, casiolink_variant = CAHUTE_CASIOLINK_VARIANT_AUTO,
-                  err = CAHUTE_OK;
+    int medium_type, protocol;
+    int casiolink_variant = CAHUTE_CASIOLINK_VARIANT_AUTO;
 
     unsupported_flags =
         flags
@@ -1154,7 +1280,7 @@ cahute_open_serial_link(
     int fd;
 
     fd = open(name_or_path, O_NOCTTY | O_RDWR);
-    if (fd < 0)
+    if (fd < 0) {
         switch (errno) {
         case ENODEV:
         case ENOENT:
@@ -1171,6 +1297,10 @@ cahute_open_serial_link(
             msg(ll_error, "Unknown error: %s (%d)", strerror(errno), errno);
             return CAHUTE_ERROR_UNKNOWN;
         }
+    }
+
+    medium_type = CAHUTE_LINK_MEDIUM_POSIX_SERIAL;
+    medium_state.posix.fd = fd;
 #elif defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
     HANDLE handle = INVALID_HANDLE_VALUE;
     HANDLE overlapped_event_handle = INVALID_HANDLE_VALUE;
@@ -1231,94 +1361,39 @@ cahute_open_serial_link(
         CloseHandle(handle);
         return CAHUTE_ERROR_UNKNOWN;
     }
+
+    medium_type = CAHUTE_LINK_MEDIUM_WIN32_SERIAL;
+    medium_state.windows.handle = handle;
+
+    SecureZeroMemory(&medium_state.windows.overlapped, sizeof(OVERLAPPED));
+
+    medium_state.windows.overlapped.hEvent = overlapped_event_handle;
 #else
     CAHUTE_RETURN_IMPL("No serial device opening method available.");
 #endif
 
-    link = malloc(
-        sizeof(cahute_link) + 32 + CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE
-        + DEFAULT_DATA_BUFFER_SIZE
-    );
-    if (!link)
-        err = CAHUTE_ERROR_ALLOC;
+    if (flags & CAHUTE_SERIAL_NOCHECK)
+        open_flags |= PROTOCOL_FLAG_NOCHECK;
+    if (flags & CAHUTE_SERIAL_NODISC)
+        open_flags |= PROTOCOL_FLAG_NODISC;
+    if (flags & CAHUTE_SERIAL_NOTERM)
+        open_flags |= PROTOCOL_FLAG_NOTERM;
+    if (flags & CAHUTE_SERIAL_RECEIVER)
+        open_flags |= PROTOCOL_FLAG_RECEIVER;
 
-#if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
-    if (err) {
-        close(fd);
-        return err;
-    }
-
-    link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
-    link->medium = CAHUTE_LINK_MEDIUM_POSIX_SERIAL;
-    link->medium_state.posix.fd = fd;
-#elif defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
-    if (err) {
-        CloseHandle(handle);
-        return err;
-    }
-
-    link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
-    link->medium = CAHUTE_LINK_MEDIUM_WIN32_SERIAL;
-    link->medium_state.windows.handle = handle;
-
-    SecureZeroMemory(
-        &link->medium_state.windows.overlapped,
-        sizeof(OVERLAPPED)
-    );
-    link->medium_state.windows.overlapped.hEvent = overlapped_event_handle;
-#endif
-
-    link->serial_flags = 0;
-    link->serial_speed = 0;
-    link->protocol = protocol;
-    link->medium_read_start = 0;
-    link->medium_read_size = 0;
-    link->medium_read_buffer = (cahute_u8 *)link + sizeof(cahute_link);
-
-    /* Ensure that the data buffer is aligned correctly, for sensitive
-     * mediums such as Win32 SCSI devices. */
-    link->medium_read_buffer +=
-        (~(uintptr_t)link->medium_read_buffer & 31) + 1;
-
-    link->data_buffer =
-        link->medium_read_buffer + CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
-    link->data_buffer_size = 0;
-    link->data_buffer_capacity = DEFAULT_DATA_BUFFER_SIZE;
-    link->cached_device_info = NULL;
-
-    /* The link is now considered opened, with protocol uninitialized.
-     * We want to set the serial parameters to the medium now. */
-    err = cahute_set_serial_params_to_link(
-        link,
+    return open_link_from_medium(
+        linkp,
+        open_flags,
+        medium_type,
+        &medium_state,
         flags
             & (CAHUTE_SERIAL_STOP_MASK | CAHUTE_SERIAL_PARITY_MASK
                | CAHUTE_SERIAL_XONXOFF_MASK | CAHUTE_SERIAL_DTR_MASK
                | CAHUTE_SERIAL_RTS_MASK),
-        speed
+        speed,
+        protocol,
+        casiolink_variant
     );
-    if (err) {
-        cahute_close_link(link);
-        return err;
-    }
-
-    /* Now let's initialize the protocol. */
-    if (flags & CAHUTE_SERIAL_NOCHECK)
-        protocol_flags |= PROTOCOL_FLAG_NOCHECK;
-    if (flags & CAHUTE_SERIAL_NODISC)
-        protocol_flags |= PROTOCOL_FLAG_NODISC;
-    if (flags & CAHUTE_SERIAL_NOTERM)
-        protocol_flags |= PROTOCOL_FLAG_NOTERM;
-    if (flags & CAHUTE_SERIAL_RECEIVER)
-        protocol_flags |= PROTOCOL_FLAG_RECEIVER;
-
-    err = init_link(link, protocol_flags, casiolink_variant);
-    if (err) {
-        cahute_close_link(link);
-        return err;
-    }
-
-    *linkp = link;
-    return CAHUTE_OK;
 }
 
 /**
@@ -1343,16 +1418,14 @@ cahute_open_usb_link(
     libusb_device **device_list = NULL;
     struct libusb_config_descriptor *config_descriptor = NULL;
     libusb_device_handle *device_handle = NULL;
-    cahute_link *link = NULL;
+    union cahute_link_medium_state medium_state;
     int device_count, i, libusberr, bulk_in = -1, bulk_out = -1;
-    int libusb_medium = CAHUTE_LINK_MEDIUM_LIBUSB;
-    int protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
-    unsigned long protocol_flags = 0;
+    int medium_type = 0, protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
+    unsigned long open_flags = 0;
     int err = CAHUTE_ERROR_UNKNOWN;
 
 # if WIN32_ENABLED
-    HANDLE ums_handle = INVALID_HANDLE_VALUE;
-    HANDLE cesg_handle = INVALID_HANDLE_VALUE;
+    HANDLE win_handle = INVALID_HANDLE_VALUE;
     HANDLE overlapped_event_handle = INVALID_HANDLE_VALUE;
 # endif
 
@@ -1362,7 +1435,7 @@ cahute_open_usb_link(
             CAHUTE_RETURN_IMPL("Sender mode not available for screenstreaming."
             );
 
-        protocol_flags |= PROTOCOL_FLAG_RECEIVER;
+        open_flags |= PROTOCOL_FLAG_RECEIVER;
     } else if (flags & CAHUTE_USB_RECEIVER)
         CAHUTE_RETURN_IMPL("Receiver mode not available for data protocols.");
 
@@ -1401,10 +1474,11 @@ cahute_open_usb_link(
          *
          * - If it's 8 (Mass Storage), then we are facing an SCSI device.
          * - If it's 255 (Vendor-Specific), then we are facing a P7 device. */
-        if (libusb_get_active_config_descriptor(
-                device_list[i],
-                &config_descriptor
-            ))
+        libusberr = libusb_get_active_config_descriptor(
+            device_list[i],
+            &config_descriptor
+        );
+        if (libusberr)
             goto fail;
 
         if (config_descriptor->bNumInterfaces != 1
@@ -1415,9 +1489,9 @@ cahute_open_usb_link(
         interface_class = interface_descriptor->bInterfaceClass;
 
         if (interface_class == 8)
-            libusb_medium = CAHUTE_LINK_MEDIUM_LIBUSB_UMS;
+            medium_type = CAHUTE_LINK_MEDIUM_LIBUSB_UMS;
         else if (interface_class == 255)
-            libusb_medium = CAHUTE_LINK_MEDIUM_LIBUSB;
+            medium_type = CAHUTE_LINK_MEDIUM_LIBUSB;
         else {
             msg(ll_error, "Unsupported interface class %d", interface_class);
             goto fail;
@@ -1425,7 +1499,7 @@ cahute_open_usb_link(
 
         if (flags & CAHUTE_USB_OHP)
             protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
-        else if (libusb_medium == CAHUTE_LINK_MEDIUM_LIBUSB_UMS)
+        else if (medium_type == CAHUTE_LINK_MEDIUM_LIBUSB_UMS)
             protocol = CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE;
 
         /* Find bulk in and out endpoints.
@@ -1459,6 +1533,7 @@ cahute_open_usb_link(
         }
 
         libusberr = libusb_open(device_list[i], &device_handle);
+
         switch (libusberr) {
         case 0:
             break;
@@ -1471,21 +1546,28 @@ cahute_open_usb_link(
 # if WIN32_ENABLED
         {
             char device_interface[300];
-            int win32_medium;
+            int usb_device_number = libusb_get_port_number(device_list[i]);
 
+            libusb_free_device_list(device_list, 1);
+            device_list = NULL;
+
+            /* NOTE: This function sets "medium_type" to either
+             * CAHUTE_LINK_MEDIUM_WIN32_UMS or CAHUTE_LINK_MEDIUM_WIN32_CESG */
             err = find_win32_usb_device(
                 device_interface,
                 sizeof(device_interface),
-                &win32_medium,
-                libusb_get_port_number(device_list[i])
+                &medium_type,
+                usb_device_number
             );
 
-            if (!err)
-                switch (win32_medium) {
+            if (!err) {
+                err = CAHUTE_ERROR_UNKNOWN;
+
+                switch (medium_type) {
                 case CAHUTE_LINK_MEDIUM_WIN32_UMS:
                     /* The device is a volume on which we should make
                      * synchronous SCSI requests using DeviceIoControl(). */
-                    ums_handle = CreateFileA(
+                    win_handle = CreateFileA(
                         device_interface,
                         GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -1495,7 +1577,7 @@ cahute_open_usb_link(
                         NULL
                     );
 
-                    if (ums_handle == INVALID_HANDLE_VALUE) {
+                    if (win_handle == INVALID_HANDLE_VALUE) {
                         DWORD werr = GetLastError();
 
                         if (werr == ERROR_ACCESS_DENIED)
@@ -1506,11 +1588,12 @@ cahute_open_usb_link(
                         goto fail;
                     }
 
+                    medium_state.windows_ums.handle = win_handle;
                     goto ready;
 
                 case CAHUTE_LINK_MEDIUM_WIN32_CESG:
                     /* The device is a USB device opened using CESG502. */
-                    cesg_handle = CreateFileA(
+                    win_handle = CreateFileA(
                         device_interface,
                         GENERIC_READ | GENERIC_WRITE,
                         0,
@@ -1520,7 +1603,7 @@ cahute_open_usb_link(
                         NULL
                     );
 
-                    if (cesg_handle == INVALID_HANDLE_VALUE) {
+                    if (win_handle == INVALID_HANDLE_VALUE) {
                         DWORD werr = GetLastError();
 
                         if (werr == ERROR_ACCESS_DENIED)
@@ -1539,16 +1622,24 @@ cahute_open_usb_link(
                         goto fail;
                     }
 
+                    SecureZeroMemory(
+                        &medium_state.windows.overlapped,
+                        sizeof(OVERLAPPED)
+                    );
+
+                    medium_state.windows.handle = win_handle;
+                    medium_state.windows.overlapped.hEvent =
+                        overlapped_event_handle;
                     goto ready;
                 }
+            }
+
+            /* If we cannot open a link to the device using the Windows API,
+             * we actually log the libusb error rather than the Windows API
+             * error. */
         }
 # endif
-
-            msg(ll_error,
-                "libusb_open returned %d: %s",
-                libusberr,
-                libusb_error_name(libusberr));
-            goto fail;
+            /* FALLTHRU */
 
         default:
             msg(ll_error,
@@ -1560,6 +1651,10 @@ cahute_open_usb_link(
 
         break;
     }
+
+    /* We can arrive here with or without a device handle.
+     * The device list could have been empty, or at least one case could
+     * have been encountered, but not matched. */
 
     err = CAHUTE_ERROR_UNKNOWN;
     libusb_free_device_list(device_list, 1);
@@ -1663,110 +1758,43 @@ cahute_open_usb_link(
         }
     }
 
-    goto ready;
-
-ready:
-    /* Allocate the link.
-     * The 8 additional bytes are there for alignment purposes. */
-    link = malloc(
-        sizeof(cahute_link) + 32 + CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE
-        + DEFAULT_DATA_BUFFER_SIZE
-    );
-    if (!link) {
-        err = CAHUTE_ERROR_ALLOC;
-        goto fail;
-    }
-
-# if WIN32_ENABLED
-    if (ums_handle != INVALID_HANDLE_VALUE) {
-        link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
-        link->medium = CAHUTE_LINK_MEDIUM_WIN32_UMS;
-        link->medium_state.windows_ums.handle = ums_handle;
-
-        /* The link takes control of the handle. */
-        ums_handle = INVALID_HANDLE_VALUE;
-        goto prepared;
-    }
-
-    if (cesg_handle != INVALID_HANDLE_VALUE) {
-        link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
-        link->medium = CAHUTE_LINK_MEDIUM_WIN32_CESG;
-        link->medium_state.windows.handle = cesg_handle;
-
-        SecureZeroMemory(
-            &link->medium_state.windows.overlapped,
-            sizeof(OVERLAPPED)
-        );
-        link->medium_state.windows.overlapped.hEvent = overlapped_event_handle;
-
-        /* The link takes control of the handle. */
-        cesg_handle = INVALID_HANDLE_VALUE;
-        overlapped_event_handle = INVALID_HANDLE_VALUE;
-        goto prepared;
-    }
-# endif
-
-    link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;
-    link->medium = libusb_medium;
-    link->medium_state.libusb.context = context;
-    link->medium_state.libusb.handle = device_handle;
-    link->medium_state.libusb.bulk_in = bulk_in;
-    link->medium_state.libusb.bulk_out = bulk_out;
-
-    /* Since the link now takes control over the context and device handle,
-     * in case of failure, we must not free them here. */
-    context = NULL;
-    device_handle = NULL;
+    medium_state.libusb.context = context;
+    medium_state.libusb.handle = device_handle;
+    medium_state.libusb.bulk_in = bulk_in;
+    medium_state.libusb.bulk_out = bulk_out;
 
     msg(ll_info, "Bulk in endpoint address is: 0x%02X", bulk_in);
     msg(ll_info, "Bulk out endpoint address is: 0x%02X", bulk_out);
 
 # if WIN32_ENABLED
-prepared:
+ready:
 # endif
-    link->serial_flags = 0;
-    link->serial_speed = 0;
-    link->protocol = protocol;
-    link->medium_read_start = 0;
-    link->medium_read_size = 0;
-    link->medium_read_buffer = (cahute_u8 *)link + sizeof(cahute_link);
-
-    /* Ensure that the data buffer is aligned to 8 bytes, for sensitive
-     * mediums such as Win32 SCSI devices. */
-    link->medium_read_buffer +=
-        (~(uintptr_t)link->medium_read_buffer & 31) + 1;
-
-    link->data_buffer =
-        link->medium_read_buffer + CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
-    link->data_buffer_size = 0;
-    link->data_buffer_capacity = DEFAULT_DATA_BUFFER_SIZE;
-    link->cached_device_info = NULL;
-
     if (flags & CAHUTE_USB_NOCHECK)
-        protocol_flags |= PROTOCOL_FLAG_NOCHECK;
+        open_flags |= PROTOCOL_FLAG_NOCHECK;
     if (flags & CAHUTE_USB_NODISC)
-        protocol_flags |= PROTOCOL_FLAG_NODISC;
+        open_flags |= PROTOCOL_FLAG_NODISC;
     if (flags & CAHUTE_USB_NOTERM)
-        protocol_flags |= PROTOCOL_FLAG_NOTERM;
+        open_flags |= PROTOCOL_FLAG_NOTERM;
 
-    if ((err = init_link(link, protocol_flags, 0)))
-        goto fail;
-
-    *linkp = link;
-    return CAHUTE_OK;
+    return open_link_from_medium(
+        linkp,
+        open_flags,
+        medium_type,
+        &medium_state,
+        0, /* Serial flags -- unused. */
+        0, /* Serial speed -- unused. */
+        protocol,
+        0
+    );
 
 fail:
 # if WIN32_ENABLED
     if (overlapped_event_handle != INVALID_HANDLE_VALUE)
         CloseHandle(overlapped_event_handle);
-    if (cesg_handle != INVALID_HANDLE_VALUE)
-        CloseHandle(cesg_handle);
-    if (ums_handle != INVALID_HANDLE_VALUE)
-        CloseHandle(ums_handle);
+    if (win_handle != INVALID_HANDLE_VALUE)
+        CloseHandle(win_handle);
 # endif
 
-    if (link)
-        cahute_close_link(link);
     if (config_descriptor)
         libusb_free_config_descriptor(config_descriptor);
     if (device_list)
@@ -1906,10 +1934,11 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
         free(link->cached_device_info);
 
     if ((link->flags & CAHUTE_LINK_FLAG_TERMINATE)
+        && !(link->medium.flags & CAHUTE_LINK_MEDIUM_FLAG_GONE)
         && !(
             link->flags
             & (CAHUTE_LINK_FLAG_IRRECOVERABLE | CAHUTE_LINK_FLAG_TERMINATED
-               | CAHUTE_LINK_FLAG_GONE | CAHUTE_LINK_FLAG_RECEIVER)
+               | CAHUTE_LINK_FLAG_RECEIVER)
         )) {
         switch (link->protocol) {
         case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
@@ -1923,43 +1952,8 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
         }
     }
 
-    if (link->flags & CAHUTE_LINK_FLAG_CLOSE_MEDIUM) {
-        switch (link->medium) {
-#ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
-        case CAHUTE_LINK_MEDIUM_POSIX_SERIAL:
-            close(link->medium_state.posix.fd);
-            break;
-#endif
-
-#if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG) \
-    || defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
-# if defined(CAHUTE_LINK_MEDIUM_WIN32_CESG)
-        case CAHUTE_LINK_MEDIUM_WIN32_CESG:
-# endif
-# if defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
-        case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
-# endif
-            CancelIo(link->medium_state.windows.handle);
-            CloseHandle(link->medium_state.windows.overlapped.hEvent);
-            CloseHandle(link->medium_state.windows.handle);
-            break;
-#endif
-
-#ifdef CAHUTE_LINK_MEDIUM_WIN32_UMS
-        case CAHUTE_LINK_MEDIUM_WIN32_UMS:
-            CloseHandle(link->medium_state.windows.handle);
-            break;
-#endif
-
-#ifdef CAHUTE_LINK_MEDIUM_LIBUSB
-        case CAHUTE_LINK_MEDIUM_LIBUSB:
-            libusb_close(link->medium_state.libusb.handle);
-            if (link->medium_state.libusb.context)
-                libusb_exit(link->medium_state.libusb.context);
-            break;
-#endif
-        }
-    }
+    if (link->flags & CAHUTE_LINK_FLAG_CLOSE_MEDIUM)
+        close_medium(link->medium.type, &link->medium.state);
 
     free(link);
 }

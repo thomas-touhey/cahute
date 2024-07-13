@@ -175,6 +175,17 @@ Link management related function declarations
 
         In case of error, the value of ``*linkp`` mustn't be used nor freed.
 
+    The format of the device name or path will vary depending on the platform:
+
+    * On Microsoft Windows, it will either be the DOS COM device name (e.g.
+      ``COM3``) or the path to the device.
+    * On other POSIX-compatible platforms, it will be the path to the device,
+      usually ``/dev/cu*`` or ``/dev/tty*`` (e.g. ``/dev/ttyUSB0`` for a
+      serial link over a USB-serial cable);
+
+    Available device names can be probed using :c:func:`cahute_detect_serial`,
+    although the list may be incomplete and other devices may be used.
+
     Since serial links do not offer any metadata, the protocol to use on the
     serial link is selected manually, amongst the following:
 
