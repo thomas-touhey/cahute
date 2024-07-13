@@ -29,6 +29,7 @@
 #include "xfer9860.h"
 #include <stdlib.h>
 #include <string.h>
+#include "common.h"
 #include "options.h"
 
 static char const about_message[] =
@@ -213,7 +214,7 @@ process_params:
     }
 
     if (args->distant_target_name
-        && strnlen(args->distant_target_name, 13) > 12) {
+        && portable_strnlen(args->distant_target_name, 13) > 12) {
         fprintf(
             stderr,
             "The destination filename is too long: %s\n"
@@ -224,7 +225,7 @@ process_params:
     }
 
     if (args->distant_source_name
-        && strnlen(args->distant_source_name, 13) > 12) {
+        && portable_strnlen(args->distant_source_name, 13) > 12) {
         fprintf(
             stderr,
             "The source filename is too long: %s\n"

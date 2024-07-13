@@ -47,4 +47,7 @@ read_file_contents(char const *path, cahute_u8 **datap, size_t *sizep);
 extern cahute_ssize
 portable_getdelim(char **sp, size_t *np, int delim, FILE *filep);
 
+/* Portable strnlen() implementation. */
+extern size_t portable_strnlen(char const *s, size_t maxlen);
+
 #endif /* COMMON_H */

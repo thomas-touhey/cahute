@@ -337,7 +337,7 @@ static inline int check_directory_name(char const *name) {
     if (!name)
         return 1;
 
-    n = strnlen(name, 9);
+    n = portable_strnlen(name, 9);
     if (!n || n > 8)
         return 0;
 
@@ -361,7 +361,7 @@ static inline int check_file_name(char const *name) {
     if (!name)
         return 1;
 
-    n = strnlen(name, 13);
+    n = portable_strnlen(name, 13);
     if (!n || n > 12)
         return 0;
 

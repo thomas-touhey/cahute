@@ -59,6 +59,10 @@ cahute_mcs_decode_data(
     int data_type
 ) {
     if (data_type == DATA_TYPE_PROGRAM) {
+        cahute_u8 const *name_end;
+
+        name_end = memchr(content, 0, 8);
+
         /* We have a program. */
         if (content_size < 10) {
             msg(ll_error, "Expected at least 10 bytes!");
@@ -71,7 +75,7 @@ cahute_mcs_decode_data(
             name,
             name_size,
             content,
-            strnlen((char const *)content, 8),
+            name_end ? name_end - name : 8,
             &content[10],
             content_size - 10
         );

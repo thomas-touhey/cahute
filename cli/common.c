@@ -281,3 +281,15 @@ portable_getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
     *cur_pos = '\0';
     return (cahute_ssize)(cur_pos - *lineptr);
 }
+
+/**
+ * Get a string length within bounds.
+ *
+ * @param s String length.
+ * @param maxlen Maximum length.
+ */
+size_t portable_strnlen(char const *s, size_t maxlen) {
+    char const *z = memchr(s, 0, maxlen);
+
+    return z ? (size_t)(z - s) : maxlen;
+}
