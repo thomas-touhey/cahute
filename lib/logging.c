@@ -58,6 +58,7 @@ cahute_log_to_file(
     char levelbuf[20];
     char const *level_name;
 
+    (void)cookie;
     switch (level) {
     case CAHUTE_LOGLEVEL_INFO:
         level_name = "info";
@@ -266,7 +267,7 @@ cahute_log_memory(
                     break;
 
                 if (isprint(*p))
-                    *s++ = *p;
+                    *s++ = (char)*p;
                 else
                     *s++ = '.';
             }

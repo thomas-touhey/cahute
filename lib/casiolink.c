@@ -64,7 +64,7 @@ default_mdl1_payload =
  * @param size Size of the buffer to read from.
  * @return Computed checksum.
  */
-CAHUTE_INLINE(int)
+CAHUTE_INLINE(cahute_u8)
 cahute_casiolink_checksum(cahute_u8 const *data, size_t size) {
     int checksum = 0;
 
@@ -384,19 +384,19 @@ restart_reception:
             is_end = 1;
         } else if (!memcmp(&buf[1], "A1", 2)) {
             /* CAS40 Dynamic Graph */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]);
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
             if (part_sizes[0] > 2)
                 part_sizes[0] -= 2;
 
             is_final = 1;
         } else if (!memcmp(&buf[1], "AA", 2)) {
             /* CAS40 Dynamic Graph in Bulk */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]);
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
             if (part_sizes[0] > 2)
                 part_sizes[0] -= 2;
         } else if (!memcmp(&buf[1], "AD", 2)) {
             /* CAS40 All Memories */
-            part_repeat = (buf[5] << 8) | buf[6];
+            part_repeat = ((size_t)buf[5] << 8) | buf[6];
             part_sizes[0] = 22;
             is_final = 1;
         } else if (!memcmp(&buf[1], "AL", 2)) {
@@ -405,7 +405,7 @@ restart_reception:
             link->flags |= CAHUTE_LINK_FLAG_ALMODE;
         } else if (!memcmp(&buf[1], "AM", 2)) {
             /* CAS40 Variable Memories */
-            part_repeat = (buf[5] << 8) | buf[6];
+            part_repeat = ((size_t)buf[5] << 8) | buf[6];
             part_sizes[0] = 22;
             is_final = 1;
         } else if (!memcmp(&buf[1], "BU", 2)) {
@@ -418,7 +418,7 @@ restart_reception:
             is_final = 1;
         } else if (!memcmp(&buf[1], "DC", 2)) {
             /* CAS40 Color Screenshot. */
-            int width = buf[3], height = buf[4];
+            unsigned int width = buf[3], height = buf[4];
 
             if (!memcmp(&buf[5], "\x11UWF\x03", 4)) {
                 part_repeat = 3;
@@ -429,7 +429,7 @@ restart_reception:
             is_final = 1;
         } else if (!memcmp(&buf[1], "DD", 2)) {
             /* CAS40 Monochrome Screenshot. */
-            int width = buf[3], height = buf[4];
+            unsigned int width = buf[3], height = buf[4];
 
             if (!memcmp(&buf[5], "\x10\x44WF", 4))
                 part_sizes[0] = ((width >> 3) + !!(width & 7)) * height;
@@ -438,38 +438,58 @@ restart_reception:
             is_final = 1;
         } else if (!memcmp(&buf[1], "DM", 2)) {
             /* CAS40 Defined Memories */
-            part_repeat = (buf[5] << 8) | buf[6];
+            part_repeat = ((size_t)buf[5] << 8) | buf[6];
             part_sizes[0] = 22;
             is_final = 1;
         } else if (!memcmp(&buf[1], "EN", 2)) {
             /* CAS40 Single Editor Program */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
+
             is_final = 1;
         } else if (!memcmp(&buf[1], "EP", 2)) {
             /* CAS40 Single Password Protected Editor Program */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
             is_final = 1;
         } else if (!memcmp(&buf[1], "F1", 2)) {
             /* CAS40 Single Function */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
+
             is_final = 1;
         } else if (!memcmp(&buf[1], "F6", 2)) {
             /* CAS40 Multiple Functions */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
+
             is_final = 1;
         } else if (!memcmp(&buf[1], "FN", 2)) {
             /* CAS40 Single Editor Program in Bulk */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
         } else if (!memcmp(&buf[1], "FP", 2)) {
             /* CAS40 Single Password Protected Editor Program in Bulk */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
         } else if (!memcmp(&buf[1], "G1", 2)) {
             /* CAS40 Graph Function */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
+
             is_final = 1;
         } else if (!memcmp(&buf[1], "GA", 2)) {
             /* CAS40 Graph Function in Bulk */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
         } else if (!memcmp(&buf[1], "GF", 2)) {
             /* CAS40 Factor */
             part_sizes[0] = 2 + buf[6] * 10;
@@ -481,27 +501,33 @@ restart_reception:
         } else if (!memcmp(&buf[1], "GT", 2)) {
             /* CAS40 Function Table */
             part_count = 3;
-            part_repeat = (buf[7] << 8) | buf[8];
-            part_sizes[0] = buf[6] - 2;
+            part_repeat = ((size_t)buf[7] << 8) | buf[8];
+            part_sizes[0] = buf[6];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
+
             part_sizes[1] = 32;
             part_sizes[2] = 22;
             is_final = 1;
         } else if (!memcmp(&buf[1], "M1", 2)) {
             /* CAS40 Single Matrix */
-            int width = buf[5], height = buf[6];
+            unsigned int width = buf[5], height = buf[6];
 
             part_sizes[0] = 14;
             part_repeat = width * height + 1; /* Sentinel data part. */
             is_final = 1;
         } else if (!memcmp(&buf[1], "MA", 2)) {
             /* CAS40 Single Matrix in Bulk */
-            int width = buf[5], height = buf[6];
+            unsigned int width = buf[5], height = buf[6];
 
             part_sizes[0] = 14;
             part_repeat = width * height;
         } else if (!memcmp(&buf[1], "P1", 2)) {
             /* CAS40 Single Numbered Program. */
-            part_sizes[0] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
+
             is_final = 1;
         } else if (!memcmp(&buf[1], "PD", 2)) {
             /* CAS40 Polynomial Equation */
@@ -511,13 +537,19 @@ restart_reception:
             /* CAS40 Multiple Numbered Programs */
             part_count = 2;
             part_sizes[0] = 190;
-            part_sizes[1] = ((buf[4] << 8) | buf[5]) - 2;
+            part_sizes[1] = ((size_t)buf[4] << 8) | buf[5];
+            if (part_sizes[1] >= 2)
+                part_sizes[1] -= 2;
+
             is_final = 1;
         } else if (!memcmp(&buf[1], "RT", 2)) {
             /* CAS40 Recursion Table */
             part_count = 3;
-            part_repeat = (buf[7] << 8) | buf[8];
-            part_sizes[0] = buf[6] - 2;
+            part_repeat = ((size_t)buf[7] << 8) | buf[8];
+            part_sizes[0] = buf[6];
+            if (part_sizes[0] >= 2)
+                part_sizes[0] -= 2;
+
             part_sizes[1] = 22;
             part_sizes[2] = 32;
             is_final = 1;
@@ -528,12 +560,12 @@ restart_reception:
             is_final = 1;
         } else if (!memcmp(&buf[1], "SR", 2)) {
             /* CAS40 Paired Variable Data */
-            part_repeat = (buf[5] << 8) | buf[6];
+            part_repeat = ((size_t)buf[5] << 8) | buf[6];
             part_sizes[0] = 32;
             is_final = 1;
         } else if (!memcmp(&buf[1], "SS", 2)) {
             /* CAS40 Single Variable Data */
-            part_repeat = (buf[5] << 8) | buf[6];
+            part_repeat = ((size_t)buf[5] << 8) | buf[6];
             part_sizes[0] = 22;
             is_final = 1;
         }
@@ -546,8 +578,8 @@ restart_reception:
             part_count = 0;
             is_end = 1;
         } else if (!memcmp(&buf[1], "VAL", 4)) {
-            int height = (buf[7] << 8) | buf[8];
-            int width = (buf[9] << 8) | buf[10];
+            unsigned int height = ((unsigned int)buf[7] << 8) | buf[8];
+            unsigned int width = ((unsigned int)buf[9] << 8) | buf[10];
 
             /* Variable data use size as W*H, or only W, or only H depending
              * on the case. */
@@ -559,8 +591,9 @@ restart_reception:
         } else {
             /* For other packets, the size should always be located at
              * offset 6 of the header, i.e. offset 7 of the buffer. */
-            part_sizes[0] =
-                ((buf[7] << 24) | (buf[8] << 16) | (buf[9] << 8) | buf[10]);
+            part_sizes[0] = ((size_t)buf[7] << 24) | ((size_t)buf[8] << 16)
+                            | ((size_t)buf[9] << 8) | buf[10];
+
             if (part_sizes[0] > 2)
                 part_sizes[0] -= 2;
             else
@@ -577,15 +610,15 @@ restart_reception:
     case CAHUTE_CASIOLINK_VARIANT_CAS100:
         if (!memcmp(&buf[1], "BKU1", 4)) {
             /* Backup packet for CAS100. */
-            part_sizes[0] =
-                (buf[9] << 24) | (buf[10] << 16) | (buf[11] << 8) | buf[12];
+            part_sizes[0] = ((size_t)buf[9] << 24) | ((size_t)buf[10] << 16)
+                            | ((size_t)buf[11] << 8) | buf[12];
         } else if (!memcmp(&buf[1], "END1", 4)) {
             /* End packet for CAS100. */
             part_count = 0;
             is_end = 1;
         } else if (!memcmp(&buf[1], "MCS1", 4)) {
             /* Main memory packet for CAS100. */
-            part_sizes[0] = (buf[8] << 8) | buf[9];
+            part_sizes[0] = ((size_t)buf[8] << 8) | buf[9];
             if (!part_sizes[0])
                 part_count = 0;
         } else if (!memcmp(&buf[1], "MDL1", 4)) {
@@ -602,6 +635,10 @@ restart_reception:
         }
 
         break;
+
+    default:
+        msg(ll_error, "Unhandled variant 0x%08X.", variant);
+        return CAHUTE_ERROR_UNKNOWN;
     }
 
     if (part_count && !part_sizes[0]) {
@@ -1031,20 +1068,20 @@ CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
         return CAHUTE_OK;
 
     buf_size = 40;
-    memset(buf, '\xFF', 50);
+    memset(buf, 0xFF, 50);
     buf[0] = ':';
 
     switch (link->protocol_state.casiolink.variant) {
     case CAHUTE_CASIOLINK_VARIANT_CAS40:
-        buf[1] = '\x17';
-        buf[2] = '\xFF';
+        buf[1] = 0x17;
+        buf[2] = 0xFF;
         break;
 
     case CAHUTE_CASIOLINK_VARIANT_CAS50:
         buf[1] = 'E';
         buf[2] = 'N';
         buf[3] = 'D';
-        buf[4] = '\xFF';
+        buf[4] = 0xFF;
 
         buf_size = 50;
         break;
@@ -1055,6 +1092,12 @@ CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
         buf[3] = 'D';
         buf[4] = '1';
         break;
+
+    default:
+        msg(ll_error,
+            "Unhandled variant 0x%08X.",
+            link->protocol_state.casiolink.variant);
+        return CAHUTE_ERROR_UNKNOWN;
     }
 
     buf[buf_size - 1] = cahute_casiolink_checksum(&buf[1], buf_size - 2);
@@ -1117,7 +1160,7 @@ cahute_casiolink_receive_data(
 
                 *datap = data;
                 for (i = 1; i < 39; i++) {
-                    size_t program_length = (buf[1] << 8) | buf[2];
+                    size_t program_length = ((size_t)buf[1] << 8) | buf[2];
 
                     err = cahute_create_program(
                         datap,
@@ -1147,8 +1190,9 @@ cahute_casiolink_receive_data(
 
         case CAHUTE_CASIOLINK_VARIANT_CAS50:
             if (!memcmp(&buf[1], "TXT", 4)) {
-                size_t data_size =
-                    (buf[7] << 24) | (buf[8] << 16) | (buf[9] << 8) | buf[10];
+                size_t data_size = ((size_t)buf[7] << 24)
+                                   | ((size_t)buf[8] << 16)
+                                   | ((size_t)buf[9] << 8) | buf[10];
                 size_t name_size = 8;
                 size_t pw_size = 8;
 
@@ -1204,6 +1248,12 @@ cahute_casiolink_receive_data(
             }
             /* TODO */
             break;
+
+        default:
+            msg(ll_error,
+                "Unhandled variant 0x%08X.",
+                link->protocol_state.casiolink.last_variant);
+            return CAHUTE_ERROR_UNKNOWN;
         }
 
         /* If the data was final, we still need to break here. */
@@ -1344,11 +1394,13 @@ cahute_casiolink_make_device_info(
     info->cahute_device_info_rom_version = "";
 
     info->cahute_device_info_flash_rom_capacity =
-        (raw_info[20] << 24) | (raw_info[19] << 16) | (raw_info[18] << 8)
-        | raw_info[17];
+        ((unsigned long)raw_info[20] << 24)
+        | ((unsigned long)raw_info[19] << 16)
+        | ((unsigned long)raw_info[18] << 8) | raw_info[17];
     info->cahute_device_info_ram_capacity =
-        (raw_info[24] << 24) | (raw_info[23] << 16) | (raw_info[22] << 8)
-        | raw_info[21];
+        ((unsigned long)raw_info[24] << 24)
+        | ((unsigned long)raw_info[23] << 16)
+        | ((unsigned long)raw_info[22] << 8) | raw_info[21];
 
     info->cahute_device_info_bootcode_version = "";
     info->cahute_device_info_bootcode_offset = 0;

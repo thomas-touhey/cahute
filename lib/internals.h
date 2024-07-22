@@ -82,11 +82,7 @@ cahute_log_memory(
     size_t cahute__size
 );
 
-#if defined(__cplusplus) \
-    ? CAHUTE_GNUC_PREREQ(2, 6) \
-    : !defined(__STRICT_ANSI__) && CAHUTE_GNUC_PREREQ(2, 4)
-# define CAHUTE_LOGFUNC __PRETTY_FUNCTION__
-#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
 # define CAHUTE_LOGFUNC __func__
 #elif !defined(__STRICT_ANSI__) && CAHUTE_GNUC_PREREQ(2, 0)
 # define CAHUTE_LOGFUNC __FUNCTION__
@@ -110,7 +106,8 @@ cahute_log_memory(
     { \
         msg(ll_error, MESSAGE); \
         return CAHUTE_ERROR_IMPL /* Comment to prevent match by hook. */; \
-    }
+    } \
+    (void)0 /* Force introducing a semicolon. */
 
 #if WIN32_ENABLED
 /**
@@ -173,19 +170,19 @@ cahute__log_win_error(
  * Link internals.
  * --- */
 
-#define CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE 32768
+#define CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE 32768U
 
 /* Flags that can be present on a medium at runtime. */
-#define CAHUTE_LINK_MEDIUM_FLAG_GONE 0x00000001 /* No longer available. */
+#define CAHUTE_LINK_MEDIUM_FLAG_GONE 0x00000001UL /* No longer available. */
 
 /* Flags that can be present on a link at runtime. */
-#define CAHUTE_LINK_FLAG_CLOSE_MEDIUM 0x00000001
-#define CAHUTE_LINK_FLAG_TERMINATE    0x00000002 /* Should terminate. */
-#define CAHUTE_LINK_FLAG_RECEIVER     0x00000004 /* Act as a receiver. */
+#define CAHUTE_LINK_FLAG_CLOSE_MEDIUM 0x00000001UL
+#define CAHUTE_LINK_FLAG_TERMINATE    0x00000002UL /* Should terminate. */
+#define CAHUTE_LINK_FLAG_RECEIVER     0x00000004UL /* Act as a receiver. */
 
-#define CAHUTE_LINK_FLAG_TERMINATED    0x00000200 /* Was terminated! */
-#define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000400 /* Cannot recover. */
-#define CAHUTE_LINK_FLAG_ALMODE        0x00000800 /* CAS40 AL data received. */
+#define CAHUTE_LINK_FLAG_TERMINATED    0x00000200UL /* Was terminated! */
+#define CAHUTE_LINK_FLAG_IRRECOVERABLE 0x00000400UL /* Cannot recover. */
+#define CAHUTE_LINK_FLAG_ALMODE        0x00000800UL /* CAS40 AL received. */
 
 /* Medium types allowed. */
 #if POSIX_ENABLED
@@ -339,7 +336,7 @@ struct cahute_link_medium {
 #define CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE 33
 
 /* Flags to describe whether device information was obtained or not. */
-#define CASIOLINK_FLAG_DEVICE_INFO_OBTAINED 0x00000001
+#define CASIOLINK_FLAG_DEVICE_INFO_OBTAINED 0x00000001UL
 
 /* Maximum size of raw data that can come from an extended packet.
  * Calculators support data packets with up to 256 raw bytes (512 encoded
@@ -355,7 +352,7 @@ struct cahute_link_medium {
 #define SEVEN_RAW_DEVICE_INFO_BUFFER_SIZE 200
 
 /* Flag to describe whether device information has been requested. */
-#define SEVEN_FLAG_DEVICE_INFO_REQUESTED 0x00000001
+#define SEVEN_FLAG_DEVICE_INFO_REQUESTED 0x00000001UL
 
 /**
  * CASIOLINK peer state.

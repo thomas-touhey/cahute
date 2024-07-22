@@ -94,9 +94,10 @@ cahute_receive_data(
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
         return cahute_seven_receive_data(link, datap, timeout);
-    }
 
-    CAHUTE_RETURN_IMPL("No data reception method available.");
+    default:
+        CAHUTE_RETURN_IMPL("No data reception method available.");
+    }
 }
 
 /**
@@ -129,9 +130,10 @@ cahute_receive_screen(
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
         return cahute_seven_ohp_receive_screen(link, frame, timeout);
-    }
 
-    CAHUTE_RETURN_IMPL("No screen reception method available.");
+    default:
+        CAHUTE_RETURN_IMPL("No screen reception method available.");
+    }
 }
 
 /* ---

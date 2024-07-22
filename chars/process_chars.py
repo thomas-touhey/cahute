@@ -509,9 +509,15 @@ def get_sequence_parsing_tree_lines(
                 yield f"    &{symbol}_m{i - 1},"
 
             yield f"    &{symbol}_{i},"  # Subtree.
-            yield f"    {seq_cast}" + "{" + ", ".join(
-                map(str, sequence)
-            ) + "},"  # Sequence.
+
+            if sequence:
+                yield f"    {seq_cast}" + "{" + ", ".join(
+                    map(str, sequence)
+                ) + "},"  # Sequence.
+            else:
+                # Do not emit an empty sequence.
+                yield "NULL,"
+
             yield f"    {len(sequence)}"  # Sequence length.
 
             yield "};"
@@ -585,14 +591,14 @@ def get_chars_c_lines(*, ref: CharacterReference) -> Iterator[str]:
         else:
             yield "    NULL,"
 
-        if char.cat:
+        if char.cat and char.cat[0]:
             yield "    (char const []){" + ", ".join(
                 str(ord(x)) for x in char.cat[0]
             ) + "},"
         else:
             yield "    NULL,"
 
-        if char.opcode is not None:
+        if char.opcode:
             yield "    (cahute_u16 const []){" + ", ".join(map(str, char.opcode)) + "},"
         else:
             yield "    NULL,"

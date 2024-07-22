@@ -94,6 +94,7 @@ static int open_link(cahute_link **linkp, struct args const *args) {
     unsigned long flags;
     int err;
 
+    (void)args;
     flags = 0;
     if ((err = cahute_open_simple_usb_link(&link, flags)))
         return err;
@@ -117,6 +118,7 @@ static int open_fxremote_link(cahute_link **linkp, struct args const *args) {
     unsigned long flags;
     int err;
 
+    (void)args;
     flags = CAHUTE_USB_NOCHECK | CAHUTE_USB_NODISC | CAHUTE_USB_NOTERM;
     if ((err = cahute_open_simple_usb_link(&link, flags)))
         return err;

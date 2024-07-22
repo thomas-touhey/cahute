@@ -135,8 +135,12 @@ else()
 endif()
 
 set(CMAKE_C_STANDARD 90)
-if(MSVC)
+if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
     add_compile_options(/W4)
+elseif (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    add_compile_options(
+        -Wall -Wextra -Wno-c99-extensions -Wc23-extensions
+    )
 else()
     add_compile_options(
         -Wall -Wextra -Wno-unused-macros -Wno-vla

@@ -34,7 +34,7 @@ processes it.
 
 import argparse
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from os import linesep, makedirs
 from pathlib import Path
 import sys
@@ -71,7 +71,7 @@ def write_c_source(contents: bytes, fp: TextIO, /, *, symbol: str) -> None:
     :param fp: File pointer to write the source to.
     :param symbol: Symbol to write the contents as.
     """
-    dt = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    dt = datetime.now(timezone.utc).isoformat(timespec="seconds") + "Z"
 
     fp.write(
         f"/* This file was generated on {dt} by "

@@ -38,11 +38,11 @@ CAHUTE_DECLARE_TYPE(cahute_device_info)
 CAHUTE_DECLARE_TYPE(cahute_storage_entry)
 
 /* Preprogrammed ROM information available. */
-#define CAHUTE_DEVICE_INFO_FLAG_PREPROG 0x0001
+#define CAHUTE_DEVICE_INFO_FLAG_PREPROG 0x0001UL
 /* Bootcode information available. */
-#define CAHUTE_DEVICE_INFO_FLAG_BOOTCODE 0x0002
+#define CAHUTE_DEVICE_INFO_FLAG_BOOTCODE 0x0002UL
 /* OS information available. */
-#define CAHUTE_DEVICE_INFO_FLAG_OS 0x0004
+#define CAHUTE_DEVICE_INFO_FLAG_OS 0x0004UL
 
 struct cahute_device_info {
     unsigned long cahute_device_info_flags;
@@ -97,67 +97,67 @@ typedef void(cahute_progress_func)(
  * ---
  * Protocol to open a serial link with. */
 
-#define CAHUTE_SERIAL_PROTOCOL_MASK      0x0000000F
-#define CAHUTE_SERIAL_PROTOCOL_AUTO      0x00000000 /* Protocol detection. */
-#define CAHUTE_SERIAL_PROTOCOL_CASIOLINK 0x00000001 /* CASIOLINK. */
-#define CAHUTE_SERIAL_PROTOCOL_SEVEN     0x00000007 /* Protocol 7.00. */
-#define CAHUTE_SERIAL_PROTOCOL_SEVEN_OHP 0x00000009 /* Protocol 7.00 OHP. */
+#define CAHUTE_SERIAL_PROTOCOL_MASK      0x0000000FUL
+#define CAHUTE_SERIAL_PROTOCOL_AUTO      0x00000000UL /* Protocol detection. */
+#define CAHUTE_SERIAL_PROTOCOL_CASIOLINK 0x00000001UL /* CASIOLINK. */
+#define CAHUTE_SERIAL_PROTOCOL_SEVEN     0x00000007UL /* Protocol 7.00. */
+#define CAHUTE_SERIAL_PROTOCOL_SEVEN_OHP 0x00000009UL /* Protocol 7.00 OHP. */
 
 /* CASIOLINK variant to select. */
 
-#define CAHUTE_SERIAL_CASIOLINK_VARIANT_MASK   0x00000070
-#define CAHUTE_SERIAL_CASIOLINK_VARIANT_AUTO   0x00000010 /* Auto-detect. */
-#define CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS40  0x00000020 /* CAS40. */
-#define CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS50  0x00000030 /* CAS50. */
-#define CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS100 0x00000040 /* CAS100. */
+#define CAHUTE_SERIAL_CASIOLINK_VARIANT_MASK   0x00000070UL
+#define CAHUTE_SERIAL_CASIOLINK_VARIANT_AUTO   0x00000010UL /* Auto-detect. */
+#define CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS40  0x00000020UL /* CAS40. */
+#define CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS50  0x00000030UL /* CAS50. */
+#define CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS100 0x00000040UL /* CAS100. */
 
 /* Stop bit settings (1 or 2). */
 
-#define CAHUTE_SERIAL_STOP_MASK 0x00000300
-#define CAHUTE_SERIAL_STOP_ONE  0x00000100 /* 1 stop bit. */
-#define CAHUTE_SERIAL_STOP_TWO  0x00000200 /* 2 stop bits. */
+#define CAHUTE_SERIAL_STOP_MASK 0x00000300UL
+#define CAHUTE_SERIAL_STOP_ONE  0x00000100UL /* 1 stop bit. */
+#define CAHUTE_SERIAL_STOP_TWO  0x00000200UL /* 2 stop bits. */
 
 /* Parity settings. */
 
-#define CAHUTE_SERIAL_PARITY_MASK 0x00000C00
-#define CAHUTE_SERIAL_PARITY_OFF  0x00000400 /* No parity. */
-#define CAHUTE_SERIAL_PARITY_EVEN 0x00000800 /* Even parity. */
-#define CAHUTE_SERIAL_PARITY_ODD  0x00000C00 /* Odd parity. */
+#define CAHUTE_SERIAL_PARITY_MASK 0x00000C00UL
+#define CAHUTE_SERIAL_PARITY_OFF  0x00000400UL /* No parity. */
+#define CAHUTE_SERIAL_PARITY_EVEN 0x00000800UL /* Even parity. */
+#define CAHUTE_SERIAL_PARITY_ODD  0x00000C00UL /* Odd parity. */
 
 /* XON/XOFF behaviour. */
 
-#define CAHUTE_SERIAL_XONXOFF_MASK    0x00003000
-#define CAHUTE_SERIAL_XONXOFF_DISABLE 0x00001000 /* Disable XON/XOFF */
-#define CAHUTE_SERIAL_XONXOFF_ENABLE  0x00002000 /* Enable XON/XOFF */
+#define CAHUTE_SERIAL_XONXOFF_MASK    0x00003000UL
+#define CAHUTE_SERIAL_XONXOFF_DISABLE 0x00001000UL /* Disable XON/XOFF */
+#define CAHUTE_SERIAL_XONXOFF_ENABLE  0x00002000UL /* Enable XON/XOFF */
 
 /* DTR behaviour. */
 
-#define CAHUTE_SERIAL_DTR_MASK      0x0000C000
-#define CAHUTE_SERIAL_DTR_DISABLE   0x00004000
-#define CAHUTE_SERIAL_DTR_ENABLE    0x00008000
-#define CAHUTE_SERIAL_DTR_HANDSHAKE 0x0000C000
+#define CAHUTE_SERIAL_DTR_MASK      0x0000C000UL
+#define CAHUTE_SERIAL_DTR_DISABLE   0x00004000UL
+#define CAHUTE_SERIAL_DTR_ENABLE    0x00008000UL
+#define CAHUTE_SERIAL_DTR_HANDSHAKE 0x0000C000UL
 
 /* RTS behaviour. */
 
-#define CAHUTE_SERIAL_RTS_MASK      0x00030000
-#define CAHUTE_SERIAL_RTS_DISABLE   0x00010000
-#define CAHUTE_SERIAL_RTS_ENABLE    0x00020000
-#define CAHUTE_SERIAL_RTS_HANDSHAKE 0x00030000
+#define CAHUTE_SERIAL_RTS_MASK      0x00030000UL
+#define CAHUTE_SERIAL_RTS_DISABLE   0x00010000UL
+#define CAHUTE_SERIAL_RTS_ENABLE    0x00020000UL
+#define CAHUTE_SERIAL_RTS_HANDSHAKE 0x00030000UL
 
 /* Protocol-related behaviour specific flags. */
 
-#define CAHUTE_SERIAL_RECEIVER 0x00100000 /* Start as passive/receiver. */
-#define CAHUTE_SERIAL_NOCHECK  0x00200000 /* Disable the initial handshake. */
-#define CAHUTE_SERIAL_NODISC   0x00400000 /* Disable platform discovery. */
-#define CAHUTE_SERIAL_NOTERM   0x00800000 /* Disable the term handshake. */
+#define CAHUTE_SERIAL_RECEIVER 0x00100000UL /* Start as passive/receiver. */
+#define CAHUTE_SERIAL_NOCHECK  0x00200000UL /* Disable initial handshake. */
+#define CAHUTE_SERIAL_NODISC   0x00400000UL /* Disable platform discovery. */
+#define CAHUTE_SERIAL_NOTERM   0x00800000UL /* Disable term handshake. */
 
 /* USB flags. */
 
-#define CAHUTE_USB_NOCHECK  0x0001 /* Disable the initial handshake. */
-#define CAHUTE_USB_NODISC   0x0002 /* Disable platform discovery. */
-#define CAHUTE_USB_NOTERM   0x0004 /* Disable the terminating handshake. */
-#define CAHUTE_USB_RECEIVER 0x0010 /* Act as the receiver. */
-#define CAHUTE_USB_OHP      0x0020 /* Use screen streaming mode. */
+#define CAHUTE_USB_NOCHECK  0x00000001UL /* Disable initial handshake. */
+#define CAHUTE_USB_NODISC   0x00000002UL /* Disable platform discovery. */
+#define CAHUTE_USB_NOTERM   0x00000004UL /* Disable terminating handshake. */
+#define CAHUTE_USB_RECEIVER 0x00000010UL /* Act as the receiver. */
+#define CAHUTE_USB_OHP      0x00000020UL /* Use screen streaming mode. */
 
 CAHUTE_BEGIN_DECLS
 
@@ -226,9 +226,9 @@ cahute_request_storage_capacity(
     unsigned long *capacityp
 );
 
-#define CAHUTE_SEND_FILE_FLAG_FORCE    0x00000001 /* Force overwrite. */
-#define CAHUTE_SEND_FILE_FLAG_OPTIMIZE 0x00000002 /* Automatically optimize. */
-#define CAHUTE_SEND_FILE_FLAG_DELETE   0x00000004 /* Delete first. */
+#define CAHUTE_SEND_FILE_FLAG_FORCE    0x00000001UL /* Force overwrite. */
+#define CAHUTE_SEND_FILE_FLAG_OPTIMIZE 0x00000002UL /* Auto. optimize. */
+#define CAHUTE_SEND_FILE_FLAG_DELETE   0x00000004UL /* Delete first. */
 
 CAHUTE_EXTERN(int)
 cahute_send_file_to_storage(
@@ -310,7 +310,7 @@ cahute_upload_and_run_program(
     void *cahute__progress_cookie
 );
 
-#define CAHUTE_FLASH_FLAG_RESET_SMEM 0x00000001 /* Also erase the SMEM. */
+#define CAHUTE_FLASH_FLAG_RESET_SMEM 0x00000001UL /* Also erase the SMEM. */
 
 CAHUTE_EXTERN(int)
 cahute_flash_system_using_fxremote_method(

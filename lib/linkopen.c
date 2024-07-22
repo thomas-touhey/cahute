@@ -45,12 +45,12 @@ CAHUTE_LOCAL_DATA(cahute_u8 const) casiolink_start_packet[] = {0x16};
 /**
  * Cookie for detection in the context of simple USB link opening.
  *
- * @param found_bus Bus of the found USB device; -1 if no device was found.
- * @param found_address Address relative to the bus of the found USB device;
- *        -1 if no device was found.
- * @param found_type Type of the found address, -1 if not found.
- * @param multiple Flag that, if set to 1, signifies that multiple devices have
- *        already been found.
+ * @property found_bus Bus of the found USB device; -1 if no device was found.
+ * @property found_address Address relative to the bus of the found USB device;
+ *           -1 if no device was found.
+ * @property found_type Type of the found address, -1 if not found.
+ * @property multiple Flag that, if set to 1, signifies that multiple devices have
+ *           already been found.
  */
 struct simple_usb_detection_cookie {
     int found_bus;
@@ -325,6 +325,12 @@ close_medium(int type, union cahute_link_medium_state *state) {
 
         break;
 #endif
+
+    default:
+        msg(ll_warn,
+            "No closing method for %s (%d) link medium.",
+            get_medium_name(type),
+            type);
     }
 }
 
@@ -414,6 +420,12 @@ open_link_from_medium(
         );
         if (err)
             goto fail;
+
+        break;
+
+    default:
+        /* No need to set the serial flags or params. */
+        break;
     }
 
     if (~flags & PROTOCOL_FLAG_NOTERM)
@@ -1277,63 +1289,68 @@ cahute_open_serial_link(
     }
 
 #if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
-    int fd;
-
-    fd = open(name_or_path, O_NOCTTY | O_RDWR);
-    if (fd < 0) {
-        switch (errno) {
-        case ENODEV:
-        case ENOENT:
-        case ENXIO:
-        case EPIPE:
-        case ESPIPE:
-            msg(ll_error, "Could not open serial device: %s", strerror(errno));
-            return CAHUTE_ERROR_NOT_FOUND;
-
-        case EACCES:
-            return CAHUTE_ERROR_PRIV;
-
-        default:
-            msg(ll_error, "Unknown error: %s (%d)", strerror(errno), errno);
-            return CAHUTE_ERROR_UNKNOWN;
-        }
-    }
-
-    medium_type = CAHUTE_LINK_MEDIUM_POSIX_SERIAL;
-    medium_state.posix.fd = fd;
-#elif defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
-    HANDLE handle = INVALID_HANDLE_VALUE;
-    HANDLE overlapped_event_handle = INVALID_HANDLE_VALUE;
-    DWORD werr;
-
-    handle = CreateFile(
-        name_or_path,
-        GENERIC_READ | GENERIC_WRITE,
-        0,
-        NULL,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
-        NULL
-    );
-    if (handle == INVALID_HANDLE_VALUE)
-        switch (werr = GetLastError()) {
-        case ERROR_FILE_NOT_FOUND:
-        case ERROR_DEV_NOT_EXIST:
-            return CAHUTE_ERROR_NOT_FOUND;
-
-        case ERROR_ACCESS_DENIED:
-            return CAHUTE_ERROR_PRIV;
-
-        default:
-            log_windows_error("CreateFile", werr);
-            return CAHUTE_ERROR_UNKNOWN;
-        }
-
-    /* Read timeouts will be managed by using WaitForMultipleObjects().
-     * Here we only need to configure the timeouts to return immediately. */
     {
-        COMMTIMEOUTS timeouts;
+        int fd;
 
+        fd = open(name_or_path, O_NOCTTY | O_RDWR);
+        if (fd < 0) {
+            switch (errno) {
+            case ENODEV:
+            case ENOENT:
+            case ENXIO:
+            case EPIPE:
+            case ESPIPE:
+                msg(ll_error,
+                    "Could not open serial device: %s",
+                    strerror(errno));
+                return CAHUTE_ERROR_NOT_FOUND;
+
+            case EACCES:
+                return CAHUTE_ERROR_PRIV;
+
+            default:
+                msg(ll_error, "Unknown error: %s (%d)", strerror(errno), errno
+                );
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+        }
+
+        medium_type = CAHUTE_LINK_MEDIUM_POSIX_SERIAL;
+        medium_state.posix.fd = fd;
+    }
+#elif defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
+    {
+        HANDLE handle = INVALID_HANDLE_VALUE;
+        HANDLE overlapped_event_handle = INVALID_HANDLE_VALUE;
+        COMMTIMEOUTS timeouts;
+        DWORD werr;
+
+        handle = CreateFile(
+            name_or_path,
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            NULL,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+            NULL
+        );
+        if (handle == INVALID_HANDLE_VALUE)
+            switch (werr = GetLastError()) {
+            case ERROR_FILE_NOT_FOUND:
+            case ERROR_DEV_NOT_EXIST:
+                return CAHUTE_ERROR_NOT_FOUND;
+
+            case ERROR_ACCESS_DENIED:
+                return CAHUTE_ERROR_PRIV;
+
+            default:
+                log_windows_error("CreateFile", werr);
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+
+        /* Read timeouts will be managed by using WaitForMultipleObjects().
+         * Here we only need to configure the timeouts to return
+         * immediately. */
         timeouts.ReadIntervalTimeout = MAXDWORD;
         timeouts.ReadTotalTimeoutMultiplier = 0;
         timeouts.ReadTotalTimeoutConstant = 0;
@@ -1345,29 +1362,29 @@ cahute_open_serial_link(
             CloseHandle(handle);
             return CAHUTE_ERROR_UNKNOWN;
         }
+
+        /* We only want events to be set if we are receiving a byte. */
+        if (!SetCommMask(handle, EV_RXCHAR)) {
+            log_windows_error("SetCommMask", GetLastError());
+            CloseHandle(handle);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        /* Create the overlapped event. */
+        overlapped_event_handle = CreateEvent(NULL, TRUE, FALSE, NULL);
+        if (overlapped_event_handle == INVALID_HANDLE_VALUE) {
+            log_windows_error("CreateEvent", GetLastError());
+            CloseHandle(handle);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        medium_type = CAHUTE_LINK_MEDIUM_WIN32_SERIAL;
+        medium_state.windows.handle = handle;
+
+        SecureZeroMemory(&medium_state.windows.overlapped, sizeof(OVERLAPPED));
+
+        medium_state.windows.overlapped.hEvent = overlapped_event_handle;
     }
-
-    /* We only want events to be set if we are receiving a byte. */
-    if (!SetCommMask(handle, EV_RXCHAR)) {
-        log_windows_error("SetCommMask", GetLastError());
-        CloseHandle(handle);
-        return CAHUTE_ERROR_UNKNOWN;
-    }
-
-    /* Create the overlapped event. */
-    overlapped_event_handle = CreateEvent(NULL, TRUE, FALSE, NULL);
-    if (overlapped_event_handle == INVALID_HANDLE_VALUE) {
-        log_windows_error("CreateEvent", GetLastError());
-        CloseHandle(handle);
-        return CAHUTE_ERROR_UNKNOWN;
-    }
-
-    medium_type = CAHUTE_LINK_MEDIUM_WIN32_SERIAL;
-    medium_state.windows.handle = handle;
-
-    SecureZeroMemory(&medium_state.windows.overlapped, sizeof(OVERLAPPED));
-
-    medium_state.windows.overlapped.hEvent = overlapped_event_handle;
 #else
     CAHUTE_RETURN_IMPL("No serial device opening method available.");
 #endif
@@ -1505,8 +1522,8 @@ cahute_open_usb_link(
 
         /* Find bulk in and out endpoints.
          * This search is in case they vary between host platforms. */
-        for (endpoint_descriptor = interface_descriptor->endpoint,
-            j = interface_descriptor->bNumEndpoints;
+        for ((void)(endpoint_descriptor = interface_descriptor->endpoint),
+             j = interface_descriptor->bNumEndpoints;
              j;
              endpoint_descriptor++, j--) {
             if ((endpoint_descriptor->bmAttributes & 3)
@@ -1517,8 +1534,13 @@ cahute_open_usb_link(
             case LIBUSB_ENDPOINT_OUT:
                 bulk_out = endpoint_descriptor->bEndpointAddress;
                 break;
+
             case LIBUSB_ENDPOINT_IN:
                 bulk_in = endpoint_descriptor->bEndpointAddress;
+                break;
+
+            default:
+                /* This should not be reached. */
                 break;
             }
         }
@@ -1950,6 +1972,12 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
         case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
             cahute_seven_terminate(link);
             break;
+
+        default:
+            msg(ll_warn,
+                "No method to terminate protocol %s (%d).",
+                get_protocol_name(link->protocol),
+                link->protocol);
         }
     }
 

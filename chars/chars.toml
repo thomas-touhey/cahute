@@ -314,7 +314,7 @@ cat = "\\!mark"
 code = 0x22
 name = "Quotation Mark"
 unicode = [0x22]
-cat = "\""
+cat = '"'
 
 [[chars]]
 code = 0x23

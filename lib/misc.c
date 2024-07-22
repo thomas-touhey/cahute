@@ -126,7 +126,8 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
         return CAHUTE_ERROR_UNKNOWN;
     }
 
-    *msp = res.tv_sec * 1000 + res.tv_nsec / 1000000;
+    *msp = (unsigned long)res.tv_sec * 1000
+           + (unsigned long)res.tv_nsec / 1000000;
     return CAHUTE_OK;
 }
 

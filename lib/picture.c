@@ -74,7 +74,7 @@ cahute_convert_picture(
         );
 
     dest = (cahute_u32 *)dest_uncasted;
-    src = (cahute_u8 *)src_uncasted;
+    src = (cahute_u8 const *)src_uncasted;
 
     switch (src_format) {
     case CAHUTE_PICTURE_FORMAT_1BIT_MONO:
@@ -223,10 +223,11 @@ cahute_convert_picture(
                 /* We have a 16-bit integer being 0bRRRRRGGGGGGBBBBB.
                  * We need to extract these using masks, and place it
                  * at the right ranks in the resulting 24-bit RGB pixel. */
-                unsigned long raw = (src[0] << 8) | src[1];
+                unsigned long raw = ((unsigned long)src[0] << 8) | src[1];
 
-                *dest++ = ((raw >> 11) & 31) << 19 | ((raw >> 5) & 63) << 10
-                          | (raw & 31) << 3;
+                *dest++ = (((cahute_u32)raw >> 11) & 31) << 19
+                          | (((cahute_u32)raw >> 5) & 63) << 10
+                          | ((cahute_u32)raw & 31) << 3;
 
                 src += 2;
             }

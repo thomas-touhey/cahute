@@ -113,7 +113,7 @@ fake_device_info[164] = {
 
 /**
  * Copy a string from a payload to a buffer, while null-terminating it
- * and detecting \xFF characters as end of strings.
+ * and detecting 0xFF characters as end of strings.
  *
  * SECURITY: The destination buffer is expected to be at least
  * ``max_size + 1`` long.
@@ -136,42 +136,12 @@ cahute_seven_store_string(void **bufp, cahute_u8 const *raw, size_t max_size) {
         if (!byte || byte >= 128)
             break;
 
-        *buf++ = byte;
+        *(unsigned char *)buf++ = byte;
     }
 
     *buf++ = '\0';
     *bufp = buf;
     return result;
-}
-
-/**
- * Obtain a 8-bit integer from raw data, if available.
- *
- * SECURITY: The raw buffer is expected to be at least 2 bytes long.
- *
- * @param buf Buffer from which to get the 8-bit integer.
- * @return Integer, or 0 if no integer could be decoded.
- */
-CAHUTE_INLINE(int) cahute_get_byte_hex(cahute_u8 const *raw) {
-    if (!IS_ASCII_HEX_DIGIT(raw[0]) || !IS_ASCII_HEX_DIGIT(raw[1]))
-        return 0;
-
-    return (ASCII_HEX_TO_NIBBLE(raw[0]) << 4) | ASCII_HEX_TO_NIBBLE(raw[1]);
-}
-
-/**
- * Obtain a 8-bit integer from raw data, if available.
- *
- * SECURITY: The raw buffer is expected to be at least 2 bytes long.
- *
- * @param buf Buffer from which to get the 8-bit integer.
- * @return Integer, or 0 if no integer could be decoded.
- */
-CAHUTE_INLINE(int) cahute_get_byte_dec(cahute_u8 const *raw) {
-    if (!isdigit(raw[0]) || !isdigit(raw[1]))
-        return 0;
-
-    return (raw[0] - '0') * 10 + (raw[1] - '0');
 }
 
 /**
@@ -1393,7 +1363,6 @@ cahute_seven_send_data_from_buf(
  * receives a roleswap or another command.
  *
  * @param link Link with which to receive the data.
- * @param flags Flags.
  * @param filep FILE object to write data to.
  * @param size Size of the data to receive.
  * @param code Command code of the corresponding flow.
@@ -1404,7 +1373,6 @@ cahute_seven_send_data_from_buf(
 CAHUTE_LOCAL(int)
 cahute_seven_receive_raw_data(
     cahute_link *link,
-    unsigned long flags,
     FILE *filep,
     size_t size,
     int command_code,
@@ -2923,7 +2891,6 @@ cahute_seven_request_file_from_storage(
      * Last ACK is not yet sent. */
     err = cahute_seven_receive_raw_data(
         link,
-        0,
         filep,
         filesize,
         0x45,
