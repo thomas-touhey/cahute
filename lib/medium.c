@@ -204,7 +204,7 @@ cahute_read_from_link_medium(
         switch (medium->type) {
 #ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
         case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
-            ssize_t ret;
+            cahute_ssize ret;
 
             if (timeout > 0) {
                 /* Use select() to wait for input to be present. */
@@ -567,7 +567,7 @@ cahute_write_to_link_medium(
         switch (medium->type) {
 #ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
         case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
-            ssize_t ret;
+            cahute_ssize ret;
 
             ret = write(medium->state.posix.fd, buf, size);
             if (ret < 0)

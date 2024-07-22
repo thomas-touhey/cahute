@@ -553,7 +553,7 @@ int read_casrc_file(struct casrc_database *db, FILE *filep) {
     while (1) {
         char *p, *q;
         char *name;
-        ssize_t read;
+        cahute_ssize read;
         int is_macro = 0;
 
         errno = 0;
@@ -641,7 +641,7 @@ int read_casrc_file(struct casrc_database *db, FILE *filep) {
  * @return Maximum path size.
  */
 static inline size_t unix_path_max(void) {
-    ssize_t path_max;
+    cahute_ssize path_max;
 
 # ifdef PATH_MAX
     path_max = PATH_MAX;

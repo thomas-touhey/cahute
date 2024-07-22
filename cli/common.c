@@ -222,7 +222,8 @@ fail:
  * @param filep File pointer.
  * @return Size of the obtained line.
  */
-ssize_t portable_getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
+cahute_ssize
+portable_getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
     char *cur_pos, *new_lineptr;
     size_t new_lineptr_len;
     int c;
@@ -251,7 +252,7 @@ ssize_t portable_getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
             break;
 
         if ((*lineptr + *n - cur_pos) < 2) {
-            if (SSIZE_MAX / 2 < *n) {
+            if (CAHUTE_SSIZE_MAX / 2 < *n) {
 #ifdef EOVERFLOW
                 errno = EOVERFLOW;
 #else
@@ -278,5 +279,5 @@ ssize_t portable_getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
     }
 
     *cur_pos = '\0';
-    return (ssize_t)(cur_pos - *lineptr);
+    return (cahute_ssize)(cur_pos - *lineptr);
 }

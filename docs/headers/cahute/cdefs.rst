@@ -130,6 +130,12 @@ Macro definitions
     For maximum compatibility, this macro must be used with
     :c:macro:`CAHUTE_NNPTR`.
 
+.. c:macro:: CAHUTE_SSIZE_MAX
+
+    Maximum value for :c:type:`cahute_ssize`, i.e. portable version of
+    ``SSIZE_MAX`` for platforms that do not explicitely define an ``ssize_t``
+    type.
+
 .. c:macro:: CAHUTE_PRIu8
 
     printf specifier for displaying :c:type:`cahute_u8` in decimal form,
@@ -191,6 +197,17 @@ Macro definitions
 
 Type definitions
 ----------------
+
+.. c:type:: cahute_ssize
+
+    Portable definition of ``ssize_t``.
+
+    This type is required since ``ssize_t`` may not be defined on all
+    platforms, e.g. on Windows where ``SSIZE_T`` is defined in a specific
+    header.
+
+    Due to namespace constraints, the name of this type cannot include a ``_t``
+    suffix; see :ref:`coding-style-namespace` for more information.
 
 .. c:type:: cahute_u8
 

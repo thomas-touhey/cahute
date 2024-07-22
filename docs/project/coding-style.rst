@@ -22,6 +22,8 @@ Otherwise, the rules are not yet clearly defined, and may be as a few
 contributions have gone by, and the standard for Cahute shapes itself a
 bit more clearly.
 
+.. _coding-style-namespace:
+
 Namespace
 ---------
 

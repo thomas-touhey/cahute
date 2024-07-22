@@ -1419,7 +1419,8 @@ cahute_open_usb_link(
     struct libusb_config_descriptor *config_descriptor = NULL;
     libusb_device_handle *device_handle = NULL;
     union cahute_link_medium_state medium_state;
-    int device_count, i, libusberr, bulk_in = -1, bulk_out = -1;
+    cahute_ssize device_count;
+    int i, libusberr, bulk_in = -1, bulk_out = -1;
     int medium_type = 0, protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
     unsigned long open_flags = 0;
     int err = CAHUTE_ERROR_UNKNOWN;

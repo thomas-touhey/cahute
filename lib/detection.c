@@ -37,7 +37,7 @@
  * @return Maximum path size.
  */
 CAHUTE_INLINE(size_t) unix_path_max(void) {
-    ssize_t path_max;
+    cahute_ssize path_max;
 
 # ifdef PATH_MAX
     path_max = PATH_MAX;
@@ -94,7 +94,7 @@ cahute_detect_serial(
     if (dp) {
         char *buf = fullbuf, *devbuf = &fullbuf[path_max];
         char *end = &buf[18];
-        ssize_t rl;
+        cahute_ssize rl;
 
         strcpy(buf, "/dev/serial/by-id/");
 
@@ -264,7 +264,8 @@ cahute_detect_usb(
     libusb_context *context = NULL;
     libusb_device **device_list = NULL;
     cahute_usb_detection_entry entry;
-    int device_count, id, err = CAHUTE_OK;
+    cahute_ssize device_count;
+    int id, err = CAHUTE_OK;
 
     if (libusb_init(&context)) {
         msg(ll_fatal, "Could not create a libusb context.");

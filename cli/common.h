@@ -44,7 +44,7 @@ extern int
 read_file_contents(char const *path, cahute_u8 **datap, size_t *sizep);
 
 /* Portable getdelim() implementation. */
-extern ssize_t
+extern cahute_ssize
 portable_getdelim(char **sp, size_t *np, int delim, FILE *filep);
 
 #endif /* COMMON_H */

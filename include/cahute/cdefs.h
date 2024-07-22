@@ -30,6 +30,7 @@
 #define CAHUTE_CDEFS_H 1
 #include <cahute/config.h>
 #include <stddef.h>
+#include <limits.h>
 
 /* C++ declaration and namespace management. */
 #ifdef __cplusplus
@@ -68,7 +69,7 @@ CAHUTE_BEGIN_NAMESPACE
 /* Macro to check if we have at least a specific version of MSC. */
 #if defined(CAHUTE_MSC_PREREQ) || defined(_MSC_VER)
 # define CAHUTE_MSC_PREREQ(CAHUTE__MAJ, CAHUTE__MIN) \
-     (_MSC_VER >= (CAHUTE__MAJ) * 1000 + (CAHUTE__MIN))
+     (_MSC_VER >= (CAHUTE__MAJ) * 100 + (CAHUTE__MIN))
 #else
 # define CAHUTE_MSC_PREREQ(CAHUTE__MAJ, CAHUTE__MIN) 0
 #endif
@@ -152,8 +153,6 @@ typedef uint32_t cahute_u32;
 # define CAHUTE_PRIX32 PRIX32
 
 #else /* C89 */
-# include <limits.h>
-
 /* Here, we ought to do some C89 hacking.
  * We'll use the `limits.h` definitions to try and guess which one of the
  * default types are the 8-bit, 16-bit and 32-bit integer. */
@@ -198,7 +197,27 @@ typedef unsigned long cahute_u32;
 # define CAHUTE_PRIu32 CAHUTE_P32 "u"
 # define CAHUTE_PRIx32 CAHUTE_P32 "x"
 # define CAHUTE_PRIX32 CAHUTE_P32 "X"
+#endif
 
+/* With MSVC, 'ssize_t' is not defined.
+ * <BaseTsd.h> describes Windows XP as being the minimum supported
+ * version, and MSVC 6.0 (encoded as 12.0) is the first being able
+ * to target Windows XP (NT 5.1).
+ *
+ * In order not to interfere with other namespaces, we define our
+ * own ``ssize_t`` type to use in our programs. */
+#if CAHUTE_MSC_PREREQ(12, 0)
+# include <BaseTsd.h>
+
+typedef SSIZE_T cahute_ssize;
+#else
+# include <sys/types.h>
+# define CAHUTE_SSIZE_MAX SSIZE_MAX
+typedef ssize_t cahute_ssize;
+#endif
+
+#ifndef CAHUTE_SSIZE_MAX
+# define CAHUTE_SSIZE_MAX (cahute_ssize)(~((size_t)-1 >> 1) >> 1)
 #endif
 
 /* printf definition for `size_t`. */
