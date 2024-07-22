@@ -135,13 +135,17 @@ else()
 endif()
 
 set(CMAKE_C_STANDARD 90)
-add_compile_options(
-    -Wall -Wextra -Wno-unused-macros -Wno-vla
-    -Wshadow -Wwrite-strings -Wredundant-decls -Wformat -Wformat-nonliteral
-    -Wformat-security -Wimplicit-function-declaration
-    -Wdate-time -Wmissing-prototypes -Wreturn-type -Wpointer-arith
-    -Wstack-protector -Wno-unused-parameter
-)
+if(MSVC)
+    add_compile_options(/W4)
+else()
+    add_compile_options(
+        -Wall -Wextra -Wno-unused-macros -Wno-vla
+        -Wshadow -Wwrite-strings -Wredundant-decls -Wformat -Wformat-nonliteral
+        -Wformat-security -Wimplicit-function-declaration
+        -Wdate-time -Wmissing-prototypes -Wreturn-type -Wpointer-arith
+        -Wstack-protector -Wno-unused-parameter
+    )
+endif()
 
 # ---
 # Target definitions.
