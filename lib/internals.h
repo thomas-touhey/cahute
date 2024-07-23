@@ -572,18 +572,27 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp);
         (CAHUTE__STATUSP) \
     )
 
+/* Skipping used to be done through a separate function that provided a
+ * dummy buffer to reading. However, since read now accepts NULL as a
+ * destination buffer, it is now only a macro. */
+#define cahute_skip_from_link_medium( \
+    CAHUTE__MEDIUM, \
+    CAHUTE__SIZE, \
+    CAHUTE__FT, \
+    CAHUTE__NT \
+) \
+    cahute_read_from_link_medium( \
+        (CAHUTE__MEDIUM), \
+        NULL, \
+        (CAHUTE__SIZE), \
+        (CAHUTE__FT), \
+        (CAHUTE__NT) \
+    )
+
 CAHUTE_EXTERN(int)
 cahute_read_from_link_medium(
     cahute_link_medium *medium,
     cahute_u8 *buf,
-    size_t size,
-    unsigned long first_timeout,
-    unsigned long next_timeout
-);
-
-CAHUTE_EXTERN(int)
-cahute_skip_from_link_medium(
-    cahute_link_medium *medium,
     size_t size,
     unsigned long first_timeout,
     unsigned long next_timeout

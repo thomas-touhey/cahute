@@ -32,63 +32,6 @@
 #endif
 
 /**
- * Skip data synchronously from the medium associated with the link.
- *
- * This function is guaranteed to skip exactly N bytes, or return an
- * error.
- *
- * @param medium Link medium from which to skip data.
- * @param size Size of the area to skip.
- * @param first_timeout Timeout before the first byte is received,
- *        in milliseconds.
- * @param next_timeout Timeout in-between any byte past the first one,
- *        in milliseconds.
- * @return Error, or CAHUTE_OK if no error has occurred.
- */
-CAHUTE_EXTERN(int)
-cahute_skip_from_link_medium(
-    cahute_link_medium *medium,
-    size_t size,
-    unsigned long first_timeout,
-    unsigned long next_timeout
-) {
-    if (size) {
-        cahute_u8 buf[CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE];
-        int err;
-
-        if (size >= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE) {
-            do {
-                err = cahute_read_from_link_medium(
-                    medium,
-                    buf,
-                    CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE,
-                    first_timeout,
-                    next_timeout
-                );
-                if (err)
-                    return err;
-
-                size -= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE;
-            } while (size >= CAHUTE_LINK_MEDIUM_READ_BUFFER_SIZE);
-        }
-
-        if (size) {
-            err = cahute_read_from_link_medium(
-                medium,
-                buf,
-                size,
-                first_timeout,
-                next_timeout
-            );
-            if (err)
-                return err;
-        }
-    }
-
-    return CAHUTE_OK;
-}
-
-/**
  * Read data synchronously from the medium associated with the link.
  *
  * This function is guaranteed to fill the buffer completely, or return
@@ -98,7 +41,8 @@ cahute_skip_from_link_medium(
  * unlimited, i.e. the function will wait indefinitely.
  *
  * @param medium Link medium from which to read.
- * @param buf Buffer in which to write the read data.
+ * @param buf Buffer in which to write the read data. Can be NULL if we only
+ *        want to skip data from the link medium.
  * @param size Size to read into the buffer.
  * @param first_timeout Timeout before the first byte is received,
  *        in milliseconds.
@@ -131,14 +75,19 @@ cahute_read_from_link_medium(
         size_t left = medium->read_size - medium->read_start;
 
         if (size <= left) {
-            memcpy(buf, &medium->read_buffer[medium->read_start], size);
+            if (buf)
+                memcpy(buf, &medium->read_buffer[medium->read_start], size);
+
             medium->read_start += size;
             return CAHUTE_OK;
         }
 
         if (left) {
-            memcpy(buf, &medium->read_buffer[medium->read_start], left);
-            buf += left;
+            if (buf) {
+                memcpy(buf, &medium->read_buffer[medium->read_start], left);
+                buf += left;
+            }
+
             size -= left;
         }
 
@@ -494,16 +443,20 @@ cahute_read_from_link_medium(
         }
 
         if (bytes_read >= size) {
-            memcpy(buf, medium->read_buffer, size);
+            if (buf)
+                memcpy(buf, medium->read_buffer, size);
+
             medium->read_start = size;
             medium->read_size = bytes_read;
 
             break;
         }
 
-        memcpy(buf, medium->read_buffer, bytes_read);
+        if (buf) {
+            memcpy(buf, medium->read_buffer, bytes_read);
+            buf += bytes_read;
+        }
 
-        buf += bytes_read;
         size -= bytes_read;
     }
 
