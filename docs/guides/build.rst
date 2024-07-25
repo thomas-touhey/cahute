@@ -175,7 +175,79 @@ one of the following command depending on the architecture you're targetting::
 |win| Windows XP and above, using Visual Studio
 -----------------------------------------------
 
-.. todo:: This method is not available yet.
+It is possible to build Cahute for Windows XP and above, using Microsoft's
+`Visual Studio`_ starting from version 17.6 (VS2022).
+
+.. warning::
+
+    Visual Studio is **not to be confused** with `Visual Studio Code`_, which
+    is an entirely different program.
+
+.. note::
+
+    This version of Visual Studio is targeted since it is the first to
+    include ``vcpkg`` (`source <vcpkg is Now Included with Visual Studio_>`_).
+    It may be possible to compile Cahute on earlier versions of Visual
+    Studio; see `Install and use packages with CMake`_ for more information.
+
+When opening Visual Studio, select "Clone a repository" (first option).
+
+.. figure:: msvs1.png
+
+    Initial window for Visual Studio, with the first option selected.
+
+Enter the URL of the repository you're cloning
+(``https://gitlab.com/cahuteproject/cahute.git`` if cloning the upstream),
+and select "Clone".
+
+.. figure:: msvs2.png
+
+    Repository cloning window, with the information filled out to clone
+    the main branch on the official project repository.
+
+.. note::
+
+    The IDE may open to nothing much, such as in this example:
+
+    .. figure:: msvs3.png
+
+        Empty IDE windows, obtained after cloning the repository.
+
+    In this case, double-clicking on "Directory view" in the Solution Explorer
+    on the right should solve this.
+
+Once the repository is loaded, the IDE should automatically prepare the
+repository for building using CMake and vcpkg. The resulting view should
+resemble this:
+
+.. figure:: msvs4.png
+
+    Visual Studio, after the repository was successfully loaded and configured.
+
+From here, you can select the target you want to build next to the green arrow
+on the top, and the architecture you're targetting. By leaving the default
+(``x64-Debug``) and clicking on ``p7.exe``, we obtain the following:
+
+.. figure:: msvs5.png
+
+    Visual Studio, after building and running p7.
+
+Since Cahute defines mostly command-line utilities, it may be more interesting
+to have access to a command-line interface. In order to this, in the context
+menu, select "Tools", "Command line", then "Developer Powershell":
+
+.. figure:: msvs6.png
+
+    Visual Studio, with contextual menus opened up to "Developer Powershell".
+
+A console should open at the bottom of the IDE. In this console, use ``cd``
+to go to the build directory (by default, ``.\out\build\<target>``), and
+run the command-line utilities from here with the options you want to test.
+
+.. figure:: msvs7.png
+
+    A PowerShell developer console opened in Visual Studio, running p7 from
+    the build directory directly.
 
 .. _Get notified when a release is created:
     https://docs.gitlab.com/ee/user/project/releases/
@@ -200,6 +272,14 @@ one of the following command depending on the architecture you're targetting::
 .. _MinGW build image for Cahute:
     https://gitlab.com/cahuteproject/docker-images/-/blob/develop/mingw-w64/
     archlinux.Dockerfile?ref_type=heads
+
+.. _Visual Studio: https://visualstudio.microsoft.com/fr/
+.. _Visual Studio Code: https://visualstudio.microsoft.com/fr/
+.. _vcpkg is Now Included with Visual Studio:
+    https://devblogs.microsoft.com/cppblog/
+    vcpkg-is-now-included-with-visual-studio/
+.. _Install and use packages with CMake:
+    https://learn.microsoft.com/en-us/vcpkg/get_started/get-started
 
 .. |linux| image:: linux.svg
 .. |mingw-w64| image:: mingw-w64.svg
