@@ -28,6 +28,14 @@
 
 #ifndef INTERNALS_H
 #define INTERNALS_H 1
+
+/* For Microsoft Windows, we want to explicitely select the target system to
+ * avoid breaking compatibility if possible.
+ * See the following for more information:
+ *
+ * https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt */
+#define WINVER 0x0501 /* Windows XP */
+
 #include <cahute.h>
 #include <ctype.h>
 #include <errno.h>

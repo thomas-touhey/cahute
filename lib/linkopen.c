@@ -987,7 +987,7 @@ find_win32_usb_device(char *path, size_t path_size, int *mediump, DWORD addr) {
                 disk_drive_id,
                 volume_id_buf,
                 sizeof(volume_id_buf),
-                CM_GETIDLIST_FILTER_BUSRELATIONS
+                CM_GETIDLIST_FILTER_REMOVALRELATIONS
             );
 
             if (cret == CR_BUFFER_SMALL) {
@@ -1061,7 +1061,7 @@ find_win32_usb_device(char *path, size_t path_size, int *mediump, DWORD addr) {
                 }
 
                 if (memcmp(
-                        property,
+                        &guid,
                         &GUID_DEVCLASS_VOLUME,
                         sizeof(GUID_DEVCLASS_VOLUME)
                     )) {
