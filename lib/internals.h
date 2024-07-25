@@ -63,6 +63,88 @@ CAHUTE_DECLARE_TYPE(cahute_link_medium)
 # include <libusb.h>
 #endif
 
+#include <compat.h>
+
+/* ---
+ * Endianess management.
+ * --- */
+
+CAHUTE_BEGIN_DECLS
+
+CAHUTE_EXTERN(cahute_u16) cahute_be16toh(cahute_u16 cahute__x);
+CAHUTE_EXTERN(cahute_u16) cahute_le16toh(cahute_u16 cahute__x);
+CAHUTE_EXTERN(cahute_u32) cahute_be32toh(cahute_u32 cahute__x);
+CAHUTE_EXTERN(cahute_u32) cahute_le32toh(cahute_u32 cahute__x);
+
+CAHUTE_EXTERN(cahute_u16) cahute_htobe16(cahute_u16 cahute__x);
+CAHUTE_EXTERN(cahute_u16) cahute_htole16(cahute_u16 cahute__x);
+CAHUTE_EXTERN(cahute_u32) cahute_htobe32(cahute_u32 cahute__x);
+CAHUTE_EXTERN(cahute_u32) cahute_htole32(cahute_u32 cahute__x);
+
+CAHUTE_END_DECLS
+
+/* Try to get native macros. */
+#if defined(__APPLE__)
+# include <libkern/OSByteOrder.h>
+# define cahute_macro_be16toh(CAHUTE__X) OSSwapBigToHostInt16(CAHUTE__X)
+# define cahute_macro_le16toh(CAHUTE__X) OSSwapLittleToHostInt16(CAHUTE__X)
+# define cahute_macro_be32toh(CAHUTE__X) OSSwapBigToHostInt32(CAHUTE__X)
+# define cahute_macro_le32toh(CAHUTE__X) OSSwapLittleToHostInt32(CAHUTE__X)
+# define cahute_macro_htobe16(CAHUTE__X) OSSwapHostToBigInt16(CAHUTE__X)
+# define cahute_macro_htole16(CAHUTE__X) OSSwapHostToLittleInt16(CAHUTE__X)
+# define cahute_macro_htobe32(CAHUTE__X) OSSwapHostToBigInt32(CAHUTE__X)
+# define cahute_macro_htole32(CAHUTE__X) OSSwapHostToLittleInt32(CAHUTE__X)
+#elif defined(__OpenBSD__)
+# include <sys/endian.h>
+# define cahute_macro_be16toh(CAHUTE__X) be16toh(CAHUTE__X)
+# define cahute_macro_le16toh(CAHUTE__X) le16toh(CAHUTE__X)
+# define cahute_macro_be32toh(CAHUTE__X) be32toh(CAHUTE__X)
+# define cahute_macro_le32toh(CAHUTE__X) le32toh(CAHUTE__X)
+# define cahute_macro_htobe16(CAHUTE__X) htobe16(CAHUTE__X)
+# define cahute_macro_htole16(CAHUTE__X) htole16(CAHUTE__X)
+# define cahute_macro_htobe32(CAHUTE__X) htobe32(CAHUTE__X)
+# define cahute_macro_htole32(CAHUTE__X) htole32(CAHUTE__X)
+#elif defined(__GLIBC__) && defined(__USE_MISC)
+# include <endian.h>
+# define cahute_macro_be16toh(CAHUTE__X) be16toh(CAHUTE__X)
+# define cahute_macro_le16toh(CAHUTE__X) le16toh(CAHUTE__X)
+# define cahute_macro_be32toh(CAHUTE__X) be32toh(CAHUTE__X)
+# define cahute_macro_le32toh(CAHUTE__X) le32toh(CAHUTE__X)
+# define cahute_macro_htobe16(CAHUTE__X) htobe16(CAHUTE__X)
+# define cahute_macro_htole16(CAHUTE__X) htole16(CAHUTE__X)
+# define cahute_macro_htobe32(CAHUTE__X) htobe32(CAHUTE__X)
+# define cahute_macro_htole32(CAHUTE__X) htole32(CAHUTE__X)
+#endif
+
+/* CAHUTE_NO_ENDIAN may be defined by cdefs.c to be able to define the
+ * functions prototyped above. */
+#ifndef CAHUTE_NO_ENDIAN
+# ifdef cahute_macro_be16toh
+#  define cahute_be16toh(CAHUTE__X) cahute_macro_be16toh(CAHUTE__X)
+# endif
+# ifdef cahute_macro_le16toh
+#  define cahute_le16toh(CAHUTE__X) cahute_macro_le16toh(CAHUTE__X)
+# endif
+# ifdef cahute_macro_be32toh
+#  define cahute_be32toh(CAHUTE__X) cahute_macro_be32toh(CAHUTE__X)
+# endif
+# ifdef cahute_macro_le32toh
+#  define cahute_le32toh(CAHUTE__X) cahute_macro_le32toh(CAHUTE__X)
+# endif
+# ifdef cahute_macro_htobe16
+#  define cahute_htobe16(CAHUTE__X) cahute_macro_htobe16(CAHUTE__X)
+# endif
+# ifdef cahute_macro_htole16
+#  define cahute_htole16(CAHUTE__X) cahute_macro_htole16(CAHUTE__X)
+# endif
+# ifdef cahute_macro_htobe32
+#  define cahute_htobe32(CAHUTE__X) cahute_macro_htobe32(CAHUTE__X)
+# endif
+# ifdef cahute_macro_htole32
+#  define cahute_htole32(CAHUTE__X) cahute_macro_htole32(CAHUTE__X)
+# endif
+#endif
+
 /* ---
  * Logging internals.
  * --- */

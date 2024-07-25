@@ -28,7 +28,6 @@
 
 #include "internals.h"
 #include <stdarg.h>
-#include <time.h>
 
 /**
  * Default logging callback for Cahute.

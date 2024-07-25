@@ -396,7 +396,7 @@ open_link_from_medium(
     /* Ensure that the data buffer is aligned to 8 bytes, for sensitive
      * mediums such as Win32 SCSI devices. */
     link->medium.read_buffer +=
-        (~(uintptr_t)link->medium.read_buffer & 31) + 1;
+        (~(cahute_uintptr)link->medium.read_buffer & 31) + 1;
 
     /* Initialize other link properties. */
     link->flags = CAHUTE_LINK_FLAG_CLOSE_MEDIUM;

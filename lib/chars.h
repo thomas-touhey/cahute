@@ -28,7 +28,7 @@
 
 #ifndef INTERNAL_CHARS_H
 #define INTERNAL_CHARS_H 1
-#include <cahute/cdefs.h>
+#include "internals.h"
 
 /**
  * FONTCHARACTER entry.

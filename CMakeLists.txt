@@ -92,10 +92,12 @@ add_custom_target(lint COMMAND pre-commit run --all-files)
 set(LIB_INCLUDE_DIRS
     "${CMAKE_CURRENT_BINARY_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/common"
 )
 set(CLI_INCLUDE_DIRS
     "${CMAKE_CURRENT_BINARY_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/common"
 )
 set(CLI_LIBRARIES
     ${PROJECT_NAME}
@@ -104,6 +106,7 @@ set(PKGCONFIG_DEPS "")
 set(LIB_COMPILE_DEFS "")
 
 include(GNUInstallDirs)
+include(CheckTypeSize)
 find_package(PkgConfig REQUIRED)
 find_package(Python3 REQUIRED)
 
@@ -152,6 +155,17 @@ else()
         -Wstack-protector -Wno-unused-parameter
     )
 endif()
+
+check_type_size("ssize_t" "SIZEOF_SIZE_T")
+if(SIZEOF_SIZE_T STREQUAL "")
+    check_type_size("size_t" "SIZEOF_SIZE_T" BUILTIN_TYPES_ONLY)
+endif()
+check_type_size("void*" "SIZEOF_UINTPTR_T")
+
+add_compile_definitions(
+    SIZEOF_SIZE_T=${SIZEOF_SIZE_T}
+    SIZEOF_UINTPTR_T=${SIZEOF_UINTPTR_T}
+)
 
 # ---
 # Target definitions.

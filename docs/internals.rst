@@ -13,5 +13,6 @@ happening in this project, and why it is happening.
 .. toctree::
     :maxdepth: 2
 
+    internals/compat
     internals/links
     internals/text

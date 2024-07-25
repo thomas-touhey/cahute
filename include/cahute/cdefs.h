@@ -74,6 +74,9 @@ CAHUTE_BEGIN_NAMESPACE
 # define CAHUTE_MSC_PREREQ(CAHUTE__MAJ, CAHUTE__MIN) 0
 #endif
 
+/* Export the function to be used in an extern context. */
+#define CAHUTE_EXTERN(TYPE) extern TYPE
+
 /* Export whether the function is deprecated. */
 #if CAHUTE_GNUC_PREREQ(3, 0)
 # define CAHUTE_DEPRECATED __attribute__((deprecated))
@@ -90,18 +93,6 @@ CAHUTE_BEGIN_NAMESPACE
 #else
 # define CAHUTE_WUR
 #endif
-
-/* Export the function to be used in an extern context. */
-#define CAHUTE_EXTERN(TYPE) extern TYPE
-
-/* Make a function local. */
-#define CAHUTE_LOCAL(TYPE) static TYPE
-
-/* Make a function local and inline. */
-#define CAHUTE_INLINE(TYPE) static inline TYPE
-
-/* Make some data local. */
-#define CAHUTE_LOCAL_DATA(TYPE) static TYPE
 
 /* Request non-null parameters.
  * CAHUTE_NNP is to be used inline, CAHUTE_NNP_ATTR is to be used after the
@@ -126,195 +117,18 @@ CAHUTE_BEGIN_NAMESPACE
     struct NAME; \
     typedef struct NAME NAME;
 
-/* ---
- * Integer definitions.
- * --- */
+/* Define the cahute_u8 type. */
+#if CHAR_BIT != 8
+# error "Char type is expected to be 8 bits long."
+#endif
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-# include <inttypes.h>
-# include <stdint.h>
-
-/* `stdint.h` and `inttypes.h` are standard C99 headers.
- * `stdint.h` provides the `uintN_t` types, and
- * `inttypes.h` provides the `PRI[uxX]N` macros. */
-
-typedef uint8_t cahute_u8;
-typedef uint16_t cahute_u16;
-typedef uint32_t cahute_u32;
-
-# define CAHUTE_PRIu8  PRIu8
-# define CAHUTE_PRIx8  PRIx8
-# define CAHUTE_PRIX8  PRIX8
-# define CAHUTE_PRIu16 PRIu16
-# define CAHUTE_PRIx16 PRIx16
-# define CAHUTE_PRIX16 PRIX16
-# define CAHUTE_PRIu32 PRIu32
-# define CAHUTE_PRIx32 PRIx32
-# define CAHUTE_PRIX32 PRIX32
-
-#else /* C89 */
-/* Here, we ought to do some C89 hacking.
- * We'll use the `limits.h` definitions to try and guess which one of the
- * default types are the 8-bit, 16-bit and 32-bit integer. */
-
-# define CAHUTE_P8 "hh"
 typedef unsigned char cahute_u8;
 
-/* 16-bit integer. */
+#define CAHUTE_P8 "hh"
 
-# if (USHRT_MAX > 0xffffUL)
-#  error "No 16-bit type, exiting!"
-# endif
-# define CAHUTE_P16 "h"
-typedef unsigned short cahute_u16;
-
-/* 32-bit integer. */
-
-# if (UINT_MAX == 0xffffffffUL)
-#  define CAHUTE_P32 ""
-typedef unsigned int cahute_u32;
-# elif (ULONG_MAX == 0xffffffffUL)
-#  define CAHUTE_P32 "l"
-typedef unsigned long cahute_u32;
-# else
-
-/* There is nothing between `char` and `short`, and `char` is always
- * byte-wide;
- *
- * `long long` is not defined in C89, and even if it can be used as a
- * compiler extension for C89, it is supposed to be 64-bit or more.
- * So basically we're running out of options here. */
-
-#  error "No 32-bit type, exiting!"
-# endif
-
-# define CAHUTE_PRIu8  CAHUTE_P8 "u"
-# define CAHUTE_PRIx8  CAHUTE_P8 "x"
-# define CAHUTE_PRIX8  CAHUTE_P8 "X"
-# define CAHUTE_PRIu16 CAHUTE_P16 "u"
-# define CAHUTE_PRIx16 CAHUTE_P16 "x"
-# define CAHUTE_PRIX16 CAHUTE_P16 "X"
-# define CAHUTE_PRIu32 CAHUTE_P32 "u"
-# define CAHUTE_PRIx32 CAHUTE_P32 "x"
-# define CAHUTE_PRIX32 CAHUTE_P32 "X"
-#endif
-
-/* With MSVC, 'ssize_t' is not defined.
- * <BaseTsd.h> describes Windows XP as being the minimum supported
- * version, and MSVC 6.0 (encoded as 12.0) is the first being able
- * to target Windows XP (NT 5.1).
- *
- * In order not to interfere with other namespaces, we define our
- * own ``ssize_t`` type to use in our programs. */
-#if CAHUTE_MSC_PREREQ(12, 0)
-# include <BaseTsd.h>
-
-typedef SSIZE_T cahute_ssize;
-#else
-# include <sys/types.h>
-# define CAHUTE_SSIZE_MAX SSIZE_MAX
-typedef ssize_t cahute_ssize;
-#endif
-
-#ifndef CAHUTE_SSIZE_MAX
-# define CAHUTE_SSIZE_MAX (cahute_ssize)(~((size_t)-1 >> 1) >> 1)
-#endif
-
-/* printf definition for `size_t`. */
-
-#if defined(_WIN64)
-# define CAHUTE_PRIuSIZE "llu"
-# define CAHUTE_PRIxSIZE "llx"
-# define CAHUTE_PRIXSIZE "llX"
-#elif defined(_WIN32)
-# define CAHUTE_PRIuSIZE "u"
-# define CAHUTE_PRIxSIZE "x"
-# define CAHUTE_PRIXSIZE "X"
-#else
-# define CAHUTE_PRIuSIZE "zu"
-# define CAHUTE_PRIxSIZE "zx"
-# define CAHUTE_PRIXSIZE "zX"
-#endif
-
-/* ---
- * Endianess management.
- * --- */
-
-CAHUTE_BEGIN_DECLS
-
-CAHUTE_EXTERN(cahute_u16) cahute_be16toh(cahute_u16 cahute__x);
-CAHUTE_EXTERN(cahute_u16) cahute_le16toh(cahute_u16 cahute__x);
-CAHUTE_EXTERN(cahute_u32) cahute_be32toh(cahute_u32 cahute__x);
-CAHUTE_EXTERN(cahute_u32) cahute_le32toh(cahute_u32 cahute__x);
-
-CAHUTE_EXTERN(cahute_u16) cahute_htobe16(cahute_u16 cahute__x);
-CAHUTE_EXTERN(cahute_u16) cahute_htole16(cahute_u16 cahute__x);
-CAHUTE_EXTERN(cahute_u32) cahute_htobe32(cahute_u32 cahute__x);
-CAHUTE_EXTERN(cahute_u32) cahute_htole32(cahute_u32 cahute__x);
-
-CAHUTE_END_DECLS
-
-/* Try to get native macros. */
-#if defined(__APPLE__)
-# include <libkern/OSByteOrder.h>
-# define cahute_macro_be16toh(CAHUTE__X) OSSwapBigToHostInt16(CAHUTE__X)
-# define cahute_macro_le16toh(CAHUTE__X) OSSwapLittleToHostInt16(CAHUTE__X)
-# define cahute_macro_be32toh(CAHUTE__X) OSSwapBigToHostInt32(CAHUTE__X)
-# define cahute_macro_le32toh(CAHUTE__X) OSSwapLittleToHostInt32(CAHUTE__X)
-# define cahute_macro_htobe16(CAHUTE__X) OSSwapHostToBigInt16(CAHUTE__X)
-# define cahute_macro_htole16(CAHUTE__X) OSSwapHostToLittleInt16(CAHUTE__X)
-# define cahute_macro_htobe32(CAHUTE__X) OSSwapHostToBigInt32(CAHUTE__X)
-# define cahute_macro_htole32(CAHUTE__X) OSSwapHostToLittleInt32(CAHUTE__X)
-#elif defined(__OpenBSD__)
-# include <sys/endian.h>
-# define cahute_macro_be16toh(CAHUTE__X) be16toh(CAHUTE__X)
-# define cahute_macro_le16toh(CAHUTE__X) le16toh(CAHUTE__X)
-# define cahute_macro_be32toh(CAHUTE__X) be32toh(CAHUTE__X)
-# define cahute_macro_le32toh(CAHUTE__X) le32toh(CAHUTE__X)
-# define cahute_macro_htobe16(CAHUTE__X) htobe16(CAHUTE__X)
-# define cahute_macro_htole16(CAHUTE__X) htole16(CAHUTE__X)
-# define cahute_macro_htobe32(CAHUTE__X) htobe32(CAHUTE__X)
-# define cahute_macro_htole32(CAHUTE__X) htole32(CAHUTE__X)
-#elif defined(__GLIBC__) && defined(__USE_MISC)
-# include <endian.h>
-# define cahute_macro_be16toh(CAHUTE__X) be16toh(CAHUTE__X)
-# define cahute_macro_le16toh(CAHUTE__X) le16toh(CAHUTE__X)
-# define cahute_macro_be32toh(CAHUTE__X) be32toh(CAHUTE__X)
-# define cahute_macro_le32toh(CAHUTE__X) le32toh(CAHUTE__X)
-# define cahute_macro_htobe16(CAHUTE__X) htobe16(CAHUTE__X)
-# define cahute_macro_htole16(CAHUTE__X) htole16(CAHUTE__X)
-# define cahute_macro_htobe32(CAHUTE__X) htobe32(CAHUTE__X)
-# define cahute_macro_htole32(CAHUTE__X) htole32(CAHUTE__X)
-#endif
-
-/* CAHUTE_NO_ENDIAN may be defined by cdefs.c to be able to define the
- * functions prototyped above. */
-#ifndef CAHUTE_NO_ENDIAN
-# ifdef cahute_macro_be16toh
-#  define cahute_be16toh(CAHUTE__X) cahute_macro_be16toh(CAHUTE__X)
-# endif
-# ifdef cahute_macro_le16toh
-#  define cahute_le16toh(CAHUTE__X) cahute_macro_le16toh(CAHUTE__X)
-# endif
-# ifdef cahute_macro_be32toh
-#  define cahute_be32toh(CAHUTE__X) cahute_macro_be32toh(CAHUTE__X)
-# endif
-# ifdef cahute_macro_le32toh
-#  define cahute_le32toh(CAHUTE__X) cahute_macro_le32toh(CAHUTE__X)
-# endif
-# ifdef cahute_macro_htobe16
-#  define cahute_htobe16(CAHUTE__X) cahute_macro_htobe16(CAHUTE__X)
-# endif
-# ifdef cahute_macro_htole16
-#  define cahute_htole16(CAHUTE__X) cahute_macro_htole16(CAHUTE__X)
-# endif
-# ifdef cahute_macro_htobe32
-#  define cahute_htobe32(CAHUTE__X) cahute_macro_htobe32(CAHUTE__X)
-# endif
-# ifdef cahute_macro_htole32
-#  define cahute_htole32(CAHUTE__X) cahute_macro_htole32(CAHUTE__X)
-# endif
-#endif
+#define CAHUTE_PRIu8 CAHUTE_P8 "u"
+#define CAHUTE_PRIx8 CAHUTE_P8 "x"
+#define CAHUTE_PRIX8 CAHUTE_P8 "X"
 
 CAHUTE_END_NAMESPACE
 

@@ -29,6 +29,7 @@
 #ifndef COMMON_H
 #define COMMON_H 1
 #include <cahute.h>
+#include <compat.h>
 
 extern char const *get_current_log_level(void);
 extern void set_log_level(char const *loglevel);

@@ -93,8 +93,6 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
 }
 
 #elif POSIX_ENABLED
-# include <unistd.h>
-# include <time.h>
 
 CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms) {
     struct timespec requested_timestamp;
