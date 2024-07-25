@@ -748,7 +748,6 @@ cahute_set_serial_params_to_link_medium(
     case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
         struct termios term;
         speed_t termios_speed;
-        unsigned int status, original_status;
 
         switch (speed) {
         case 300:
@@ -766,21 +765,31 @@ cahute_set_serial_params_to_link_medium(
         case 4800:
             termios_speed = B4800;
             break;
+# ifdef B9600
         case 9600:
             termios_speed = B9600;
             break;
+# endif
+# ifdef B19200
         case 19200:
             termios_speed = B19200;
             break;
+# endif
+# ifdef B38400
         case 38400:
             termios_speed = B38400;
             break;
+# endif
+# ifdef B57600
         case 57600:
             termios_speed = B57600;
             break;
+# endif
+# ifdef B115200
         case 115200:
             termios_speed = B115200;
             break;
+# endif
         default:
             msg(ll_error, "Speed unsupported by termios: %lu", speed);
             return CAHUTE_ERROR_UNKNOWN;
@@ -845,39 +854,49 @@ cahute_set_serial_params_to_link_medium(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        /* Also set the DTR/RTS mode. */
-        if (ioctl(medium->state.posix.fd, TIOCMGET, &status) >= 0)
-            status = 0;
+# if defined(TIOCM_DTR) || defined(TIOCM_RTS)
+        {
+            unsigned int status, original_status;
 
-        original_status = status;
+            /* Also set the DTR/RTS mode. */
+            if (ioctl(medium->state.posix.fd, TIOCMGET, &status) >= 0)
+                status = 0;
 
-        switch (flags & CAHUTE_SERIAL_DTR_MASK) {
-        case CAHUTE_SERIAL_DTR_ENABLE:
-        case CAHUTE_SERIAL_DTR_HANDSHAKE:
-            status |= TIOCM_DTR;
-            break;
+            original_status = status;
 
-        default:
-            status &= ~TIOCM_DTR;
-            break;
+#  if defined(TIOCM_DTR)
+            switch (flags & CAHUTE_SERIAL_DTR_MASK) {
+            case CAHUTE_SERIAL_DTR_ENABLE:
+            case CAHUTE_SERIAL_DTR_HANDSHAKE:
+                status |= TIOCM_DTR;
+                break;
+
+            default:
+                status &= ~TIOCM_DTR;
+                break;
+            }
+#  endif
+
+#  if defined(TIOCM_RTS)
+            switch (flags & CAHUTE_SERIAL_RTS_MASK) {
+            case CAHUTE_SERIAL_RTS_ENABLE:
+            case CAHUTE_SERIAL_RTS_HANDSHAKE:
+                status |= TIOCM_RTS;
+                break;
+
+            default:
+                status &= ~TIOCM_RTS;
+                break;
+            }
+#  endif
+
+            if (status != original_status
+                && ioctl(medium->state.posix.fd, TIOCMSET, &status) < 0) {
+                msg(ll_error, "Could not set DTR/RTS mode.");
+                return CAHUTE_ERROR_UNKNOWN;
+            }
         }
-
-        switch (flags & CAHUTE_SERIAL_RTS_MASK) {
-        case CAHUTE_SERIAL_RTS_ENABLE:
-        case CAHUTE_SERIAL_RTS_HANDSHAKE:
-            status |= TIOCM_RTS;
-            break;
-
-        default:
-            status &= ~TIOCM_RTS;
-            break;
-        }
-
-        if (status != original_status
-            && ioctl(medium->state.posix.fd, TIOCMSET, &status) < 0) {
-            msg(ll_error, "Could not set DTR/RTS mode.");
-            return CAHUTE_ERROR_UNKNOWN;
-        }
+# endif
     } break;
 #endif
 
