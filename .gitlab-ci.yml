@@ -65,6 +65,12 @@ publish docs:
     rules:
       - if: $CI_COMMIT_TAG
         when: always
+        variables:
+            UPLOAD_PATH: /var/www/cahuteproject/www
+      - if: $CI_COMMIT_BRANCH == "develop"
+        when: always
+        variables:
+            UPLOAD_PATH: /var/www/cahuteproject/next
     image: debian:bookworm-slim
     before_script:
         - apt-get update -y
@@ -75,7 +81,7 @@ publish docs:
         - chmod 400 "$SSH_PRIVATE_KEY"
         - ssh-add "$SSH_PRIVATE_KEY"
     script:
-        - rsync -Prlt --delete docs/_build/html/ gitlab-cahute@cahuteproject.org:/var/www/cahuteproject/www
+        - rsync -Prlt --delete docs/_build/html/ gitlab-cahute@cahuteproject.org:$UPLOAD_PATH
     dependencies:
         - build docs
 
