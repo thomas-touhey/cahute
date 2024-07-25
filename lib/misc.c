@@ -95,24 +95,27 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
 #elif POSIX_ENABLED
 
 CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms) {
-    struct timespec requested_timestamp;
-
-    requested_timestamp.tv_sec = ms / 1000;
-    requested_timestamp.tv_nsec = (ms % 1000) * 1000000;
-    nanosleep(&requested_timestamp, NULL);
+    usleep(ms * 1000);
     return CAHUTE_OK;
 }
 
 CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
+# if DJGPP_ENABLED
+    /* DJGPP does not define 'clock_gettime()', however it defines 'uclock()'
+     * which is not present on Linux and other POSIX systems.
+     * Note that uclock() is said not to return correct values on
+     * Windows 3.X, unfortunately. */
+    *msp = (unsigned long)(uclock() / 1000);
+# else
     struct timespec res;
     int ret;
 
     ret = clock_gettime(
-# ifdef CLOCK_BOOTTIME
+#  ifdef CLOCK_BOOTTIME
         CLOCK_BOOTTIME,
-# else
+#  else
         CLOCK_MONOTONIC,
-# endif
+#  endif
         &res
     );
 
@@ -126,6 +129,7 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp) {
 
     *msp = (unsigned long)res.tv_sec * 1000
            + (unsigned long)res.tv_nsec / 1000000;
+# endif
     return CAHUTE_OK;
 }
 

@@ -34,12 +34,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
 CAHUTE_DECLARE_TYPE(cahute_link_medium)
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)
 # define WIN32_ENABLED 1
 #else
 # define WIN32_ENABLED 0
+#endif
+
+#if defined(__DJGPP) || defined(__DJGPP__)
+# define DJGPP_ENABLED 1
+#else
+# define DJGPP_ENABLED 0
 #endif
 
 #if WIN32_ENABLED
