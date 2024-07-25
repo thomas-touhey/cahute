@@ -536,10 +536,14 @@ fail:
 
 #if WIN32_ENABLED && LIBUSB_ENABLED
 # include <cfgmgr32.h>
-# include <usbiodef.h>
 # include <initguid.h>
+# if defined(__MINGW32__) || defined(__MINGW64__)
+#  include <ddk/wdmguid.h>
+# else
+#  include <wdmguid.h>
+# endif
+# include <usbiodef.h>
 # include <devguid.h>
-# include <ddk/wdmguid.h>
 # define HEXDIGIT(C) \
      ((C) >= 'a' ? (C) - 'a' + 10 : (C) >= 'A' ? (C) - 'A' + 10 : (C) - '0')
 
