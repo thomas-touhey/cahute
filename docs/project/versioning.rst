@@ -85,5 +85,21 @@ see :ref:`project-commit-naming`.
     This structure, while simple, gives flexibility for release branches,
     hotfix branches, and so on, to be introduced later.
 
+Documentation
+-------------
+
+The documentation source is included within the repository, and included in
+the releases on Git (although removed from the tarballs).
+
+A built version of the documentation of the latest release is available at
+`cahuteproject.org`_, through HTTP.
+
+A preview version is also available at `next.cahuteproject.org`_, through
+HTTP. It is built and published every time one or more new commits land on
+the ``develop`` branch, and as such, may include content that is not yet
+available in the latest release.
+
 .. _Semantic Versioning: https://semver.org/
 .. _Releases: https://gitlab.com/cahuteproject/cahute/-/releases
+.. _cahuteproject.org: https://cahuteproject.org/
+.. _next.cahuteproject.org: https://next.cahuteproject.org/

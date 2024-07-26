@@ -6,6 +6,7 @@ https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 from __future__ import annotations
 
+from os import environ
 from pathlib import Path
 import sys
 
@@ -29,6 +30,14 @@ primary_domain = "c"
 
 html_theme = "furo"
 html_theme_options = {
+    "light_css_variables": {
+        "color-announcement-text": "#000000",
+        "color-announcement-background": "#F9B308",
+    },
+    "dark_css_variables": {
+        "color-announcement-text": "#000000",
+        "color-announcement-background": "#F9B308",
+    },
     "footer_icons": [
         {
             "name": "Planète Casio",
@@ -44,6 +53,14 @@ html_theme_options = {
         },
     ],
 }
+
+if environ.get("CI_COMMIT_BRANCH") == "develop" or environ.get("IS_PREVIEW"):
+    html_theme_options["announcement"] = (
+        "<p>This is a <b>preview</b> of the documentation for the next "
+        + "version of Cahute.</p><p>It may describe features that are not "
+        + "available in the latest release.</p>"
+    )
+
 html_static_path = ["_static"]
 html_title = f"Cahute {version}"
 html_favicon = '_static/favicon.png'

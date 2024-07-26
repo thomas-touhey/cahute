@@ -1,3 +1,23 @@
+.announcement {
+    overflow-x: visible !important;
+    height: auto !important;
+    padding: .5em;
+}
+
+.announcement-content {
+    display: flex;
+    flex-wrap: wrap;
+    font-size: .9em !important;
+    gap: .2em;
+    justify-content: center;
+    white-space: normal !important;
+}
+
+.announcement-content p {
+    margin: 0;
+    padding: 0;
+}
+
 h1 img, h2 img, p img {
     vertical-align: baseline;
     width: .8em;
