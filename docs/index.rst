@@ -35,7 +35,8 @@ It is also talked about in the following places:
 * `Planète Casio <Planète Casio topic_>`_ (*in French*);
 * `TI-Planet <TI-Planet topic_>`_ (*in French*);
 * `Casiopeia <Casiopeia topic_>`_;
-* `Universal Casio Forum <UCF topic_>`_.
+* `Universal Casio Forum <UCF topic_>`_;
+* `Cemetech <Cemetech topic_>`_.
 
 The project's code and documentation contents are licensed under CeCILL_
 version 2.1 as distributed by the CEA, CNRS and Inria on
@@ -140,6 +141,8 @@ is based on.
 .. _UCF topic:
     https://community.casiocalc.org/topic/
     8214-cahute-a-toolset-for-protocols-and-file-formats/
+.. _Cemetech topic:
+    https://www.cemetech.net/forum/viewtopic.php?p=307733
 
 .. _Simon Lothar:
     https://www.casiopeia.net/forum/memberlist.php?mode=viewprofile&u=10405
