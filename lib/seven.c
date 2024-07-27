@@ -28,10 +28,20 @@
 
 #include "internals.h"
 
-/* TIMEOUT_PACKET_START is the timeout before a packet starts.
- * TIMEOUT_PACKET_CONTENTS is the timeout in between bytes for a packet. */
-#define TIMEOUT_PACKET_START    0
-#define TIMEOUT_PACKET_CONTENTS 2000
+/* TIMEOUT_PACKET_START is the maximum delay before which the first byte of a
+ * packet is expected under normal circumstances.
+ * TIMEOUT_PACKET_INIT is the maximum delay before which the first byte of
+ * the response to an initial check in the context of link initiation is
+ * expected.
+ * TIMEOUT_PACKET_TIMEOUT is the maximum delay before which the first byte of
+ * the response to a presence check in the context of a normal timeout is
+ * expected.
+ * TIMEOUT_PACKET_CONTENTS is the timeout in between bytes for a packet, after
+ * the first byte of a packet has been received, in any circumstances. */
+#define TIMEOUT_PACKET_START    10000 /* 10 seconds. */
+#define TIMEOUT_PACKET_INIT     500   /* 500 ms (.5 seconds). */
+#define TIMEOUT_PACKET_TIMEOUT  10000 /* 10 seconds. */
+#define TIMEOUT_PACKET_CONTENTS 2000  /* 2 seconds. */
 
 #define IS_ASCII_HEX_DIGIT(C) \
     (((C) >= '0' && (C) <= '9') || ((C) >= 'A' && (C) <= 'F'))
@@ -94,6 +104,14 @@
     EXPECT_PACKET(PACKET_TYPE_ACK, PACKET_SUBTYPE_ACK_BASIC)
 #define EXPECT_BASIC_ACK_OR_FAIL \
     EXPECT_PACKET_OR_FAIL(PACKET_TYPE_ACK, PACKET_SUBTYPE_ACK_BASIC)
+
+/* Raw initial check packet to send. */
+CAHUTE_LOCAL_DATA(cahute_u8 const)
+initial_check_packet[] = {5, '0', '0', '0', '7', '0'};
+
+/* Raw check packet to send in case of timeout. */
+CAHUTE_LOCAL_DATA(cahute_u8 const)
+timeout_check_packet[] = {5, '0', '1', '0', '6', 'F'};
 
 /* Raw device info to present for command '01' on receiver mode. */
 CAHUTE_LOCAL_DATA(cahute_u8 const)
@@ -501,7 +519,8 @@ cahute_seven_receive(cahute_link *link, unsigned long timeout) {
 }
 
 #define SEND_FLAG_DISABLE_CHECKSUM 0x00000001 /* Disable checksum flow. */
-#define SEND_FLAG_DISABLE_RECEIVE  0x00000002 /* Disable packet reception. */
+#define SEND_FLAG_DISABLE_TIMEOUT  0x00000002 /* Disable timeout flow. */
+#define SEND_FLAG_DISABLE_RECEIVE  0x00000004 /* Disable packet reception. */
 
 /**
  * Send a raw Protocol 7.00 packet, receive a response and store it into
@@ -517,6 +536,7 @@ cahute_seven_receive(cahute_link *link, unsigned long timeout) {
  * @param flags Flags, as or'd `SEND_FLAG_*` constants.
  * @param raw_packet Raw packet data to send.
  * @param raw_packet_size Size of the raw packet data to send.
+ * @param timeout Timeout to use for start of packet.
  * @return Cahute error.
  */
 CAHUTE_LOCAL(int)
@@ -524,18 +544,19 @@ cahute_seven_send_and_receive(
     cahute_link *link,
     unsigned long flags,
     cahute_u8 const *raw_packet,
-    size_t raw_packet_size
+    size_t raw_packet_size,
+    unsigned long timeout
 ) {
     int err, correct = 0;
-    int tries = 3;
+    int attempts, initial_attempts = 3;
 
     if (flags & SEND_FLAG_DISABLE_CHECKSUM) {
         /* No retries and no checksum flow if this flag is on, we directly
          * return CAHUTE_ERROR_CORRUPT! */
-        tries = 1;
+        initial_attempts = 1;
     }
 
-    for (; tries > 0; tries--) {
+    for (attempts = initial_attempts; attempts > 0; attempts--) {
         msg(ll_info, "Sending the following packet to the device:");
         mem(ll_info, raw_packet, raw_packet_size);
 
@@ -550,7 +571,52 @@ cahute_seven_send_and_receive(
         }
 
         msg(ll_info, "Packet sent successfully, now waiting for response.");
-        if ((err = cahute_seven_receive(link, TIMEOUT_PACKET_START)))
+        err = cahute_seven_receive(link, timeout);
+        if (err == CAHUTE_ERROR_TIMEOUT_START
+            && (~flags & SEND_FLAG_DISABLE_TIMEOUT)) {
+            /* We are about to continue, but if the timeout recovery flow
+             * succeeds, we want to restore the number of attempts. */
+            msg(ll_info,
+                "Link did not respond in a timely manner; sending timeout "
+                "check:");
+            mem(ll_info, timeout_check_packet, 6);
+
+            err = cahute_write_to_link(link, timeout_check_packet, 6);
+            if (err)
+                return err;
+
+            err = cahute_seven_receive(link, TIMEOUT_PACKET_TIMEOUT);
+            if (err == CAHUTE_ERROR_TIMEOUT_START) {
+                msg(ll_info,
+                    "Link did not respond on sent packet nor timeout check.");
+                link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+                return CAHUTE_ERROR_TIMEOUT_START;
+            }
+
+            if (err)
+                return err;
+
+            /* From fxReverse: "If the passive side receives the check packet,
+             * an error packet is returned as a retransmission request,
+             * the active side resends the packet and communication
+             * continues". */
+            if (link->protocol_state.seven.last_packet_type != PACKET_TYPE_NAK
+                || link->protocol_state.seven.last_packet_subtype
+                       != PACKET_SUBTYPE_NAK_RESEND) {
+                msg(ll_info,
+                    "Expected a resend error on timeout check, got a packet "
+                    "of type %02X and subtype %02X.",
+                    link->protocol_state.seven.last_packet_type,
+                    link->protocol_state.seven.last_packet_subtype);
+                link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+                return CAHUTE_ERROR_TIMEOUT_START;
+            }
+
+            attempts = initial_attempts;
+            continue;
+        }
+
+        if (err)
             return err;
 
         if (link->protocol_state.seven.last_packet_type == PACKET_TYPE_NAK
@@ -601,7 +667,13 @@ cahute_seven_send_basic(
         cahute_seven_checksum(&packet[1], 3)
     );
 
-    return cahute_seven_send_and_receive(link, flags, packet, 6);
+    return cahute_seven_send_and_receive(
+        link,
+        flags,
+        packet,
+        6,
+        TIMEOUT_PACKET_START
+    );
 }
 
 /**
@@ -653,7 +725,13 @@ cahute_seven_send_extended(
         cahute_seven_checksum(&packet[1], 7 + data_size)
     );
 
-    return cahute_seven_send_and_receive(link, flags, packet, 10 + data_size);
+    return cahute_seven_send_and_receive(
+        link,
+        flags,
+        packet,
+        10 + data_size,
+        TIMEOUT_PACKET_START
+    );
 }
 
 /**
@@ -922,7 +1000,7 @@ end:
  * @return Cahute error.
  */
 CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link) {
-    int err;
+    int err, attempts = 8;
 
     if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
         err = cahute_seven_receive(link, TIMEOUT_PACKET_START);
@@ -937,17 +1015,19 @@ CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link) {
             PACKET_TYPE_ACK,
             PACKET_SUBTYPE_ACK_BASIC
         );
-        if (err)
-            return err;
-    } else {
-        err = cahute_seven_send_basic(
+        return err;
+    }
+
+    for (; attempts > 0; attempts--) {
+        err = cahute_seven_send_and_receive(
             link,
-            0,
-            PACKET_TYPE_CHECK,
-            PACKET_SUBTYPE_CHECK_INIT
+            SEND_FLAG_DISABLE_TIMEOUT,
+            initial_check_packet,
+            6,
+            TIMEOUT_PACKET_INIT
         );
-        if (err)
-            return err;
+        if (err == CAHUTE_ERROR_TIMEOUT_START)
+            continue;
 
         if (link->protocol_state.seven.last_packet_type != PACKET_TYPE_ACK
             || link->protocol_state.seven.last_packet_subtype
@@ -955,9 +1035,12 @@ CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link) {
             msg(ll_error, "Calculator did not answer a basic ACK.");
             return CAHUTE_ERROR_UNKNOWN;
         }
+
+        return CAHUTE_OK;
     }
 
-    return CAHUTE_OK;
+    msg(ll_error, "Link did not respond to the initial check.");
+    return CAHUTE_ERROR_TIMEOUT_START;
 }
 
 /**
@@ -1064,7 +1147,8 @@ cahute_seven_send_data(
             return err;
 
         shifted = 1;
-        loop_send_flags |= SEND_FLAG_DISABLE_CHECKSUM;
+        loop_send_flags |=
+            SEND_FLAG_DISABLE_CHECKSUM | SEND_FLAG_DISABLE_TIMEOUT;
 
         if (progress_func)
             (*progress_func)(progress_cookie, 1, packet_count);
@@ -1251,7 +1335,8 @@ cahute_seven_send_data_from_buf(
             return err;
 
         shifted = 1;
-        loop_send_flags |= SEND_FLAG_DISABLE_CHECKSUM;
+        loop_send_flags |=
+            SEND_FLAG_DISABLE_CHECKSUM | SEND_FLAG_DISABLE_TIMEOUT;
 
         if (progress_func)
             (*progress_func)(progress_cookie, 1, packet_count);
@@ -1629,7 +1714,8 @@ cahute_seven_receive_raw_data_into_buf(
             return err;
 
         shifted = 1;
-        loop_send_flags |= SEND_FLAG_DISABLE_CHECKSUM;
+        loop_send_flags |=
+            SEND_FLAG_DISABLE_CHECKSUM | SEND_FLAG_DISABLE_TIMEOUT;
     }
 
     /* Read all middle packets in the flow. */
