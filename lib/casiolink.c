@@ -44,9 +44,12 @@ default_mdl1_payload =
     (cahute_u8 const *)":MDL1GY351\xFF" "000000N1.03\0\0\x01\0\0\0\x04\0\0\0"
     "\x01\0\x03\xFF\xFF\xFF\xFF\0";
 
-/* TIMEOUT_PACKET_TYPE is the timeout before reading the packet type, i.e.
+/* TIMEOUT_INIT is the timeout before reading the response to the START
+ * packet, at link initiation.
+ * TIMEOUT_PACKET_TYPE is the timeout before reading the packet type, i.e.
  * the first byte, while TIMEOUT_PACKET_CONTENTS is the timeout before
  * reading any of the following bytes. */
+#define TIMEOUT_INIT            500
 #define TIMEOUT_PACKET_CONTENTS 2000
 
 #define PACKET_TYPE_ACK          0x06
@@ -932,121 +935,136 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
             if (err)
                 return err;
         }
-    } else {
-        /* Make the initiation flow. */
-        buf[0] = PACKET_TYPE_START;
-        err = cahute_write_to_link(link, buf, 1);
-        if (err)
-            return err;
 
-        err = cahute_read_from_link(link, buf, 1, 0, 0);
-        if (err)
-            return err;
+        return CAHUTE_OK;
+    }
 
-        if (buf[0] != PACKET_TYPE_ESTABLISHED) {
-            msg(ll_error,
-                "Expected ESTABLISHED packet (0x%02X), got 0x%02X.",
-                PACKET_TYPE_ESTABLISHED,
-                buf[0]);
+    /* Initial handshake, common to all CASIOLINK variants. */
+    {
+        int initial_attempts = 6, attempts;
 
-            return CAHUTE_ERROR_UNKNOWN;
-        }
-
-        /* In the CAS100 variant, we actually need to initiate an additional
-         * flow here, being the MDL1 flow. */
-        if (link->protocol_state.casiolink.variant
-            == CAHUTE_CASIOLINK_VARIANT_CAS100) {
-            char serial_params[7];
-
-            memcpy(buf, default_mdl1_payload, 40);
-
-            /* NOTE: sprintf() adds a terminating zero, but we don't care,
-             * since we override buf[17] right after. */
-            sprintf(serial_params, "%06lu", link->medium.serial_speed);
-            switch (link->medium.serial_flags & CAHUTE_SERIAL_PARITY_MASK) {
-            case CAHUTE_SERIAL_PARITY_EVEN:
-                serial_params[6] = 'E';
-                break;
-
-            case CAHUTE_SERIAL_PARITY_ODD:
-                serial_params[6] = 'O';
-                break;
-
-            default:
-                serial_params[6] = 'N';
-            }
-
-            memcpy(&buf[11], serial_params, 7);
-
-            buf[39] = cahute_casiolink_checksum(&buf[1], 38);
-
-            err = cahute_write_to_link(link, buf, 40);
-            if (err)
-                return err;
-
-            err = cahute_read_from_link(
-                link,
-                buf,
-                40,
-                0,
-                TIMEOUT_PACKET_CONTENTS
-            );
-            if (err)
-                return err;
-
-            msg(ll_info, "Received data for MDL1 is the following:");
-            mem(ll_info, buf, 40);
-
-            err = 0;
-            if (memcmp(buf, "\x3AMDL1", 5)
-                || memcmp(&buf[11], serial_params, 7))
-                err = CAHUTE_ERROR_UNKNOWN;
-
-            if (!err) {
-                checksum = cahute_casiolink_checksum(buf + 1, 38);
-                if (buf[39] != checksum)
-                    err = CAHUTE_ERROR_CORRUPT;
-            }
-
-            if (err) {
-                cahute_u8 send_buf[1] = {PACKET_TYPE_CORRUPTED};
-
-                msg(ll_error,
-                    "Unknown or invalid packet when MDL1 was expected:");
-                mem(ll_error, buf, 40);
-
-                err = cahute_write_to_link(link, send_buf, 1);
-                if (err)
-                    return err;
-
-                return err;
-            }
-
-            /* We want to store the received MDL1 packet here.
-             * TODO: We may want to check the speed here. */
-            memcpy(
-                link->protocol_state.casiolink.raw_device_info,
-                &buf[5],
-                CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE
-            );
-            link->protocol_state.casiolink.flags |=
-                CASIOLINK_FLAG_DEVICE_INFO_OBTAINED;
-
-            /* Send the acknowledgement. */
-            buf[0] = PACKET_TYPE_ACK;
-
+        msg(ll_info,
+            "Making the initial handshake (%d attempts, %lums for each).",
+            initial_attempts,
+            TIMEOUT_INIT);
+        for (attempts = initial_attempts; attempts > 0; attempts--) {
+            /* Make the initiation flow. */
+            buf[0] = PACKET_TYPE_START;
             err = cahute_write_to_link(link, buf, 1);
             if (err)
                 return err;
 
-            /* Receive the initial acknowledgement. */
-            err = cahute_read_from_link(link, buf, 1, 0, 0);
+            err = cahute_read_from_link(link, buf, 1, TIMEOUT_INIT, 0);
+            if (err == CAHUTE_ERROR_TIMEOUT_START)
+                continue;
+
             if (err)
                 return err;
 
-            if (buf[0] != PACKET_TYPE_ACK)
+            if (buf[0] != PACKET_TYPE_ESTABLISHED) {
+                msg(ll_error,
+                    "Expected ESTABLISHED packet (0x%02X), got 0x%02X.",
+                    PACKET_TYPE_ESTABLISHED,
+                    buf[0]);
+
                 return CAHUTE_ERROR_UNKNOWN;
+            }
+
+            break;
         }
+
+        if (attempts <= 0) {
+            msg(ll_error, "No response after %d attempts.");
+            return CAHUTE_ERROR_TIMEOUT_START;
+        }
+    }
+
+    /* In the CAS100 variant, we actually need to initiate an additional
+     * flow here, being the MDL1 flow. */
+    if (link->protocol_state.casiolink.variant
+        == CAHUTE_CASIOLINK_VARIANT_CAS100) {
+        char serial_params[7];
+
+        memcpy(buf, default_mdl1_payload, 40);
+
+        /* NOTE: sprintf() adds a terminating zero, but we don't care,
+         * since we override buf[17] right after. */
+        sprintf(serial_params, "%06lu", link->medium.serial_speed);
+        switch (link->medium.serial_flags & CAHUTE_SERIAL_PARITY_MASK) {
+        case CAHUTE_SERIAL_PARITY_EVEN:
+            serial_params[6] = 'E';
+            break;
+
+        case CAHUTE_SERIAL_PARITY_ODD:
+            serial_params[6] = 'O';
+            break;
+
+        default:
+            serial_params[6] = 'N';
+        }
+
+        memcpy(&buf[11], serial_params, 7);
+
+        buf[39] = cahute_casiolink_checksum(&buf[1], 38);
+
+        err = cahute_write_to_link(link, buf, 40);
+        if (err)
+            return err;
+
+        err = cahute_read_from_link(link, buf, 40, 0, TIMEOUT_PACKET_CONTENTS);
+        if (err)
+            return err;
+
+        msg(ll_info, "Received data for MDL1 is the following:");
+        mem(ll_info, buf, 40);
+
+        err = 0;
+        if (memcmp(buf, "\x3AMDL1", 5) || memcmp(&buf[11], serial_params, 7))
+            err = CAHUTE_ERROR_UNKNOWN;
+
+        if (!err) {
+            checksum = cahute_casiolink_checksum(buf + 1, 38);
+            if (buf[39] != checksum)
+                err = CAHUTE_ERROR_CORRUPT;
+        }
+
+        if (err) {
+            cahute_u8 send_buf[1] = {PACKET_TYPE_CORRUPTED};
+
+            msg(ll_error, "Unknown or invalid packet when MDL1 was expected:");
+            mem(ll_error, buf, 40);
+
+            err = cahute_write_to_link(link, send_buf, 1);
+            if (err)
+                return err;
+
+            return err;
+        }
+
+        /* We want to store the received MDL1 packet here.
+         * TODO: We may want to check the speed here. */
+        memcpy(
+            link->protocol_state.casiolink.raw_device_info,
+            &buf[5],
+            CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE
+        );
+        link->protocol_state.casiolink.flags |=
+            CASIOLINK_FLAG_DEVICE_INFO_OBTAINED;
+
+        /* Send the acknowledgement. */
+        buf[0] = PACKET_TYPE_ACK;
+
+        err = cahute_write_to_link(link, buf, 1);
+        if (err)
+            return err;
+
+        /* Receive the initial acknowledgement. */
+        err = cahute_read_from_link(link, buf, 1, 0, 0);
+        if (err)
+            return err;
+
+        if (buf[0] != PACKET_TYPE_ACK)
+            return CAHUTE_ERROR_UNKNOWN;
     }
 
     return CAHUTE_OK;
