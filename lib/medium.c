@@ -374,21 +374,16 @@ cahute_read_from_link_medium(
 
             avail = (status_buf[6] << 8) | status_buf[7];
             if (!avail) {
-                if (!timeout)
-                    err = cahute_sleep(200);
-                else {
-                    if (timeout < 20)
-                        goto time_out;
-
-                    err = cahute_sleep(timeout >= 200 ? 200 : timeout - 10);
-                }
-
+                err = cahute_sleep(10);
                 if (err)
                     return err;
 
                 continue;
             }
 
+            /* NOTE: The target size here should always at least have 4 MiB,
+             * which means this condition should actually never evaluate
+             * to true. */
             if (avail > target_size)
                 avail = target_size;
 
