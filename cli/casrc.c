@@ -70,7 +70,7 @@ int create_casrc_database(struct casrc_database **dbp) {
  */
 void destroy_casrc_database(struct casrc_database *db) {
     struct casrc_setting *setting;
-    struct casrc_macro *macro;
+    struct casrc_setting *macro;
 
     setting = db->settings;
     while (setting) {
@@ -91,13 +91,13 @@ void destroy_casrc_database(struct casrc_database *db) {
 
     macro = db->macros;
     while (macro) {
-        struct casrc_macro *macro_to_free = macro;
-        struct casrc_property_diff *diff;
+        struct casrc_setting *macro_to_free = macro;
+        struct casrc_property *diff;
 
         macro = macro->next;
-        diff = macro_to_free->diffs;
+        diff = macro_to_free->properties;
         while (diff) {
-            struct casrc_property_diff *diff_to_free = diff;
+            struct casrc_property *diff_to_free = diff;
 
             diff = diff->next;
             free(diff_to_free);
@@ -110,19 +110,19 @@ void destroy_casrc_database(struct casrc_database *db) {
 }
 
 /**
- * Get a set of property diffs from a macro name.
+ * Get a list of properties from a macro name.
  *
  * @param db casrc database to access.
  * @param key Key of the macro to get.
  * @param diffp Pointer to the pointer to the first diff to set.
  * @return 0 if there were no errors, other otherwise.
  */
-static int get_casrc_macro_diffs(
+static int get_casrc_macro_properties(
     struct casrc_database *db,
     char const *key,
-    struct casrc_property_diff **diffp
+    struct casrc_property **diffp
 ) {
-    struct casrc_macro *node = db->macros;
+    struct casrc_setting *node = db->macros;
     int cmp_result = 1;
 
     for (; node; node = node->next) {
@@ -137,7 +137,7 @@ static int get_casrc_macro_diffs(
         } while (s[-1] && !cmp_result);
 
         if (!cmp_result) {
-            *diffp = node->diffs;
+            *diffp = node->properties;
             return 0;
         }
 
@@ -241,83 +241,93 @@ static inline void get_key_value_pair(
 }
 
 /**
- * Define a macro using a given casrc line.
+ * Define a setting or macro using a given casrc line.
  *
- * @param db casrc database to modify.
+ * @param db Database to use to obtain macros.
+ * @param macros Macro linked list to which to add the macro.
  * @param name Name of the macro to define.
  * @param line Line to define; note that it will be modified.
+ * @param reset Whether to reset the setting.
  * @return 0 if there were no errors, other otherwise.
  */
-int define_casrc_macro(
+int define_casrc_setting(
     struct casrc_database *db,
+    struct casrc_setting **macrosp,
     char const *name,
-    char *line
+    char *line,
+    int reset
 ) {
-    struct casrc_macro **macrop, *macro;
-    struct casrc_property_diff **diffp, *diff;
+    struct casrc_setting **macrop, *macro;
+    struct casrc_property **diffp, *diff;
     char *com, *buf;
     int comp;
 
     /* Find the entry corresponding to the macro. */
-    for (macrop = &db->macros;
+    for (macrop = macrosp;
          (*macrop) && (comp = strcmp(name, (*macrop)->name)) > 0;
          macrop = &(*macrop)->next)
         ;
     if (!*macrop || comp < 0) {
         /* We want to create a new macro to insert right there. */
-        macro = malloc(sizeof(struct casrc_macro) + strlen(name) + 1);
+        macro = malloc(sizeof(struct casrc_setting) + strlen(name) + 1);
         if (!macro) {
             fprintf(stderr, "malloc() for macro failed.\n");
             return 1;
         }
 
-        buf = &((char *)macro)[sizeof(struct casrc_macro)];
+        buf = &((char *)macro)[sizeof(struct casrc_setting)];
         strcpy(buf, name);
 
         macro->next = *macrop;
         macro->name = buf;
-        macro->diffs = NULL;
+        macro->properties = NULL;
 
         *macrop = macro;
+        diffp = &macro->properties;
     } else {
         /* We have found an exact match, we want to replace the macro. */
         macro = *macrop;
+        diffp = &macro->properties;
 
-        for (diff = macro->diffs; diff;) {
-            struct casrc_property_diff *diff_to_free = diff;
+        if (reset) {
+            for (diff = macro->properties; diff;) {
+                struct casrc_property *diff_to_free = diff;
 
-            diff = diff->next;
-            free(diff_to_free);
+                diff = diff->next;
+                free(diff_to_free);
+            }
+
+            macro->properties = NULL;
+        } else {
+            /* Place the cursor at the end of the existing properties. */
+            while (*diffp)
+                diffp = &(*diffp)->next;
         }
-
-        macro->diffs = NULL;
     }
 
     /* Now that the pointer to the diffs to define is ready, we can
      * decode the property diffs and assign them to it. */
-    diffp = &macro->diffs;
     while (!get_next_comma_component(&line, &com)) {
-        struct casrc_property_diff *other_diff;
+        struct casrc_property *other_diff;
         char const *key, *value;
         size_t key_len, value_len;
         int set;
 
         if (strcmp(name, com)
-            && !get_casrc_macro_diffs(db, com, &other_diff)) {
+            && !get_casrc_macro_properties(db, com, &other_diff)) {
             /* We're expanding another macro! */
             for (; other_diff; other_diff = other_diff->next) {
                 key_len = strlen(other_diff->name);
                 value_len = strlen(other_diff->value);
                 diff = malloc(
-                    sizeof(struct casrc_property_diff) + key_len + value_len
-                    + 2
+                    sizeof(struct casrc_property) + key_len + value_len + 2
                 );
                 if (!diff) {
                     fprintf(stderr, "malloc() for property diff failed.\n");
                     return 1;
                 }
 
-                buf = &((char *)diff)[sizeof(struct casrc_property_diff)];
+                buf = &((char *)diff)[sizeof(struct casrc_property)];
                 strcpy(buf, other_diff->name);
                 strcpy(&buf[key_len + 1], other_diff->value);
 
@@ -343,15 +353,13 @@ int define_casrc_macro(
         /* We can create our new node here! */
         key_len = strlen(key);
         value_len = strlen(value);
-        diff = malloc(
-            sizeof(struct casrc_property_diff) + key_len + value_len + 2
-        );
+        diff = malloc(sizeof(struct casrc_property) + key_len + value_len + 2);
         if (!diff) {
             fprintf(stderr, "malloc() for property diff failed.\n");
             return 1;
         }
 
-        buf = &((char *)diff)[sizeof(struct casrc_property_diff)];
+        buf = &((char *)diff)[sizeof(struct casrc_property)];
         strcpy(buf, key);
         strcpy(&buf[key_len + 1], value);
 
@@ -364,174 +372,6 @@ int define_casrc_macro(
         diffp = &diff->next;
     }
 
-
-    return 0;
-}
-
-/**
- * Apply a property diff to a given setting.
- *
- * The provided name is considered to be already lowercased.
- *
- * @param setting Setting to which to apply the property diff.
- * @param name Key of the property to set or unset on the setting.
- * @param value Value of the property, if the property is to be set.
- * @param unset Whether to set (0) or unset (non-0) the property.
- */
-static int apply_property_diff(
-    struct casrc_setting *setting,
-    char const *name,
-    char const *value,
-    int unset
-) {
-    struct casrc_property **propertyp, *property;
-    size_t key_len, value_len = value ? strlen(value) : 0;
-    char *buf;
-    int comp;
-
-    for (propertyp = &setting->properties;
-         (*propertyp) && (comp = strcmp(name, (*propertyp)->name)) > 0;
-         propertyp = &(*propertyp)->next)
-        ;
-    if (!(*propertyp) || comp < 0) {
-        /* The property does not exist, but we have a pointer to where we
-         * could define it. */
-    } else {
-        if (!unset && !strcmp((*propertyp)->value, value))
-            return 0;
-
-        if (!unset && strlen((*propertyp)->value) == value_len) {
-            strcpy((*propertyp)->value, value);
-            return 0;
-        }
-
-        /* In all cases, we want to free the property it we are going to
-         * change it, because we may require a different buffer size
-         * for the value. */
-        property = *propertyp;
-        *propertyp = property->next;
-        free(property);
-    }
-
-    if (unset)
-        return 0;
-
-    key_len = strlen(name);
-    property = malloc(sizeof(struct casrc_property) + key_len + value_len + 2);
-    if (!property) {
-        fprintf(stderr, "malloc() for property failed.\n");
-        return 1;
-    }
-
-    buf = &((char *)property)[sizeof(struct casrc_property)];
-    strcpy(buf, name);
-    strcpy(&buf[key_len + 1], value);
-
-    property->next = *propertyp;
-    property->name = buf;
-    property->value = &buf[key_len + 1];
-
-    *propertyp = property;
-    return 0;
-}
-
-/**
- * Define all properties for a given casrc setting.
- *
- * This is used by CaS' command-line parsing, since options '-i', '-o', '-l'
- * and '-m' at least are of the same format as a composant in the casrc file.
- *
- * Note that this function clears all existing properties for the given
- * setting before defining the new properties.
- *
- * @param db casrc database to modify.
- * @param name Key of the setting to define.
- * @param line Line to define; not that it will be modified.
- * @param reset Whether to reset all properties of the setting before applying
- *        the diffs, or not.
- * @return 0 if there were no errors, other otherwise.
- */
-int define_casrc_setting(
-    struct casrc_database *db,
-    char const *name,
-    char *line,
-    int reset
-) {
-    struct casrc_setting **settingp, *setting;
-    struct casrc_property *property;
-    char *com, *buf;
-    char const *key, *value;
-    int comp, set, err;
-
-    /* Find the entry corresponding to the setting. */
-    for (settingp = &db->settings;
-         (*settingp) && (comp = strcmp(name, (*settingp)->name)) > 0;
-         settingp = &(*settingp)->next)
-        ;
-    if (!*settingp || comp < 0) {
-        /* We want to insert a new setting. */
-        setting = malloc(sizeof(struct casrc_setting) + strlen(name) + 1);
-        if (!setting) {
-            fprintf(stderr, "malloc() for setting failed.\n");
-            return 1;
-        }
-
-        buf = &((char *)setting)[sizeof(struct casrc_setting)];
-        strcpy(buf, name);
-
-        setting->next = *settingp;
-        setting->name = buf;
-        setting->properties = NULL;
-
-        *settingp = setting;
-    } else {
-        /* We have found an exact match, we may want to reset the existing
-         * properties. */
-        setting = *settingp;
-
-        if (reset) {
-            for (property = setting->properties; property;) {
-                struct casrc_property *property_to_free = property;
-
-                property = property->next;
-                free(property_to_free);
-            }
-
-            setting->properties = NULL;
-        }
-    }
-
-    /* We are now ready to apply the diffs. */
-    while (!get_next_comma_component(&line, &com)) {
-        struct casrc_property_diff *diff;
-
-        /* A macro may exist with the exact name of the component. */
-        if (!get_casrc_macro_diffs(db, com, &diff)) {
-            /* We're expanding a macro! */
-            for (; diff; diff = diff->next) {
-                err = apply_property_diff(
-                    setting,
-                    diff->name,
-                    diff->value,
-                    diff->unset
-                );
-                if (err)
-                    return 1;
-            }
-
-            continue;
-        }
-
-        /* We have a key/value pair, which we can parse. */
-        get_key_value_pair(com, &key, &value, &set);
-        if (!*key) {
-            /* Empty key, we want to just ignore the entry. */
-            continue;
-        }
-
-        if (apply_property_diff(setting, key, value, !set))
-            return 1;
-    }
 
     return 0;
 }
@@ -622,9 +462,9 @@ int read_casrc_file(struct casrc_database *db, FILE *filep) {
         *p = '\0';
 
         if (is_macro)
-            ret = define_casrc_macro(db, name, q);
+            ret = define_casrc_setting(db, &db->macros, name, q, 1);
         else
-            ret = define_casrc_setting(db, name, q, 0);
+            ret = define_casrc_setting(db, &db->settings, name, q, 0);
 
         if (ret)
             break;
@@ -748,6 +588,7 @@ char const *get_casrc_property(
 ) {
     struct casrc_setting *setting;
     struct casrc_property *property;
+    char const *result = NULL;
     int comp = 1;
 
     for (setting = db->settings;
@@ -757,15 +598,17 @@ char const *get_casrc_property(
     if (comp)
         return NULL;
 
-    comp = 1;
-    for (property = setting->properties;
-         property && (comp = strcmp(property_name, property->name)) > 0;
-         property = property->next)
-        ;
-    if (comp)
-        return NULL;
+    for (property = setting->properties; property; property = property->next) {
+        if (strcmp(property->name, property_name))
+            continue;
 
-    return property->value;
+        if (property->unset)
+            result = NULL;
+        else
+            result = property->value;
+    }
+
+    return result;
 }
 
 /**
@@ -782,25 +625,33 @@ char const *get_casrc_setting_property(
     char const *name
 ) {
     struct casrc_property *property;
-    int comp = 1;
-
-    if (override_setting) {
-        for (property = override_setting->properties;
-             property && (comp = strcmp(name, property->name)) > 0;
-             property = property->next)
-            ;
-        if (!comp)
-            return property->value;
-    }
+    char const *result = NULL;
 
     if (default_setting) {
-        for (property = default_setting->properties;
-             property && (comp = strcmp(name, property->name)) > 0;
-             property = property->next)
-            ;
-        if (!comp)
-            return property->value;
+        for (property = default_setting->properties; property;
+             property = property->next) {
+            if (strcmp(property->name, name))
+                continue;
+
+            if (property->unset)
+                result = NULL;
+            else
+                result = property->value;
+        }
     }
 
-    return NULL;
+    if (override_setting) {
+        for (property = override_setting->properties; property;
+             property = property->next) {
+            if (strcmp(property->name, name))
+                continue;
+
+            if (property->unset)
+                result = NULL;
+            else
+                result = property->value;
+        }
+    }
+
+    return result;
 }

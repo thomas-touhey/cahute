@@ -31,28 +31,30 @@
 #include <stdio.h>
 
 /**
- * Node representing a setting property.
+ * Node representing a property.
  *
- * @param next Next property node for the setting, or NULL if this is the
- *        last property for the node.
- * @param name Name of the property, lowercased for case-insensitive matching
- *        purposes.
- * @param value Value of the property, lowercased for easier processing.
+ * @param next Next property in the list, or NULL if this is the last one.
+ * @param name Name of the property to set or unset.
+ * @param value If the property should be set, the value to define the
+ *        property with.
+ * @param unset Whether to set (0) the property, or unset (non-0).
  */
 struct casrc_property {
     struct casrc_property *next;
     char *name;
     char *value;
+    int unset;
 };
 
 /**
- * Node representing a setting in the database.
+ * Node representing a setting or macro in the database.
  *
- * @param next Next setting in the database, or NULL if this is the last
- *        setting for the database.
- * @param name Name of the property, lowercased for case-insensitive
- *        matching purposes.
- * @param properties Properties in the setting.
+ * @param next Next setting or macro in the list, or NULL if this is the
+ *        last one.
+ * @param name Name of the setting or macro for evaluation.
+ *             In the case of macros, this is lowercased for case-insensitive
+ *             matching purposes.
+ * @param properties Properties in the macro.
  */
 struct casrc_setting {
     struct casrc_setting *next;
@@ -61,47 +63,16 @@ struct casrc_setting {
 };
 
 /**
- * Node representing a property diff for a macro.
- *
- * @param next Next property diff for the macro, or NULL if this is the
- *        last one.
- * @param name Name of the property to set or unset.
- * @param value If the property should be set, the value to define the
- *        property with.
- * @param unset Whether to set (0) the property, or unset (non-0).
- */
-struct casrc_property_diff {
-    struct casrc_property_diff *next;
-    char *name;
-    char *value;
-    int unset;
-};
-
-/**
- * Node representing a macro in the database.
- *
- * @param next Next macro in the database, or NULL if this is the last one.
- * @param name Name of the macro for evaluation, lowercased for
- *        case-insensitive matching purposes.
- * @param diffs Property diffs in the macro.
- */
-struct casrc_macro {
-    struct casrc_macro *next;
-    char *name;
-    struct casrc_property_diff *diffs;
-};
-
-/**
  * casrc database.
  *
  * @property settings Settings, as alphabetically-sorted named sets of
  *           properties.
  * @property macros Macros, as alphabetically-sorted named sets of
- *           property diffs.
+ *           properties.
  */
 struct casrc_database {
     struct casrc_setting *settings;
-    struct casrc_macro *macros;
+    struct casrc_setting *macros;
 };
 
 /**
@@ -140,34 +111,18 @@ extern int read_casrc_file(struct casrc_database *db, FILE *filep);
 extern int load_default_casrc(struct casrc_database *db);
 
 /**
- * Define a macro using a given casrc line.
+ * Define a setting in a list using a given casrc line.
  *
- * @param db casrc database to modify.
+ * @param db Database to use to obtain macros.
+ * @param settings casrc settings list to add the new setting to.
  * @param name Key of the macro to define.
  * @param line Line to define.
- * @return 0 if there were no errors, other otherwise.
- */
-extern int
-define_casrc_macro(struct casrc_database *db, char const *name, char *line);
-
-/**
- * Define all properties for a given casrc setting.
- *
- * This is used by CaS' command-line parsing, since options '-i', '-o', '-l'
- * and '-m' at least are of the same format as a composant in the casrc file.
- *
- * Note that this function clears all existing properties for the given
- * setting before defining the new properties.
- *
- * @param db casrc database to modify.
- * @param name Key of the setting to define.
- * @param line Line to define.
- * @param reset Whether to reset all properties of the setting before applying
- *        the diffs, or not.
+ * @param reset Whether to reset the setting.
  * @return 0 if there were no errors, other otherwise.
  */
 extern int define_casrc_setting(
     struct casrc_database *db,
+    struct casrc_setting **settings,
     char const *name,
     char *line,
     int reset

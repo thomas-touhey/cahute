@@ -754,27 +754,41 @@ int parse_args(int argc, char **argv, struct args *args) {
         goto fail;
     }
 
-    if (raw_input_attr && define_casrc_setting(db, "in", raw_input_attr, 1)) {
+    if (raw_input_attr
+        && define_casrc_setting(db, &db->settings, "in", raw_input_attr, 1)) {
         fprintf(stderr, "Could not load the input properties.\n");
         destroy_casrc_database(db);
         goto fail;
     }
 
     if (raw_output_attr
-        && define_casrc_setting(db, "out", raw_output_attr, 1)) {
+        && define_casrc_setting(
+            db,
+            &db->settings,
+            "out",
+            raw_output_attr,
+            1
+        )) {
         fprintf(stderr, "Could not load the output properties.\n");
         destroy_casrc_database(db);
         goto fail;
     }
 
-    if (raw_list_attr && define_casrc_setting(db, "list", raw_list_attr, 1)) {
+    if (raw_list_attr
+        && define_casrc_setting(db, &db->settings, "list", raw_list_attr, 1)) {
         fprintf(stderr, "Could not load the listing properties.\n");
         destroy_casrc_database(db);
         goto fail;
     }
 
     if (raw_model_attr
-        && define_casrc_setting(db, "model", raw_model_attr, 1)) {
+        && define_casrc_setting(
+            db,
+            &db->settings,
+            "model",
+            raw_model_attr,
+            1
+        )) {
         fprintf(stderr, "Could not load the model properties.\n");
         destroy_casrc_database(db);
         goto fail;
