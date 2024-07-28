@@ -41,6 +41,12 @@ extern void print_content(
     int dest_encoding
 );
 
+extern int parse_serial_attributes(
+    char const *raw,
+    unsigned long *flagsp,
+    unsigned long *speedp
+);
+
 extern int
 read_file_contents(char const *path, cahute_u8 **datap, size_t *sizep);
 

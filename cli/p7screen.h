@@ -41,6 +41,11 @@
  */
 struct args {
     int zoom;
+
+    /* Connection-related parameters. */
+    unsigned long serial_flags;
+    unsigned long serial_speed;
+    char const *serial_name;
 };
 
 extern int parse_args(int ac, char **av, struct args *args);

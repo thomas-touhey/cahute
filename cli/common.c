@@ -134,6 +134,83 @@ extern void print_content(
 }
 
 /**
+ * Parse serial attributes.
+ *
+ * The raw string format is "{speed}{parity}{stop bits}", where:
+ *
+ * - Speed is expressed in bauds, e.g. "9600".
+ * - Parity is either "E" for even, "O" for odd and "N" for disabled.
+ * - Stop bits is either "1" or "2".
+ *
+ * An example string is "9600N2" for 9600 bauds, no parity and 2 stop bits.
+ *
+ * @param raw Raw serial attributes.
+ * @param flagsp Pointer to the flags to define.
+ * @param speedp Pointer to the speed to define.
+ * @return Whether an error has occurred (1) or not (0).
+ */
+extern int parse_serial_attributes(
+    char const *raw,
+    unsigned long *flagsp,
+    unsigned long *speedp
+) {
+    char const *s;
+    unsigned long speed = 0;
+    unsigned long flags = 0;
+
+    for (s = raw; *s >= '0' && *s <= '9'; s++)
+        speed = speed * 10 + *s - '0';
+
+
+    if (s == raw)
+        return 1;
+
+    switch (speed) {
+    case 300:
+    case 600:
+    case 1200:
+    case 2400:
+    case 4800:
+    case 9600:
+    case 19200:
+    case 38400:
+    case 57600:
+    case 115200:
+    case 230400:
+    case 460800:
+        break;
+
+    default:
+        return 1;
+    }
+
+    if (*s == 'N')
+        flags |= CAHUTE_SERIAL_PARITY_OFF;
+    else if (*s == 'E')
+        flags |= CAHUTE_SERIAL_PARITY_EVEN;
+    else if (*s == 'O')
+        flags |= CAHUTE_SERIAL_PARITY_ODD;
+    else
+        return 1;
+
+    s++;
+    if (*s == '1')
+        flags |= CAHUTE_SERIAL_STOP_ONE;
+    else if (*s == '2')
+        flags |= CAHUTE_SERIAL_STOP_TWO;
+    else
+        return 1;
+
+    s++;
+    if (*s) /* String should be terminated. */
+        return 1;
+
+    *speedp = speed;
+    *flagsp = flags;
+    return 0;
+}
+
+/**
  * Read file contents into a buffer.
  *
  * @param path Path to the file to read.

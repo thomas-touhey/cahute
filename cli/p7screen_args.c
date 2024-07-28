@@ -50,6 +50,13 @@ static char const help_message[] =
     "  -v, --version     Displays the version\n"
     "  -l, --log <level> Logging level to set (default: %s).\n"
     "                    One of: info, warning, error, fatal, none.\n"
+    "  --com <device>    Path or name of the serial device with which to\n"
+    "                    communicate. If this option isn't used, the\n"
+    "                    program will use USB to find the calculator.\n "
+    " --use <settings>  Serial settings to use, when the link is established\n"
+    "                    over a serial link (i.e. when used with `--com`).\n"
+    "                    For example, \"9600N2\" represents 9600 bauds, no\n"
+    "                    parity, and two stop bits.\n"
     "  -z, --zoom <zoom> Change the zoom (1 to 16)\n"
     "                    By default, the zoom will be %d.\n"
     "\n"
@@ -79,6 +86,8 @@ static struct long_option const long_options[] = {
     {"help", 0, 'h'},
     {"version", 0, 'v'},
     {"zoom", OPTION_FLAG_PARAMETER_REQUIRED, 'z'},
+    {"com", OPTION_FLAG_PARAMETER_REQUIRED, 'c'},
+    {"use", OPTION_FLAG_PARAMETER_REQUIRED, 'U'},
     {"log", OPTION_FLAG_PARAMETER_REQUIRED, 'l'},
 
     LONG_OPTION_SENTINEL
@@ -95,11 +104,14 @@ static struct long_option const long_options[] = {
 int parse_args(int argc, char **argv, struct args *args) {
     struct option_parser_state state;
     char const *command = argv[0];
-    int help = 0, zoom, option, optopt;
+    int help = 0, zoom, err, option, optopt;
     char *optarg;
 
     /* Default parsed arguments. */
     args->zoom = DEFAULT_ZOOM;
+    args->serial_flags = 0;
+    args->serial_speed = 0;
+    args->serial_name = NULL;
 
     init_option_parser(
         &state,
@@ -120,6 +132,25 @@ int parse_args(int argc, char **argv, struct args *args) {
             /* -v, --version: display the version message and quit. */
             puts(version_message);
             return 0;
+
+        case 'c':
+            /* --com: set the serial port. */
+            args->serial_name = optarg;
+            break;
+
+        case 'U':
+            /* --use: use serial settings. */
+            err = parse_serial_attributes(
+                optarg,
+                &args->serial_flags,
+                &args->serial_speed
+            );
+            if (err) {
+                fprintf(stderr, "-u, --use: invalid format!\n");
+                return 0;
+            }
+
+            break;
 
         case 'z':
             /* --zoom: set the zoom as an integer between 1 and 16. */

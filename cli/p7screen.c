@@ -246,10 +246,24 @@ int main(int ac, char **av) {
     if (!parse_args(ac, av, &args))
         return 0;
 
-    err = cahute_open_simple_usb_link(
-        &link,
-        CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP
-    );
+    if (args.serial_name)
+        /* The user has selected a serial link!
+         * On serial links, we can either use automatic protocol detection
+         * with the risk that we have a data protocol, or we can choose a
+         * specific protocol but not support both CASIOLINK screen captures
+         * and Protocol 7.00 Screenstreaming. We choose the former. */
+        err = cahute_open_serial_link(
+            &link,
+            args.serial_flags | CAHUTE_SERIAL_RECEIVER,
+            args.serial_name,
+            args.serial_speed
+        );
+    else
+        err = cahute_open_simple_usb_link(
+            &link,
+            CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP
+        );
+
     if (err) {
         switch (err) {
         case CAHUTE_ERROR_NOT_FOUND:
