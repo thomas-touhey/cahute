@@ -329,10 +329,13 @@ struct cahute_link_posix_medium_state {
  *
  * @property handle Device handle.
  * @property overlapped Overlapped I/O adapter.
+ * @property read_in_progress Whether a read is currently in progress or not.
  */
 struct cahute_link_windows_medium_state {
     HANDLE handle;
     OVERLAPPED overlapped;
+    DWORD received;
+    int read_in_progress;
 };
 #endif
 

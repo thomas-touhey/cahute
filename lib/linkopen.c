@@ -305,7 +305,11 @@ close_medium(int type, union cahute_link_medium_state *state) {
 # if defined(CAHUTE_LINK_MEDIUM_WIN32_SERIAL)
     case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
 # endif
-        CancelIo(state->windows.handle);
+        if (!CancelIo(state->windows.handle)) {
+            DWORD werr = GetLastError();
+            log_windows_error("CancelIo", werr);
+        }
+
         CloseHandle(state->windows.overlapped.hEvent);
         CloseHandle(state->windows.handle);
         break;
@@ -1384,6 +1388,8 @@ cahute_open_serial_link(
 
         medium_type = CAHUTE_LINK_MEDIUM_WIN32_SERIAL;
         medium_state.windows.handle = handle;
+        medium_state.windows.read_in_progress = 0;
+        medium_state.windows.received = 0;
 
         SecureZeroMemory(&medium_state.windows.overlapped, sizeof(OVERLAPPED));
 
@@ -1655,6 +1661,8 @@ cahute_open_usb_link(
                     );
 
                     medium_state.windows.handle = win_handle;
+                    medium_state.windows.read_in_progress = 0;
+                    medium_state.windows.received = 0;
                     medium_state.windows.overlapped.hEvent =
                         overlapped_event_handle;
                     goto ready;

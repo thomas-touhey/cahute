@@ -229,72 +229,73 @@ cahute_read_from_link_medium(
         case CAHUTE_LINK_MEDIUM_WIN32_SERIAL:
 # endif
         {
-            DWORD received = 0;
             BOOL ret;
 
-            ret = ReadFile(
-                medium->state.windows.handle,
-                dest,
-                target_size,
-                &received,
-                &medium->state.windows.overlapped
-            );
-            if (!ret) {
-                DWORD werr = GetLastError();
+            /* If a read operation is not already in progress, we want to
+             * initiate it now. */
+            if (!medium->state.windows.read_in_progress) {
+                medium->state.windows.received = 0;
+                ret = ReadFile(
+                    medium->state.windows.handle,
+                    dest,
+                    target_size,
+                    &medium->state.windows.received,
+                    &medium->state.windows.overlapped
+                );
 
-                if (werr == ERROR_IO_PENDING) {
-                    ret = WaitForSingleObject(
-                        medium->state.windows.overlapped.hEvent,
-                        timeout ? timeout : INFINITE
-                    );
-                    switch (ret) {
-                    case WAIT_OBJECT_0:
-                        ret = GetOverlappedResult(
-                            medium->state.windows.handle,
-                            &medium->state.windows.overlapped,
-                            &received,
-                            FALSE
-                        );
+                if (!ret) {
+                    DWORD werr = GetLastError();
 
-                        if (!ret) {
-                            werr = GetLastError();
-                            if (werr == ERROR_GEN_FAILURE)
-                                return CAHUTE_ERROR_GONE;
-
-                            log_windows_error("GetOverlappedResult", werr);
-                            return CAHUTE_ERROR_UNKNOWN;
-                        }
-                        break;
-
-                    case WAIT_TIMEOUT:
-                        if (!CancelIo(medium->state.windows.handle)) {
-                            werr = GetLastError();
-                            log_windows_error("CancelIo", werr);
-                            return CAHUTE_ERROR_UNKNOWN;
-                        }
-
-                        goto time_out;
-
-                    default:
-                        log_windows_error(
-                            "WaitForSingleObject",
-                            GetLastError()
-                        );
-
-                        if (!CancelIo(medium->state.windows.handle)) {
-                            werr = GetLastError();
-                            log_windows_error("CancelIo", werr);
-                        }
-
+                    if (werr == ERROR_IO_PENDING)
+                        medium->state.windows.read_in_progress = 1;
+                    else {
+                        log_windows_error("ReadFile", werr);
                         return CAHUTE_ERROR_UNKNOWN;
                     }
-                } else {
-                    log_windows_error("ReadFile", GetLastError());
+                }
+            }
+
+            /* If a read operation is in progress, i.e. either if it has been
+             * initiated in a previous read or if it has been initiated before
+             * and has not returned immediately, we want to check on it. */
+            if (medium->state.windows.read_in_progress) {
+                ret = WaitForSingleObject(
+                    medium->state.windows.overlapped.hEvent,
+                    timeout ? timeout : INFINITE
+                );
+                switch (ret) {
+                case WAIT_OBJECT_0:
+                    medium->state.windows.read_in_progress = 0;
+                    ret = GetOverlappedResult(
+                        medium->state.windows.handle,
+                        &medium->state.windows.overlapped,
+                        &medium->state.windows.received,
+                        FALSE
+                    );
+
+                    if (!ret) {
+                        DWORD werr = GetLastError();
+                        if (werr == ERROR_GEN_FAILURE)
+                            return CAHUTE_ERROR_GONE;
+
+                        log_windows_error("GetOverlappedResult", werr);
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
+                    break;
+
+                case WAIT_TIMEOUT:
+                    /* Read will still be in progress for next time we come
+                     * back to this function. */
+                    goto time_out;
+
+                default:
+                    log_windows_error("WaitForSingleObject", GetLastError());
+
                     return CAHUTE_ERROR_UNKNOWN;
                 }
             }
 
-            bytes_read = (size_t)received;
+            bytes_read = (size_t)medium->state.windows.received;
         }
 
         break;
