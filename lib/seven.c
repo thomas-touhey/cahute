@@ -1028,6 +1028,8 @@ CAHUTE_EXTERN(int) cahute_seven_initiate(cahute_link *link) {
         );
         if (err == CAHUTE_ERROR_TIMEOUT_START)
             continue;
+        else if (err)
+            return err;
 
         if (link->protocol_state.seven.last_packet_type != PACKET_TYPE_ACK
             || link->protocol_state.seven.last_packet_subtype
