@@ -130,26 +130,54 @@ directory aside it, and install from it, by running the following commands:
 |apple| macOS, OS X
 -------------------
 
-.. warning::
-
-    This build method is not officially supported yet.
-
-    See `#33 <https://gitlab.com/cahuteproject/cahute/-/issues/33>`_ for
-    more information.
-
-In order to install the dependencies, it is recommended you use Homebrew_:
+In order to install the native dependencies, it is recommended you use
+Homebrew_:
 
 .. code-block:: bash
 
     brew install cmake pkg-config python@3.12 libusb sdl2
 
-In the parent directory to the source, you can now create the ``build``
-directory aside it, and install from it, by running the following commands:
+You must also install the Python dependencies, by going to the parent directory
+to the source, and creating a virtual environment within ``build/venv`` using
+the following commands:
+
+.. code-block:: bash
+
+    python3 -m venv build/venv
+    source build/venv/bin/activate
+    python -m pip install toml
+
+You can now initialize the build directory by running the following command:
 
 .. parsed-literal::
 
-    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release
+
+.. warning::
+
+    The build initialization command **must be run in the same shell as
+    the one where the Python venv was initialized**.
+
+    If you have created a new shell, you must run the following command
+    beforehand:
+
+    .. code-block:: bash
+
+        source build/venv/bin/activate
+
+Now that the build directory has been initialized, you can build using the
+following command:
+
+.. code-block:: bash
+
     cmake --build build
+
+.. note::
+
+    This can be run in any shell, provided you adapt the path to be absolute
+    or relative to the current directory (e.g. ``cmake --build .`` if within
+    the build directory), and the Python venv does not need to be
+    activated beforehand since CMake remembers it must use it.
 
 .. _build-mingw:
 
