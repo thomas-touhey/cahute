@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(
     cahute
-    VERSION 0.4
+    VERSION 0.5
     DESCRIPTION "Communication and file format handling tools for CASIO calculators"
     HOMEPAGE_URL "https://cahuteproject.org/"
     LANGUAGES C

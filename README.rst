@@ -18,7 +18,8 @@ The project is also talked about on the following communities:
 * `Planète Casio <Planète Casio topic_>`_ (*in French*);
 * `TI-Planet <TI-Planet topic_>`_ (*in French*);
 * `Casiopeia <Casiopeia topic_>`_;
-* `Universal Casio Forum <UCF topic_>`_.
+* `Universal Casio Forum <UCF topic_>`_;
+* `Cemetech <Cemetech topic_>`_.
 
 .. _Cahute documentation: https://cahuteproject.org/
 .. _Cahute releases: https://gitlab.com/cahuteproject/cahute/-/releases
@@ -37,3 +38,5 @@ The project is also talked about on the following communities:
 .. _UCF topic:
     https://community.casiocalc.org/topic/
     8214-cahute-a-toolset-for-protocols-and-file-formats/
+.. _Cemetech topic:
+    https://www.cemetech.net/forum/viewtopic.php?p=307733

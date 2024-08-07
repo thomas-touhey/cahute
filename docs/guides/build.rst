@@ -52,6 +52,8 @@ The project is present in the "cahute-|version|" directory.
     following the steps in `Get notified when a release is created`_.
     You can check your notification settings at any time in Notifications_.
 
+.. _build-linux:
+
 |linux| Linux distributions
 ---------------------------
 
@@ -123,8 +125,44 @@ directory aside it, and install from it, by running the following commands:
 
           usermod -a -G uucp <your-username>
 
+.. _build-osx:
+
+|apple| macOS, OS X
+-------------------
+
+.. warning::
+
+    This build method is not officially supported yet.
+
+    See `#33 <https://gitlab.com/cahuteproject/cahute/-/issues/33>`_ for
+    more information.
+
+In order to install the dependencies, it is recommended you use Homebrew_:
+
+.. code-block:: bash
+
+    brew install cmake pkg-config python@3.12 libusb sdl2
+
+In the parent directory to the source, you can now create the ``build``
+directory aside it, and install from it, by running the following commands:
+
+.. parsed-literal::
+
+    cmake -B build -S cahute-|version| -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+    cmake --build build
+
+.. _build-mingw:
+
 |mingw-w64| Windows XP and above, from Linux distributions
 ----------------------------------------------------------
+
+.. warning::
+
+    Both Windows XP and above as a target and this build method are not
+    officially supported yet.
+
+    See `#32 <https://gitlab.com/cahuteproject/cahute/-/issues/32>`_ for
+    more information.
 
 Building Cahute for Windows XP and above from Linux distributions
 using `MinGW-w64`_ is possible, as described in `Cross Compiling With CMake`_.
@@ -172,8 +210,18 @@ one of the following command depending on the architecture you're targetting::
     `MinGW build image for Cahute`_, which is exploited in the project's
     continuous integration pipelines as described in ``.gitlab-ci.yml``.
 
+.. _build-amiga-gcc:
+
 |amigaos| AmigaOS 3.2 and above, from Linux distributions
 ---------------------------------------------------------
+
+.. warning::
+
+    Both AmigaOS 3.2 and above as a target and this build method are not
+    officially supported yet.
+
+    See `#26 <https://gitlab.com/cahuteproject/cahute/-/issues/26>`_ for
+    more information.
 
 Building Cahute for AmigaOS 3.2 and above from Linux distributions
 using `m68k-amigaos-gcc`_, including the Native Development Kit (NDK),
@@ -211,8 +259,19 @@ You can now build the project using the following command::
     ``p7screen`` will not be included, since it requires SDL2 which is not
     available with the AmigaOS 3.2 toolchain.
 
+.. _build-visual-studio:
+
 |win| Windows XP and above, using Visual Studio
 -----------------------------------------------
+
+.. warning::
+
+    Both Windows XP and above as a target and this build method are not
+    officially supported yet.
+
+    See `#10 <https://gitlab.com/cahuteproject/cahute/-/issues/10>`_ and
+    `#32 <https://gitlab.com/cahuteproject/cahute/-/issues/32>`_ for
+    more information.
 
 It is possible to build Cahute for Windows XP and above, using Microsoft's
 `Visual Studio`_ starting from version 17.6 (VS2022).
@@ -301,6 +360,8 @@ run the command-line utilities from here with the options you want to test.
 .. _SDL: https://www.libsdl.org/
 .. _libusb: https://libusb.info/
 
+.. _Homebrew: https://brew.sh/
+
 .. _MinGW-w64: https://www.mingw-w64.org/
 .. _Archlinux: https://archlinux.org/
 .. _paru: https://github.com/Morganamilo/paru
@@ -328,6 +389,7 @@ run the command-line utilities from here with the options you want to test.
     https://learn.microsoft.com/en-us/vcpkg/get_started/get-started
 
 .. |linux| image:: linux.svg
+.. |apple| image:: apple.svg
 .. |mingw-w64| image:: mingw-w64.svg
 .. |win| image:: win.png
 .. |amigaos| image:: amigaos.png
