@@ -1871,7 +1871,7 @@ cahute_open_usb_link(
         goto fail;
     }
 
-    if (protocol == CAHUTE_LINK_PROTOCOL_USB_SEVEN) {
+    if (medium_type == CAHUTE_LINK_MEDIUM_LIBUSB) {
         /* Calculators running 1.x OSes with Protocol 7.00 support may need a
          * push to enable communicating using Protocol 7.00, in the form of
          * a vendor-specific request documented in fxReverse. */

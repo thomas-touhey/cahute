@@ -60,6 +60,49 @@ when the file system and main memory are presented using SCSI.
     Note however that these should be used through the system's serial
     bus interface rather than directly.
 
+.. _usb-device-enabling:
+
+Vendor-specific USB device enabling
+-----------------------------------
+
+Over USB links, some older fx-9860G derivatives, such as the fx-9860G Slim
+running OS 1.x, require a special USB control flow to be executed before they
+can send or receive any data. This can manifest differently depending on the
+application protocol:
+
+* With Protocol 7.00, the calculator will not answer the initial check.
+* With Protocol 7.00 Screenstreaming, the calculator will freeze until the
+  control flow is made, since it is attempting to send screen data.
+
+This control flow has the following properties:
+
+* ``bmRequestType`` set to ``0x41``, to designate a vendor-specific
+  interface request with no incoming data transfer;
+* ``bRequest`` set to ``0x01``, as it is the command that enables
+  Protocol 7.00 data transfers.
+* Both ``wValue`` and ``wIndex`` set to ``0x0000``.
+* No data transfer.
+
+Using libusb_, this can be done using the following excerpt:
+
+.. code-block:: c
+
+    libusb_control_transfer(
+        device_handle,
+        0x41,  /* bmRequestType */
+        0x01,  /* bRequest */
+        0x0000,  /* wValue */
+        0x0000,  /* wIndex */
+        NULL,
+        0,
+        300
+    );
+
+Ideally, this flow is run by a driver that can be used as soon as the
+calculator is connected to the host. Otherwise, it means that the calculator
+may freeze until a transfer utility is used, such as one of Cahute's
+command-line utilities.
+
 .. _usb-detection-windows:
 
 Driver detection on Microsoft Windows
@@ -100,6 +143,7 @@ since this is the value encountered in the wild.
 .. |DEVPKEY_Device_Driver| replace:: ``DEVPKEY_Device_Driver``
 
 .. _FTDI: https://ftdichip.com/
+.. _libusb: https://libusb.info/
 .. _libusb-compatible kernel driver:
     https://github.com/libusb/libusb/wiki/
     Windows#user-content-Driver_Installation

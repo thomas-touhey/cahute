@@ -17,6 +17,8 @@ The communication schema is the following:
         Participant sender as Sender<br />(Calculator)
         Participant receiver as Receiver<br />(PC, ...)
 
+        Note over sender,receiver: Initialize the link
+
         alt Sender requires acknowledgement from the Receiver
             sender->>receiver: Check packet
             receiver->>sender: Acknowledgement packet
@@ -33,6 +35,17 @@ The communication schema is the following:
     It is recommended, on the receiving function, to add an option to
     find the beginning of the next screenstreaming packet, to fix such
     desynchronized inputs.
+
+.. _seven-ohp-init:
+
+Initialize the link
+-------------------
+
+There is no specific initialization within the application protocol.
+
+However, when used over USB links, some devices may freeze up until the
+receiver / host runs a special USB control flow; see :ref:`usb-device-enabling`
+for more information.
 
 .. _seven-ohp-acknowledge:
 
