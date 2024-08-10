@@ -10,4 +10,5 @@ the Cahute C library directly.
     developer-guides/build
     developer-guides/detection
     developer-guides/links
+    developer-guides/files
     developer-guides/text

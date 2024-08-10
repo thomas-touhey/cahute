@@ -97,6 +97,7 @@
 #include <compat.h>
 
 CAHUTE_DECLARE_TYPE(cahute_link_medium)
+CAHUTE_DECLARE_TYPE(cahute_file_medium)
 
 #if AMIGAOS_ENABLED
 CAHUTE_EXTERN(int)
@@ -454,11 +455,11 @@ union cahute_link_medium_state {
  * @property read_buffer Buffer for reading from the medium in a
  *           stream-like interface. See ``cahute_read_from_link_medium``
  *           definition for more information.
+ *           Guaranteed to be aligned to a multiple of 32 bytes.
  * @property read_start Offset at which the unread data starts within
  *           the read buffer for the medium.
  * @property read_size Number of unread bytes in the read buffer for the
- *           medium, starting at the offset stored in ``medium_read_start``.
- *           Guaranteed to be aligned to a multiple of 32 bytes.
+ *           medium, starting at the offset stored in ``read_start``.
  */
 struct cahute_link_medium {
     int type;
@@ -633,6 +634,117 @@ struct cahute_link {
 };
 
 /* ---
+ * File internals.
+ * --- */
+
+#define CAHUTE_FILE_MEDIUM_READ_BUFFER_SIZE 4096U
+
+#define CAHUTE_MAX_FILE_OFFSET 2147483647
+
+#define CAHUTE_FILE_FLAG_CLOSE_MEDIUM 1 /* Whether to close the medium. */
+#define CAHUTE_FILE_FLAG_EXAMINED     2 /* Whether file type was examined. */
+
+#define CAHUTE_FILE_MEDIUM_FLAG_WRITE 0x00000001 /* Can write to medium. */
+#define CAHUTE_FILE_MEDIUM_FLAG_READ  0x00000002 /* Can read from medium. */
+#define CAHUTE_FILE_MEDIUM_FLAG_SEEK  0x00000004 /* Can seek on medium. */
+#define CAHUTE_FILE_MEDIUM_FLAG_SIZE  0x00000008 /* File size is avail. */
+
+#if POSIX_ENABLED
+# define CAHUTE_FILE_MEDIUM_POSIX 1
+#endif
+
+#if WIN32_ENABLED
+# define CAHUTE_FILE_MEDIUM_WIN32 2
+#endif
+
+#if defined(CAHUTE_FILE_MEDIUM_POSIX)
+/**
+ * POSIX file medium state.
+ *
+ * @property fd File descriptor on the opened file.
+ */
+struct cahute_file_posix_medium_state {
+    int fd;
+};
+#endif
+
+#if defined(CAHUTE_FILE_MEDIUM_WIN32)
+/**
+ * Windows API medium state.
+ *
+ * @property handle File handle.
+ */
+struct cahute_file_windows_medium_state {
+    HANDLE handle;
+};
+#endif
+
+/**
+ * File medium state, to be used depending on the file flags.
+ *
+ * @property posix Medium state if the selected medium type is POSIX.
+ * @property windows Medium state if the selected medium type is WIN32.
+ */
+union cahute_file_medium_state {
+#if defined(CAHUTE_FILE_MEDIUM_POSIX)
+    struct cahute_file_posix_medium_state posix;
+#endif
+#if defined(CAHUTE_FILE_MEDIUM_WIN32)
+    struct cahute_file_windows_medium_state windows;
+#endif
+};
+
+/**
+ * File medium related information.
+ *
+ * @property type Medium type, as any ``CAHUTE_FILE_MEDIUM_*`` constant.
+ * @property write Whether the medium is writable or not.
+ * @property flags Medium flags.
+ * @property offset Current offset on the underlying medium.
+ * @property state State of the specific medium to use, e.g. opened handles
+ *           and contexts to close at file closing.
+ * @property read_offset Current offset for the read buffer.
+ * @property read_size Number of unread bytes in the read buffer for the
+ *           medium, starting at the offset stored in ``read_start``.
+ * @property read_buffer Buffer for reading from the medium in a stream-like
+ *           interface. See ``cahute_read_from_file_medium`` definition
+ *           for more information.
+ *           Guaranteed to be aligned to a multiple of 32 bytes.
+ * @property file_size File size computed when the file was opened.
+ */
+struct cahute_file_medium {
+    int type;
+
+    unsigned long flags;
+    unsigned long offset;
+    unsigned long read_offset;
+    unsigned long file_size;
+    size_t read_size;
+
+    cahute_u8 *read_buffer;
+    union cahute_file_medium_state state;
+};
+
+/**
+ * File related information.
+ *
+ * @property flags Flags.
+ * @property medium Medium.
+ * @property type Found file type.
+ *           If flag CAHUTE_FILE_FLAG_EXAMINED is present and this is
+ *           set to 0, this means that the file has been examined but no
+ *           known type was found.
+ * @property extension Extension normalized in ASCII lowercase, for later use
+ *           in guessing, if found in the file name.
+ */
+struct cahute_file {
+    unsigned long flags;
+    cahute_file_medium medium;
+    int type;
+    char extension[5];
+};
+
+/* ---
  * Miscellaneous functions, defined in misc.c
  * --- */
 
@@ -640,7 +752,7 @@ CAHUTE_EXTERN(int) cahute_sleep(unsigned long ms);
 CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp);
 
 /* ---
- * Link medium functions, defined in medium.c
+ * Link medium functions, defined in linkmedium.c
  * --- */
 
 /* Compatibility macros. */
@@ -777,6 +889,26 @@ cahute_scsi_request_from_link_medium(
     cahute_u8 *buf,
     size_t buf_size,
     int *statusp
+);
+
+/* ---
+ * File medium functions, defined in filemedium.c
+ * --- */
+
+CAHUTE_EXTERN(int)
+cahute_read_from_file_medium(
+    cahute_file_medium *medium,
+    unsigned long off,
+    cahute_u8 *buf,
+    size_t size
+);
+
+CAHUTE_EXTERN(int)
+cahute_write_to_file_medium(
+    cahute_file_medium *medium,
+    unsigned long offset,
+    void const *data,
+    size_t size
 );
 
 /* ---

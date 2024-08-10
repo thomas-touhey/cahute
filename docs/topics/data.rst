@@ -25,8 +25,7 @@ files:
     and :ref:`file-format-ctf` for more information;
   - MCS (Main Control Structure) files, with the G1M/G1R/G2M/G2R/G3M/G3R
     extensions, are a binary collection of main memory files for the fx-9860G
-    and compatible. See :ref:`file-format-g1m`, :ref:`file-format-g2r`
-    and :ref:`file-format-g3m` for more information.
+    and compatible. See :ref:`file-format-mainmem` for more information.
 
 Main memory files usually have an associated data type and a format.
 

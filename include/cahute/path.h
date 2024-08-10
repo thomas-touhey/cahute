@@ -26,16 +26,36 @@
  * knowledge of the CeCILL 2.1 license and that you accept its terms.
  * ************************************************************************* */
 
-#ifndef CAHUTE_H
-#define CAHUTE_H 1
-#include <cahute/cdefs.h>
-#include <cahute/data.h>
-#include <cahute/detection.h>
-#include <cahute/error.h>
-#include <cahute/file.h>
-#include <cahute/link.h>
-#include <cahute/logging.h>
-#include <cahute/path.h>
-#include <cahute/picture.h>
-#include <cahute/text.h>
+#ifndef CAHUTE_PATH_H
+#define CAHUTE_PATH_H 1
+#include "cdefs.h"
+
+CAHUTE_BEGIN_NAMESPACE
+
+#define CAHUTE_PATH_TYPE_POSIX         1
+#define CAHUTE_PATH_TYPE_DOS           2
+#define CAHUTE_PATH_TYPE_WIN32_ANSI    3
+#define CAHUTE_PATH_TYPE_WIN32_UNICODE 4
+
+#if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)
+# define CAHUTE_PATH_TYPE_CLI CAHUTE_PATH_TYPE_WIN32_ANSI
+#elif defined(__DJGPP) || defined(__DJGPP)
+# define CAHUTE_PATH_TYPE_CLI CAHUTE_PATH_TYPE_DOS
+#else
+# define CAHUTE_PATH_TYPE_CLI CAHUTE_PATH_TYPE_POSIX
 #endif
+
+CAHUTE_BEGIN_DECLS
+
+CAHUTE_EXTERN(int)
+cahute_find_path_extension(
+    char *cahute__buf,
+    size_t cahute__buf_size,
+    void const *cahute__path,
+    int cahute__path_type
+);
+
+CAHUTE_END_DECLS
+CAHUTE_END_NAMESPACE
+
+#endif /* CAHUTE_PATH_H */

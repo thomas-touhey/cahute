@@ -26,16 +26,70 @@
  * knowledge of the CeCILL 2.1 license and that you accept its terms.
  * ************************************************************************* */
 
-#ifndef CAHUTE_H
-#define CAHUTE_H 1
-#include <cahute/cdefs.h>
-#include <cahute/data.h>
-#include <cahute/detection.h>
-#include <cahute/error.h>
-#include <cahute/file.h>
-#include <cahute/link.h>
-#include <cahute/logging.h>
-#include <cahute/path.h>
-#include <cahute/picture.h>
-#include <cahute/text.h>
-#endif
+#ifndef CAHUTE_FILE_H
+#define CAHUTE_FILE_H 1
+#include "cdefs.h"
+#include "path.h"
+
+CAHUTE_BEGIN_NAMESPACE
+CAHUTE_DECLARE_TYPE(cahute_file)
+
+#define CAHUTE_FILE_TYPE_ADDIN_CG   1
+#define CAHUTE_FILE_TYPE_ADDIN_FX   2
+#define CAHUTE_FILE_TYPE_CASIOLINK  3
+#define CAHUTE_FILE_TYPE_EACT_FX    4
+#define CAHUTE_FILE_TYPE_FKEY_FX    5
+#define CAHUTE_FILE_TYPE_FKEY_CG    6
+#define CAHUTE_FILE_TYPE_LANG_CG    7
+#define CAHUTE_FILE_TYPE_LANG_FX    8
+#define CAHUTE_FILE_TYPE_MAINMEM    9
+#define CAHUTE_FILE_TYPE_PICTURE_CG 10
+#define CAHUTE_FILE_TYPE_PICTURE_CP 11
+
+CAHUTE_BEGIN_DECLS
+
+CAHUTE_EXTERN(int)
+cahute_open_file_for_reading(
+    cahute_file **cahute__filep,
+    void const *cahute__path,
+    int cahute__path_type
+);
+
+CAHUTE_EXTERN(int)
+cahute_open_file_for_export(
+    cahute_file **cahute__filep,
+    unsigned long cahute__size,
+    void const *cahute__path,
+    int cahute__path_type
+);
+
+CAHUTE_EXTERN(int) cahute_open_stdout(cahute_file **cahute__filep);
+
+CAHUTE_EXTERN(int)
+cahute_get_file_size(cahute_file *cahute__file, unsigned long *cahute__sizep);
+
+CAHUTE_EXTERN(int)
+cahute_read_from_file(
+    cahute_file *cahute__file,
+    unsigned long cahute__offset,
+    void *cahute__buf,
+    size_t cahute__size
+);
+
+CAHUTE_EXTERN(int)
+cahute_write_to_file(
+    cahute_file *cahute__file,
+    unsigned long cahute__offset,
+    void const *cahute__data,
+    size_t cahute__data_size
+);
+
+CAHUTE_EXTERN(int)
+cahute_guess_file_type(cahute_file *cahute__file, int *cahute__typep);
+
+CAHUTE_EXTERN(void) cahute_close_file(cahute_file *cahute__filep);
+
+CAHUTE_END_DECLS
+CAHUTE_END_NAMESPACE
+
+#endif /* CAHUTE_FILE_H */

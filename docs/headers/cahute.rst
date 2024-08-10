@@ -8,7 +8,9 @@
     cahute/data
     cahute/detection
     cahute/error
+    cahute/file
     cahute/link
     cahute/logging
+    cahute/path
     cahute/picture
     cahute/text

@@ -411,7 +411,7 @@ open_link_from_medium(
     link->medium.read_size = 0;
     link->medium.read_buffer = (cahute_u8 *)link + sizeof(cahute_link);
 
-    /* Ensure that the data buffer is aligned to 8 bytes, for sensitive
+    /* Ensure that the data buffer is aligned to 32 bytes, for sensitive
      * mediums such as Win32 SCSI devices. */
     link->medium.read_buffer +=
         (~(cahute_uintptr)link->medium.read_buffer & 31) + 1;

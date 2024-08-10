@@ -9,7 +9,11 @@ int main(void) {
 
     err = cahute_open_simple_usb_link(&link, 0);
     if (err) {
-        fprintf(stderr, "cahute_open_usb has returned error 0x%04X.\n", err);
+        fprintf(
+            stderr,
+            "cahute_open_simple_usb_link() has returned error 0x%04X.\n",
+            err
+        );
         return 1;
     }
 

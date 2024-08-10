@@ -194,12 +194,16 @@ add_library(${PROJECT_NAME} STATIC
     "${CMAKE_CURRENT_BINARY_DIR}/lib/chars.c"
     lib/data.c
     lib/detection.c
+    lib/file.c
+    lib/filemedium.c
+    lib/fileopen.c
     lib/link.c
+    lib/linkmedium.c
     lib/linkopen.c
     lib/logging.c
     lib/mcs.c
-    lib/medium.c
     lib/misc.c
+    lib/path.c
     lib/picture.c
     lib/seven.c
     lib/seven_ohp.c

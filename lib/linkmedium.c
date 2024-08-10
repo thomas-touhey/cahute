@@ -208,7 +208,7 @@ cahute_read_from_link_medium(
 
                 default:
                     msg(ll_error,
-                        "An error occurred while calling read() %s (%d)",
+                        "An error occurred while calling read(): %s (%d)",
                         strerror(errno),
                         errno);
                     return CAHUTE_ERROR_UNKNOWN;

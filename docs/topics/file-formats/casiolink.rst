@@ -1,9 +1,9 @@
 .. _file-format-casiolink:
 
-CASIOLINK file formats
-======================
+CASIOLINK archives
+==================
 
-CASIOLINK files are main memory archives for CASIO calculators. They usually
+CASIOLINK archives are main memory archives for CASIO calculators. They usually
 end with the ``.CAS`` extension.
 
 The file is a series of main memory files directly concatenated, where every
