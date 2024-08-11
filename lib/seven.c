@@ -1092,8 +1092,7 @@ CAHUTE_EXTERN(int) cahute_seven_terminate(cahute_link *link) {
  *
  * @param link Link with which to send the data.
  * @param flags OR'd `SEND_DATA_FLAG_*` constants.
- * @param filep FILE object to read data from.
- * @param size Size of the data to send.
+ * @param file FILE to read data from.
  * @param progress_func Function to display progress.
  * @param progress_cookie Cookie to pass to the progress function.
  * @return Cahute error, or 0 if successful.
@@ -1102,17 +1101,20 @@ CAHUTE_LOCAL(int)
 cahute_seven_send_data(
     cahute_link *link,
     unsigned long flags,
-    FILE *filep,
-    size_t size,
+    cahute_file *file,
+    unsigned long size,
     cahute_progress_func *progress_func,
     void *progress_cookie
 ) {
     cahute_u8 buf[264];
-    size_t last_packet_size = size & 255;
-    unsigned long packet_count = (size >> 8) + !!last_packet_size;
+    size_t last_packet_size;
+    unsigned long packet_count;
+    unsigned long offset = 0;
     unsigned long i, loop_send_flags = 0;
     int err, shifted = 0;
 
+    last_packet_size = size & 255;
+    packet_count = (size >> 8) + !!last_packet_size;
     last_packet_size = last_packet_size ? last_packet_size : 256;
     cahute_seven_set_ascii_hex(buf, (packet_count >> 8) & 255);
     cahute_seven_set_ascii_hex(&buf[2], packet_count & 255);
@@ -1129,13 +1131,11 @@ cahute_seven_send_data(
         buf[6] = '0';
         buf[7] = '1';
 
-        if (!fread(&buf[8], 256, 1, filep)) {
-            msg(ll_error,
-                "Could not read file data: %s (%d)",
-                strerror(errno),
-                errno);
-            return CAHUTE_ERROR_UNKNOWN;
-        }
+        err = cahute_read_from_file(file, offset, &buf[8], 256);
+        if (err)
+            return err;
+
+        offset += 256;
 
         err = cahute_seven_send_extended(
             link,
@@ -1161,12 +1161,8 @@ cahute_seven_send_data(
         cahute_seven_set_ascii_hex(&buf[4], (i >> 8) & 255);
         cahute_seven_set_ascii_hex(&buf[6], i & 255);
 
-        if (!fread(&buf[8], 256, 1, filep)) {
-            msg(ll_error,
-                "Could not read file data: %s (%d)",
-                strerror(errno),
-                errno);
-
+        err = cahute_read_from_file(file, offset, &buf[8], 256);
+        if (err) {
             if (shifted) {
                 msg(ll_error,
                     "An error has occurred while we were using packet "
@@ -1174,8 +1170,10 @@ cahute_seven_send_data(
                 link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
             }
 
-            return CAHUTE_ERROR_UNKNOWN;
+            return err;
         }
+
+        offset += 256;
 
         msg(ll_info, "Sending data packet %lu/%lu.", i, packet_count);
         err = cahute_seven_send_extended(
@@ -1216,13 +1214,9 @@ cahute_seven_send_data(
     cahute_seven_set_ascii_hex(&buf[4], (packet_count >> 8) & 255);
     cahute_seven_set_ascii_hex(&buf[6], packet_count & 255);
 
-    if (!fread(&buf[8], last_packet_size, 1, filep)) {
-        msg(ll_error,
-            "Could not read file data: %s (%d)",
-            strerror(errno),
-            errno);
-        return CAHUTE_ERROR_UNKNOWN;
-    }
+    err = cahute_read_from_file(file, offset, &buf[8], last_packet_size);
+    if (err)
+        return err;
 
     msg(ll_info,
         "Sending data packet %lu/%lu (last).",
@@ -1450,7 +1444,7 @@ cahute_seven_send_data_from_buf(
  * receives a roleswap or another command.
  *
  * @param link Link with which to receive the data.
- * @param filep FILE object to write data to.
+ * @param file File to write data to.
  * @param size Size of the data to receive.
  * @param code Command code of the corresponding flow.
  * @param progress_func Function to display progress.
@@ -1460,7 +1454,7 @@ cahute_seven_send_data_from_buf(
 CAHUTE_LOCAL(int)
 cahute_seven_receive_raw_data(
     cahute_link *link,
-    FILE *filep,
+    cahute_file *file,
     size_t size,
     int command_code,
     cahute_progress_func *progress_func,
@@ -1468,6 +1462,7 @@ cahute_seven_receive_raw_data(
 ) {
     cahute_u8 const *buf = link->protocol_state.seven.last_packet_data;
     unsigned long packet_count = 0;
+    unsigned long offset = 0;
     unsigned int i;
     int err;
 
@@ -1561,15 +1556,12 @@ cahute_seven_receive_raw_data(
         }
 
         /* Write what is in the current packet. */
-        if (!fwrite(&buf[8], current_size, 1, filep)) {
-            msg(ll_error,
-                "Could not write file data: %s (%d)",
-                strerror(errno),
-                errno);
-            return CAHUTE_ERROR_UNKNOWN;
-        }
+        err = cahute_write_to_file(file, offset, &buf[8], current_size);
+        if (err)
+            return err;
 
         size -= current_size;
+        offset += current_size;
 
         if (progress_func)
             (*progress_func)(progress_cookie, i, packet_count);
@@ -2764,8 +2756,7 @@ cahute_seven_optimize_storage(cahute_link *link, char const *storage) {
  * @param directory Optional name of the directory.
  * @param name Name of the file.
  * @param storage Name of the storage device.
- * @param filep File pointer to read from.
- * @param file_size Size of the file.
+ * @param file File to read from.
  * @param overwrite_func Overwrite confirmation function.
  * @param overwrite_cookie Cookie to pass to the overwrite confirmation
  *        function.
@@ -2780,14 +2771,18 @@ cahute_seven_send_file_to_storage(
     char const *directory,
     char const *name,
     char const *storage,
-    FILE *filep,
-    size_t file_size,
+    cahute_file *file,
     cahute_confirm_overwrite_func *overwrite_func,
     void *overwrite_cookie,
     cahute_progress_func *progress_func,
     void *progress_cookie
 ) {
+    unsigned long file_size;
     int err, should_upload_data = 1;
+
+    err = cahute_get_file_size(file, &file_size);
+    if (err)
+        return err;
 
     if (flags & CAHUTE_SEND_FILE_FLAG_DELETE) {
         int file_type = SEVEN_FILE_TYPE_NONE;
@@ -2893,7 +2888,7 @@ cahute_seven_send_file_to_storage(
         && (err = cahute_seven_send_data(
                 link,
                 0,
-                filep,
+                file,
                 file_size,
                 progress_func,
                 progress_cookie
@@ -2910,7 +2905,8 @@ cahute_seven_send_file_to_storage(
  * @param directory Optional name of the directory.
  * @param name Name of the file.
  * @param storage Name of the storage device.
- * @param filep File pointer to write to.
+ * @param path Path to which to write the result.
+ * @param path_type Type of the path.
  * @param progress_func Function to call to signify progress.
  * @param progress_cookie Cookie to pass to the progress function.
  * @return Cahute error, or 0 if successful.
@@ -2921,12 +2917,14 @@ cahute_seven_request_file_from_storage(
     char const *directory,
     char const *name,
     char const *storage,
-    FILE *filep,
+    void const *path,
+    int path_type,
     cahute_progress_func *progress_func,
     void *progress_cookie
 ) {
-    int err;
+    int err = CAHUTE_OK;
     unsigned long filesize;
+    cahute_file *file = NULL;
 
     /* Active sends 0x44 command.
      * Active receives ACK. */
@@ -2944,7 +2942,7 @@ cahute_seven_request_file_from_storage(
         NULL
     );
     if (err)
-        return err;
+        goto fail;
 
     EXPECT_BASIC_ACK;
 
@@ -2972,21 +2970,29 @@ cahute_seven_request_file_from_storage(
         NULL /* D6 */
     );
     if (err)
-        return err;
+        goto fail;
+
+    if (path)
+        err = cahute_open_file_for_export(&file, filesize, path, path_type);
+    else
+        err = cahute_open_stdout(&file);
+
+    if (err)
+        goto fail;
 
     /* Active sends ACK.
      * Data flow occurs from passive to active.
      * Last ACK is not yet sent. */
     err = cahute_seven_receive_raw_data(
         link,
-        filep,
+        file,
         filesize,
         0x45,
         progress_func,
         progress_cookie
     );
     if (err)
-        return err;
+        goto fail;
 
     /* Active sends ACK for last data packet.
      * Passive sends ROLESWAP.
@@ -2998,10 +3004,15 @@ cahute_seven_request_file_from_storage(
         PACKET_SUBTYPE_ACK_BASIC
     );
     if (err)
-        return err;
+        goto fail;
 
     EXPECT_PACKET(PACKET_TYPE_ROLESWAP, 0);
-    return CAHUTE_OK;
+
+fail:
+    if (file)
+        cahute_close_file(file);
+
+    return err;
 }
 
 /**

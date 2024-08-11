@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
             NULL,
             args.distant_target_name,
             "fls0",
-            args.local_source_fp,
+            args.local_source_file,
             NULL,
             NULL,
             NULL,
@@ -101,7 +101,8 @@ int main(int argc, char **argv) {
             NULL,
             args.distant_source_name,
             "fls0",
-            args.local_target_fp,
+            args.local_target_path,
+            CAHUTE_PATH_TYPE_CLI,
             NULL,
             NULL
         );
@@ -123,10 +124,8 @@ int main(int argc, char **argv) {
 fail:
     if (link)
         cahute_close_link(link);
-    if (args.local_source_fp && args.local_source_path)
-        fclose(args.local_source_fp);
-    if (args.local_target_fp && args.local_target_path)
-        fclose(args.local_target_fp);
+    if (args.local_source_file)
+        cahute_close_file(args.local_source_file);
 
     ret = 1;
     switch (err) {

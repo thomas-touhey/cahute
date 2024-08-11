@@ -48,10 +48,10 @@
  *
  * The combinations for the operations on the file system are the following:
  *
- * - SEND a {local_source_fp}'s content to a {distant_target_name}, in the
+ * - SEND a {local_source_file}'s content to a {distant_target_name}, in the
  *   {distant_target_directory_name} directory on {storage_name}.
  * - GET {distant_source_name}, in the {distant_source_directory_name}
- *   directory on {storage_name}, to {local_target_fp}.
+ *   directory on {storage_name}, to {local_target_path}.
  * - COPY {distant_source_name}, in the {distant_source_directory_name}
  *   directory, to {distant_target_name}, in the
  *   {distant_target_directory_name}, on {storage_name}.
@@ -97,9 +97,8 @@
  * Local filesystem properties:
  *
  * @property local_source_path Path to the local file when uploading a file.
- * @property local_source_fp Local FILE object for uploading a file.
+ * @property local_source_file Local file object for uploading a file.
  * @property local_target_path Path to the local file when downloading a file.
- * @property local_target_fp Local FILE object for downloading a file.
  */
 struct args {
     int command;
@@ -129,8 +128,7 @@ struct args {
      * such as stdin. Same for the target with stdout or stderr. */
     char const *local_source_path;
     char const *local_target_path;
-    FILE *local_source_fp;
-    FILE *local_target_fp;
+    cahute_file *local_source_file;
 };
 
 extern int parse_args(int ac, char **av, struct args *args);

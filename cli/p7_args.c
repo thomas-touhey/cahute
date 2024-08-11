@@ -342,8 +342,7 @@ int parse_args(int argc, char **argv, struct args *args) {
 
     args->local_source_path = NULL;
     args->local_target_path = NULL;
-    args->local_source_fp = NULL;
-    args->local_target_fp = NULL;
+    args->local_source_file = NULL;
 
     init_option_parser(
         &state,
@@ -545,9 +544,7 @@ int parse_args(int argc, char **argv, struct args *args) {
         args->distant_source_directory_name = o_directory;
         args->distant_source_name = params[0];
 
-        if (!strcmp(o_output, "-")) /* Standard output. */
-            args->local_target_fp = stdout;
-        else
+        if (strcmp(o_output, "-")) /* Not standard output. */
             args->local_target_path = o_output;
     } else if (!strcmp(subcommand, "copy") || !strcmp(subcommand, "cp")) {
         if (help || param_count != 2) {
@@ -647,32 +644,19 @@ int parse_args(int argc, char **argv, struct args *args) {
     }
 
     /* Open the local source path if a path is given. */
-    if (args->local_source_path && !args->local_source_fp) {
-        args->local_source_fp = fopen(args->local_source_path, "rb");
-        if (!args->local_source_fp) {
+    if (args->local_source_path && !args->local_source_file) {
+        err = cahute_open_file_for_reading(
+            &args->local_source_file,
+            args->local_source_path,
+            CAHUTE_PATH_TYPE_CLI
+        );
+        if (err) {
             fprintf(
                 stderr,
                 "Can't open '%s': %s\n",
                 args->local_source_path,
-                strerror(errno)
+                cahute_get_error_name(err)
             );
-            return 0;
-        }
-    }
-
-    /* Open the local target path if a path is given. */
-    if (args->local_target_path && !args->local_target_fp) {
-        args->local_target_fp = fopen(args->local_target_path, "wb+");
-        if (!args->local_target_fp) {
-            fprintf(
-                stderr,
-                "Can't open '%s': %s\n",
-                args->local_target_path,
-                strerror(errno)
-            );
-            if (args->local_source_path && args->local_source_fp)
-                fclose(args->local_source_fp);
-
             return 0;
         }
     }

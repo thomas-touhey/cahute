@@ -107,7 +107,7 @@ int parse_args(int argc, char **argv, struct args *args) {
     struct option_parser_state state;
     char const *command_path = argv[0];
     char *optarg;
-    int option, optopt, about = 0, help = 0, multiple_operations = 0;
+    int option, optopt, about = 0, help = 0, multiple_operations = 0, err;
 
     args->operation = 0;
     args->throttle = 0;
@@ -115,8 +115,7 @@ int parse_args(int argc, char **argv, struct args *args) {
     args->distant_target_name = NULL;
     args->local_source_path = NULL;
     args->local_target_path = NULL;
-    args->local_source_fp = NULL;
-    args->local_target_fp = NULL;
+    args->local_source_file = NULL;
 
     init_option_parser(
         &state,
@@ -236,24 +235,16 @@ process_params:
     }
 
     if (args->local_source_path) {
-        args->local_source_fp = fopen(args->local_source_path, "rb");
-        if (!args->local_source_fp) {
+        err = cahute_open_file_for_reading(
+            &args->local_source_file,
+            args->local_source_path,
+            CAHUTE_PATH_TYPE_CLI
+        );
+        if (err) {
             fprintf(
                 stderr,
                 "Unable to open file: %s\n",
                 args->local_source_path
-            );
-            return 0;
-        }
-    }
-
-    if (args->local_target_path) {
-        args->local_target_fp = fopen(args->local_target_path, "wb");
-        if (!args->local_target_fp) {
-            fprintf(
-                stderr,
-                "Unable to open file: %s\n",
-                args->local_target_path
             );
             return 0;
         }

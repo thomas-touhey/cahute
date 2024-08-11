@@ -595,7 +595,7 @@ Link control related function declarations
 
 .. c:function:: int cahute_send_file_to_storage(cahute_link *link, \
     unsigned long flags, char const *directory, char const *name, \
-    char const *storage, FILE *filep, \
+    char const *storage, cahute_file *file, \
     cahute_confirm_overwrite_func *overwrite_func, void *overwrite_cookie, \
     cahute_progress_func *progress_func, void *progress_cookie)
 
@@ -645,8 +645,7 @@ Link control related function declarations
         or ``NULL`` if the file should be placed at root.
     :param name: Name of the file in the target storage device.
     :param storage: Name of the storage device on which to place the file.
-    :param filep: Standard FILE pointer to read file data and estimate
-        file size from.
+    :param file: File to read data and estimate file size from.
     :param overwrite_func: Pointer to the overwrite function to call.
         If this is set to ``NULL``, the overwrite will be systematically
         rejected if requested by the calculator.
@@ -659,7 +658,8 @@ Link control related function declarations
 
 .. c:function:: int cahute_request_file_from_storage(cahute_link *link, \
     char const *directory, char const *name, char const *storage, \
-    FILE *filep, cahute_progress_func *progress_func, void *progress_cookie)
+    void const *path, int path_type, cahute_progress_func *progress_func, \
+    void *progress_cookie)
 
     Request a file from a storage device on the calculator.
 
@@ -671,7 +671,9 @@ Link control related function declarations
         or ``NULL`` if the file should be placed at root.
     :param name: Name of the file to request.
     :param storage: Name of the storage device from which to request the file.
-    :param filep: Standard FILE pointer to write file data.
+    :param path: Path to the file to create and write the received content
+        into. If NULL, the requested file will be written in standard output.
+    :param path_type: Type of the path.
     :param progress_func: Pointer to the optional progress function to call
         once for every step in the transfer process.
     :param progress_cookie: Cookie to pass to the progress function.

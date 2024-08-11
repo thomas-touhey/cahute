@@ -352,7 +352,7 @@ cahute_request_storage_capacity(
  *        NULL if at root.
  * @param name Name of the file to place the file as.
  * @param storage Storage on which to place the file.
- * @param filep File pointer.
+ * @param file File to read from.
  * @param overwrite_func Function to call to confirm overwrite.
  * @param overwrite_cookie Cookie to pass to the overwrite confirmation
  *        function.
@@ -367,13 +367,12 @@ cahute_send_file_to_storage(
     char const *directory,
     char const *name,
     char const *storage,
-    FILE *filep,
+    cahute_file *file,
     cahute_confirm_overwrite_func *overwrite_func,
     void *overwrite_cookie,
     cahute_progress_func *progress_func,
     void *progress_cookie
 ) {
-    size_t file_size;
     unsigned long unsupported_flags =
         (flags
          & ~(CAHUTE_SEND_FILE_FLAG_FORCE | CAHUTE_SEND_FILE_FLAG_OPTIMIZE
@@ -389,24 +388,6 @@ cahute_send_file_to_storage(
     if (err)
         return err;
 
-    /* Compute the file size. */
-    if (fseek(filep, 0L, SEEK_END) < 0) {
-        msg(ll_fatal,
-            "Cannot seek on the provided file pointer; is it a seekable "
-            "standard stream?");
-        return CAHUTE_ERROR_UNKNOWN;
-    }
-
-    file_size = (size_t)ftell(filep);
-    if (file_size > REASONABLE_FILE_CONTENT_LIMIT) {
-        msg(ll_error,
-            "file too big (over 128MiB) or unsupported file type (e.g. "
-            "directory)");
-        return CAHUTE_ERROR_UNKNOWN;
-    }
-
-    rewind(filep);
-
     /* Send the file using the protocol. */
     switch (link->protocol) {
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
@@ -417,8 +398,7 @@ cahute_send_file_to_storage(
             directory,
             name,
             storage,
-            filep,
-            file_size,
+            file,
             overwrite_func,
             overwrite_cookie,
             progress_func,
@@ -437,7 +417,8 @@ cahute_send_file_to_storage(
  * @param directory Optional name of the directory.
  * @param name Name of the file.
  * @param storage Name of the storage device.
- * @param filep File pointer to write to.
+ * @param path Path to the file to create, or NULL if stdout.
+ * @param path_type Type of the path.
  * @param progress_func Function to call to signify progress.
  * @param progress_cookie Cookie to pass to the progress function.
  * @return Cahute error, or 0 if successful.
@@ -448,7 +429,8 @@ cahute_request_file_from_storage(
     char const *directory,
     char const *name,
     char const *storage,
-    FILE *filep,
+    void const *path,
+    int path_type,
     cahute_progress_func *progress_func,
     void *progress_cookie
 ) {
@@ -466,7 +448,8 @@ cahute_request_file_from_storage(
             directory,
             name,
             storage,
-            filep,
+            path,
+            path_type,
             progress_func,
             progress_cookie
         );

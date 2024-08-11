@@ -370,7 +370,7 @@ int main(int ac, char **av) {
             args.distant_target_directory_name,
             args.distant_target_name,
             args.storage_name,
-            args.local_source_fp,
+            args.local_source_file,
             &confirm_overwrite,
             NULL,
             args.nice_display ? (cahute_progress_func *)&display_progress : 0,
@@ -384,7 +384,8 @@ int main(int ac, char **av) {
             args.distant_source_directory_name,
             args.distant_source_name,
             args.storage_name,
-            args.local_target_fp,
+            args.local_target_path,
+            CAHUTE_PATH_TYPE_CLI,
             args.nice_display ? (cahute_progress_func *)&display_progress : 0,
             &progress_displayed
         );
@@ -440,10 +441,8 @@ int main(int ac, char **av) {
 
     cahute_close_link(link);
 
-    if (args.local_source_fp && args.local_source_path)
-        fclose(args.local_source_fp);
-    if (args.local_target_fp && args.local_target_path)
-        fclose(args.local_target_fp);
+    if (args.local_source_file)
+        cahute_close_file(args.local_source_file);
 
     return 0;
 
@@ -456,10 +455,8 @@ fail:
         cahute_close_link(link);
 
     /* If files have been opened when parsing args, we want to close them. */
-    if (args.local_source_fp && args.local_source_path)
-        fclose(args.local_source_fp);
-    if (args.local_target_fp && args.local_target_path)
-        fclose(args.local_target_fp);
+    if (args.local_source_file)
+        cahute_close_file(args.local_source_file);
 
     /* If a local target path was defined, we want to remove it. */
     if (args.local_target_path)

@@ -29,6 +29,7 @@
 #ifndef CAHUTE_LINK_H
 #define CAHUTE_LINK_H 1
 #include "cdefs.h"
+#include "file.h"
 #include "picture.h"
 #include <stdio.h>
 
@@ -237,7 +238,7 @@ cahute_send_file_to_storage(
     char const *cahute__directory,
     char const *cahute__name,
     char const *cahute__storage,
-    FILE *cahute__filep,
+    cahute_file *cahute__file,
     cahute_confirm_overwrite_func *cahute__overwrite_func,
     void *cahute__overwrite_cookie,
     cahute_progress_func *cahute__progress_func,
@@ -250,7 +251,8 @@ cahute_request_file_from_storage(
     char const *cahute__directory,
     char const *cahute__name,
     char const *cahute__storage,
-    FILE *cahute__filep,
+    void const *cahute__path,
+    int cahute__path_type,
     cahute_progress_func *cahute__progress_func,
     void *cahute__progress_cookie
 );

@@ -980,8 +980,7 @@ cahute_seven_send_file_to_storage(
     char const *directory,
     char const *name,
     char const *storage,
-    FILE *filep,
-    size_t file_size,
+    cahute_file *file,
     cahute_confirm_overwrite_func *overwrite_func,
     void *overwrite_cookie,
     cahute_progress_func *progress_func,
@@ -994,7 +993,8 @@ cahute_seven_request_file_from_storage(
     char const *directory,
     char const *name,
     char const *storage,
-    FILE *filep,
+    void const *path,
+    int path_type,
     cahute_progress_func *progress_func,
     void *progress_cookie
 );

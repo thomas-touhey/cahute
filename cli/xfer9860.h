@@ -40,10 +40,10 @@
  *
  * The operations are the following:
  *
- * - UPLOAD contents of a {local_source_fp} as {distant_target_name} on
+ * - UPLOAD contents of a {local_source_file} as {distant_target_name} on
  *   storage device "fls0".
  * - DOWNLOAD contents of {distant_source_name} from storage device "fls0"
- *   into {local_target_fp}.
+ *   into {local_target_path}.
  * - Get INFO regarding the calculator.
  * - OPTIMIZE the "fls0" storage device.
  *
@@ -53,8 +53,7 @@
  * @property distant_target_name Distant file name for upload.
  * @property local_source_path Path of the local source file for upload.
  * @property local_target_path Path of the local target file for download.
- * @property local_source_fp Local source file pointer for upload.
- * @property local_target_fp Local target file pointer for download.
+ * @property local_source_file Local source file for upload.
  */
 struct args {
     int operation;
@@ -63,8 +62,7 @@ struct args {
     char const *distant_target_name;
     char const *local_source_path;
     char const *local_target_path;
-    FILE *local_source_fp;
-    FILE *local_target_fp;
+    cahute_file *local_source_file;
 };
 
 extern int parse_args(int argc, char **argv, struct args *args);
