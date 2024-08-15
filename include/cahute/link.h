@@ -189,8 +189,6 @@ cahute_get_device_info(
 
 CAHUTE_EXTERN(void) cahute_close_link(cahute_link *cahute__link);
 
-CAHUTE_END_DECLS
-
 /* ---
  * Data transfer operations.
  * --- */

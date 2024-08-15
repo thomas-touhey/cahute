@@ -34,7 +34,7 @@
 
 /* C++ declaration and namespace management. */
 #ifdef __cplusplus
-# define CAHUTE_BEGIN_NAMESPACE namespace "cahute" {
+# define CAHUTE_BEGIN_NAMESPACE namespace cahute {
 # define CAHUTE_BEGIN_DECLS     extern "C" {
 # define CAHUTE_END_DECLS       }
 # define CAHUTE_END_NAMESPACE   }
