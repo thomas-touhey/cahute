@@ -183,6 +183,7 @@ cahute_populate_file_from_memory(
  * Open a file on the current system, for reading.
  *
  * @param filep Pointer to the file to open.
+ * @param flags Flags for opening the file.
  * @param path Path to the file to open.
  * @param path_type Type of the path.
  * @return Error, or 0 if successful.
@@ -190,6 +191,7 @@ cahute_populate_file_from_memory(
 CAHUTE_EXTERN(int)
 cahute_open_file_for_reading(
     cahute_file **filep,
+    unsigned long flags,
     void const *path,
     int path_type
 ) {

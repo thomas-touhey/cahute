@@ -29,7 +29,7 @@
 #include "internals.h"
 
 /**
- * Create a program.
+ * Create a program with contents stored in a file.
  *
  * @param datap Pointer to the data to allocate.
  * @param encoding Text encoding used for the name, password and content.
@@ -37,28 +37,56 @@
  * @param name_size Size of the program name.
  * @param password Password of the program.
  * @param password_size Size of the password program.
- * @param content Content of the program.
- * @param size Size of the program content.
+ * @param file File object from which to read the contents.
+ * @param content_offset Offset from which to read the contents.
+ * @param content_size Size of the content to read.
  * @return Cahute error.
  */
 CAHUTE_EXTERN(int)
-cahute_create_program(
+cahute_create_program_from_file(
     cahute_data **datap,
     int encoding,
     void const *name,
     size_t name_size,
     void const *password,
     size_t password_size,
-    void const *content,
-    size_t size
+    cahute_file *file,
+    unsigned long content_offset,
+    size_t content_size
 ) {
     cahute_data *data;
     struct cahute__data_content_program *program;
     cahute_u8 *buf;
+    cahute_u8 const *p;
+    int err;
 
-    data = malloc(sizeof(cahute_data) + name_size + password_size + size + 12);
+    /* For the name and password, in the case of CASIO's encodings,
+     * we want to ensure that there is no 0xFF or 0x00 sentinel in the
+     * strings. */
+    switch (encoding) {
+    case CAHUTE_TEXT_ENCODING_LEGACY_8:
+    case CAHUTE_TEXT_ENCODING_9860_8:
+        if (name_size && (p = memchr(name, 0xFF, name_size)))
+            name_size = (size_t)(p - (cahute_u8 const *)name);
+        if (name_size && (p = memchr(name, 0x00, name_size)))
+            name_size = (size_t)(p - (cahute_u8 const *)name);
+
+        if (password_size && (p = memchr(password, 0xFF, password_size)))
+            password_size = (size_t)(p - (cahute_u8 const *)password);
+        if (password_size && (p = memchr(password, 0x00, password_size)))
+            password_size = (size_t)(p - (cahute_u8 const *)password);
+
+        break;
+    }
+
+    data = malloc(
+        sizeof(cahute_data) + name_size + password_size + content_size + 12
+    );
     if (!data)
         return CAHUTE_ERROR_ALLOC;
+
+    /* TODO: Recompute the name and password size depending on the presence
+     * of 0xFF and 0x00 at the end? */
 
     buf = (cahute_u8 *)&data[1];
 
@@ -69,7 +97,7 @@ cahute_create_program(
     program->cahute_data_content_program_encoding = encoding;
     program->cahute_data_content_program_name_size = name_size;
     program->cahute_data_content_program_password_size = password_size;
-    program->cahute_data_content_program_size = size;
+    program->cahute_data_content_program_size = content_size;
 
     if (name_size) {
         program->cahute_data_content_program_name = buf;
@@ -107,13 +135,14 @@ cahute_create_program(
 
     program->cahute_data_content_program_content = buf;
 
-    if (size) {
-        if (content)
-            memcpy(buf, content, size);
-        else
-            memset(buf, 0, size);
+    if (content_size) {
+        err = cahute_read_from_file(file, content_offset, buf, content_size);
+        if (err) {
+            free(data);
+            return err;
+        }
 
-        buf += size;
+        buf += content_size;
     }
 
     buf[0] = 0;

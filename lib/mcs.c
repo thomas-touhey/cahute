@@ -32,7 +32,7 @@
 /**
  * Decode an MCS file.
  *
- * @param datap Pointer to the data to allocate.
+ * @param final_datap Pointer to the data to allocate.
  * @param group Name of the group of the file to decode.
  * @param group_size Size of the name of the group of the file to decode.
  * @param directory Name of the directory of the file to decode.
@@ -40,28 +40,55 @@
  *        to decode.
  * @param name Name of the file to decode.
  * @param name_size Size of the name of the file to decode.
- * @param content Content of the file to decode.
- * @param content_size Size of the content of the file to decode.
+ * @param file File from which to read content.
+ * @param content_offset Offset from which to read the file content.
+ * @param content_size Size of the content to read from the file.
  * @param data_type Type of the data to decode.
  * @return Cahute error.
  */
 CAHUTE_EXTERN(int)
 cahute_mcs_decode_data(
-    cahute_data **datap,
+    cahute_data **final_datap,
     cahute_u8 const *group,
     size_t group_size,
     cahute_u8 const *directory,
     size_t directory_size,
     cahute_u8 const *name,
     size_t name_size,
-    cahute_u8 const *content,
+    cahute_file *file,
+    unsigned long content_offset,
     size_t content_size,
     int data_type
 ) {
-    if (data_type == DATA_TYPE_PROGRAM) {
-        cahute_u8 const *name_end;
+    cahute_data *data = NULL;
+    cahute_data **datap = &data;
+    cahute_u8 const *p;
+    int err;
 
-        name_end = memchr(content, 0, 8);
+    /* For the group, directory and name, we want to ensure that there is no
+     * 0xFF or 0x00 sentinel in the strings. */
+    if (group_size && (p = memchr(group, 0xFF, group_size)))
+        group_size = (size_t)(p - (cahute_u8 const *)group);
+    if (group_size && (p = memchr(group, 0x00, group_size)))
+        group_size = (size_t)(p - (cahute_u8 const *)group);
+
+    if (directory_size && (p = memchr(directory, 0xFF, directory_size)))
+        directory_size = (size_t)(p - (cahute_u8 const *)directory);
+    if (directory_size && (p = memchr(directory, 0x00, directory_size)))
+        directory_size = (size_t)(p - (cahute_u8 const *)directory);
+
+    if (name_size && (p = memchr(name, 0xFF, name_size)))
+        name_size = (size_t)(p - (cahute_u8 const *)name);
+    if (name_size && (p = memchr(name, 0x00, name_size)))
+        name_size = (size_t)(p - (cahute_u8 const *)name);
+
+    msg(ll_info, "Data Type: 0x%02X", data_type);
+    msg(ll_info, "Directory Name: %.*s", directory_size, directory);
+    msg(ll_info, "Data Name: %.*s", name_size, name);
+    msg(ll_info, "Group Name: %.*s", group_size, group);
+
+    if (data_type == DATA_TYPE_PROGRAM) {
+        cahute_u8 program_header[10];
 
         /* We have a program. */
         if (content_size < 10) {
@@ -69,25 +96,35 @@ cahute_mcs_decode_data(
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        return cahute_create_program(
+        err = cahute_read_from_file(file, content_offset, program_header, 10);
+        if (err)
+            return err;
+
+        err = cahute_create_program_from_file(
             datap,
             CAHUTE_TEXT_ENCODING_9860_8,
             name,
             name_size,
-            content,
-            name_end ? name_end - name : 8,
-            &content[10],
+            program_header,
+            8,
+            file,
+            content_offset + 10,
             content_size - 10
         );
+        if (err)
+            return err;
+
+        goto data_ready;
     }
 
     /* TODO */
-    msg(ll_info, "Data Type: 0x%02X", data_type);
-    msg(ll_info, "Directory Name: %.*s", directory_size, directory);
-    msg(ll_info, "Data Name: %.*s", name_size, name);
-    msg(ll_info, "Group Name: %.*s", group_size, group);
-    msg(ll_info, "Raw file contents:");
-    mem(ll_info, content, content_size);
-
     CAHUTE_RETURN_IMPL("MCS file not implemented.");
+
+data_ready:
+    while (*datap)
+        datap = &(*datap)->cahute_data_next;
+
+    *datap = *final_datap;
+    *final_datap = data;
+    return CAHUTE_OK;
 }

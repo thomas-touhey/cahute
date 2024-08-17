@@ -29,28 +29,35 @@
 #ifndef CAHUTE_FILE_H
 #define CAHUTE_FILE_H 1
 #include "cdefs.h"
+#include "data.h"
 #include "path.h"
 
 CAHUTE_BEGIN_NAMESPACE
 CAHUTE_DECLARE_TYPE(cahute_file)
 
+#define CAHUTE_FILE_TYPE_UNKNOWN    0
 #define CAHUTE_FILE_TYPE_ADDIN_CG   1
 #define CAHUTE_FILE_TYPE_ADDIN_FX   2
-#define CAHUTE_FILE_TYPE_CASIOLINK  3
-#define CAHUTE_FILE_TYPE_EACT_FX    4
-#define CAHUTE_FILE_TYPE_FKEY_FX    5
-#define CAHUTE_FILE_TYPE_FKEY_CG    6
-#define CAHUTE_FILE_TYPE_LANG_CG    7
-#define CAHUTE_FILE_TYPE_LANG_FX    8
-#define CAHUTE_FILE_TYPE_MAINMEM    9
-#define CAHUTE_FILE_TYPE_PICTURE_CG 10
-#define CAHUTE_FILE_TYPE_PICTURE_CP 11
+#define CAHUTE_FILE_TYPE_BITMAP     4
+#define CAHUTE_FILE_TYPE_CASIOLINK  8
+#define CAHUTE_FILE_TYPE_CTF        16
+#define CAHUTE_FILE_TYPE_EACT_FX    32
+#define CAHUTE_FILE_TYPE_FKEY_FX    64
+#define CAHUTE_FILE_TYPE_FKEY_CG    128
+#define CAHUTE_FILE_TYPE_FXPROGRAM  256
+#define CAHUTE_FILE_TYPE_GIF        512
+#define CAHUTE_FILE_TYPE_LANG_CG    1024
+#define CAHUTE_FILE_TYPE_LANG_FX    2048
+#define CAHUTE_FILE_TYPE_MAINMEM    4096
+#define CAHUTE_FILE_TYPE_PICTURE_CG 8192
+#define CAHUTE_FILE_TYPE_PICTURE_CP 16384
 
 CAHUTE_BEGIN_DECLS
 
 CAHUTE_EXTERN(int)
 cahute_open_file_for_reading(
     cahute_file **cahute__filep,
+    unsigned long cahute__flags,
     void const *cahute__path,
     int cahute__path_type
 );
@@ -85,7 +92,16 @@ cahute_write_to_file(
 );
 
 CAHUTE_EXTERN(int)
-cahute_guess_file_type(cahute_file *cahute__file, int *cahute__typep);
+cahute_guess_file_type(
+    cahute_file *cahute__file,
+    unsigned long *cahute__typep
+);
+
+CAHUTE_EXTERN(int)
+cahute_get_data_from_file(
+    cahute_file *cahute__file,
+    cahute_data **cahute__datap
+);
 
 CAHUTE_EXTERN(void) cahute_close_file(cahute_file *cahute__filep);
 

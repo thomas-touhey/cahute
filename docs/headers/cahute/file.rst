@@ -141,6 +141,15 @@ Function declarations
     :param typep: Value to define with the determined type for the file.
     :return: Error, or 0 if the operation was successful.
 
+.. c:function:: int cahute_get_data_from_file(cahute_file *file, \
+    cahute_data **datap);
+
+    Decode data from a file opened for reading.
+
+    :param file: File object.
+    :param datap: Pointer to the data to create.
+    :return: Error, or 0 if the operation was successful.
+
 .. c:function:: void cahute_close_file(cahute_file *file)
 
     Close a file.

@@ -98,6 +98,7 @@
 
 CAHUTE_DECLARE_TYPE(cahute_link_medium)
 CAHUTE_DECLARE_TYPE(cahute_file_medium)
+CAHUTE_DECLARE_TYPE(cahute_casiolink_data_description)
 
 #if AMIGAOS_ENABLED
 CAHUTE_EXTERN(int)
@@ -926,6 +927,93 @@ cahute_write_to_file_medium(
 );
 
 /* ---
+ * Data management, defined in data.c
+ * --- */
+
+CAHUTE_EXTERN(int)
+cahute_create_program_from_file(
+    cahute_data **datap,
+    int encoding,
+    void const *name,
+    size_t name_size,
+    void const *password,
+    size_t password_size,
+    cahute_file *file,
+    unsigned long content_offset,
+    size_t content_size
+);
+
+/* ---
+ * CASIOLINK header and file format management, defined in casiolink.c
+ * --- */
+
+#define CAHUTE_CASIOLINK_DATA_FLAG_END    0x00000001 /* Ends communication. */
+#define CAHUTE_CASIOLINK_DATA_FLAG_FINAL  0x00000002 /* Final. */
+#define CAHUTE_CASIOLINK_DATA_FLAG_AL     0x00000004 /* Starts AL mode. */
+#define CAHUTE_CASIOLINK_DATA_FLAG_AL_END 0x00000008 /* Ends AL mode. */
+#define CAHUTE_CASIOLINK_DATA_FLAG_NO_LOG 0x00000010 /* Do not log part. */
+#define CAHUTE_CASIOLINK_DATA_FLAG_MDL    0x00000020 /* Is CAS100 MDL data. */
+
+/**
+ * Data description to be determined from a header.
+ *
+ * This allows, in the CASIOLINK protocol implementation, to separate reading
+ * and acknowledging over the link from the file decoding part.
+ * It can be determined from a header and variant using the
+ * ``cahute_casiolink_determine_data_description()`` function.
+ *
+ * A few examples of such structure are the following:
+ *
+ * ``{part_count=0}``
+ *     No data part accompanying the header.
+ *
+ * ``{part_count=1, last_part_repeat=1, part_sizes=[55]}
+ *     One data part of size 55 bytes accompanying the header.
+ *
+ * ``{part_count=2, last_part_repeat=1, part_sizes=[56, 57]}``
+ *     Two data parts of respective sizes 56 and 57 bytes accompanying the
+ *     header.
+ *
+ * ``{part_count=2, last_part_repeat=3, part_sizes=[32, 16]}``
+ *     Four data parts, of respective sizes 32, 16, 16 and 16 bytes
+ *     accompanying the header.
+ *
+ * @param flags Data description flags, using ``CAHUTE_CASIOLINK_DATA_FLAG_*``
+ *        values.
+ * @param packet_type Packet type (first byte of the packet) to be expected
+ *        with the data parts.
+ * @param part_count Number of part sizes used in the ``part_sizes`` array.
+ * @param last_part_repeat How much times the last part is repeated.
+ * @param part_sizes Distinct part sizes.
+ */
+struct cahute_casiolink_data_description {
+    unsigned long flags;
+    int packet_type;
+    size_t part_count;
+    size_t last_part_repeat;
+    size_t part_sizes[5];
+};
+
+CAHUTE_EXTERN(int)
+cahute_casiolink_determine_header_variant(cahute_u8 const *data);
+
+CAHUTE_EXTERN(int)
+cahute_casiolink_determine_data_description(
+    cahute_u8 const *data,
+    int variant,
+    cahute_casiolink_data_description *desc
+);
+
+CAHUTE_EXTERN(int)
+cahute_casiolink_decode_data(
+    cahute_data **datap,
+    cahute_file *file,
+    unsigned long *offsetp,
+    int variant,
+    int check_data
+);
+
+/* ---
  * CASIOLINK protocol and file format functions, defined in casiolink.c
  * --- */
 
@@ -1097,7 +1185,8 @@ cahute_mcs_decode_data(
     size_t directory_size,
     cahute_u8 const *name,
     size_t name_size,
-    cahute_u8 const *content,
+    cahute_file *file,
+    unsigned long content_offset,
     size_t content_size,
     int data_type
 );

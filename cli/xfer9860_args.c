@@ -237,6 +237,7 @@ process_params:
     if (args->local_source_path) {
         err = cahute_open_file_for_reading(
             &args->local_source_file,
+            0,
             args->local_source_path,
             CAHUTE_PATH_TYPE_CLI
         );

@@ -62,18 +62,6 @@ struct cahute_data {
 
 CAHUTE_BEGIN_DECLS
 
-CAHUTE_EXTERN(int)
-cahute_create_program(
-    cahute_data **cahute__datap,
-    int cahute__encoding,
-    void const *cahute__name,
-    size_t cahute__name_size,
-    void const *cahute__password,
-    size_t cahute__password_size,
-    void const *cahute__content,
-    size_t cahute__size
-);
-
 CAHUTE_EXTERN(void) cahute_destroy_data(cahute_data *cahute__data);
 
 CAHUTE_END_DECLS

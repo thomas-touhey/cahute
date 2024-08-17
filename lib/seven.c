@@ -2258,6 +2258,7 @@ cahute_seven_receive_data(
             }
 
             {
+                cahute_file file;
                 cahute_u8 parambuf[40];
 
                 if (sizeof(parambuf)
@@ -2331,6 +2332,12 @@ cahute_seven_receive_data(
                 if (err)
                     return err;
 
+                cahute_populate_file_from_memory(
+                    &file,
+                    link->data_buffer,
+                    link->data_buffer_size
+                );
+
                 err = cahute_mcs_decode_data(
                     datap,
                     param1,
@@ -2339,7 +2346,8 @@ cahute_seven_receive_data(
                     param3_size,
                     param2,
                     param2_size,
-                    link->data_buffer,
+                    &file,
+                    0,
                     link->data_buffer_size,
                     data_type
                 );

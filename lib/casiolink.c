@@ -77,6 +77,685 @@ cahute_casiolink_checksum(cahute_u8 const *data, size_t size) {
     return (~checksum + 1) & 255;
 }
 
+/* ---
+ * Common utilities to decode CASIOLINK data.
+ * --- */
+
+/**
+ * Read the first 40 bytes of a CASIOLINK header to determine the type.
+ *
+ * @param data First 40 bytes of the CASIOLINK header, including the 0x3A.
+ * @return Variant.
+ */
+CAHUTE_EXTERN(int)
+cahute_casiolink_determine_header_variant(cahute_u8 const *data) {
+    /* We want to try to determine the currently selected variant based
+     * on the header's content. */
+    if (!memcmp(&data[1], "ADN1", 4) || !memcmp(&data[1], "ADN2", 4)
+        || !memcmp(&data[1], "BKU1", 4) || !memcmp(&data[1], "END1", 4)
+        || !memcmp(&data[1], "FCL1", 4) || !memcmp(&data[1], "FMV1", 4)
+        || !memcmp(&data[1], "MCS1", 4) || !memcmp(&data[1], "MDL1", 4)
+        || !memcmp(&data[1], "REQ1", 4) || !memcmp(&data[1], "REQ2", 4)
+        || !memcmp(&data[1], "SET1", 4)) {
+        /* The type seems to be a CAS100 header type we can use. */
+        return CAHUTE_CASIOLINK_VARIANT_CAS100;
+    }
+
+    if (!memcmp(&data[1], "END\xFF", 4) || !memcmp(&data[1], "FNC", 4)
+        || !memcmp(&data[1], "IMG", 4) || !memcmp(&data[1], "MEM", 4)
+        || !memcmp(&data[1], "REQ", 4) || !memcmp(&data[1], "TXT", 4)
+        || !memcmp(&data[1], "VAL", 4)) {
+        /* The type seems to be a CAS50 header type.
+         * This means that we actually have 10 more bytes to read for
+         * a full header.
+         *
+         * NOTE: The '4' in the memcmp() calls above are intentional,
+         * as the NUL character ('\0) is actually considered as part of
+         * the CAS50 header type. */
+        return CAHUTE_CASIOLINK_VARIANT_CAS50;
+    }
+
+    /* By default, we consider the header to be a CAS40 header. */
+    return CAHUTE_CASIOLINK_VARIANT_CAS40;
+}
+
+/**
+ * Determine the number, size and type of data packets following a header.
+ *
+ * @param data CASIOLINK header, including the 0x3A.
+ * @param variant Variant for which to determine the elements.
+ * @param desc Data description to fill.
+ * @return Error, or 0 if successful.
+ */
+CAHUTE_EXTERN(int)
+cahute_casiolink_determine_data_description(
+    cahute_u8 const *data,
+    int variant,
+    cahute_casiolink_data_description *desc
+) {
+    desc->flags = 0;
+    desc->packet_type = PACKET_TYPE_HEADER;
+    desc->part_count = 1;
+    desc->last_part_repeat = 1;
+    desc->part_sizes[0] = 0;
+
+    switch (variant) {
+    case CAHUTE_CASIOLINK_VARIANT_CAS40:
+        if (!memcmp(&data[1], "\x17\x17", 2)) {
+            /* CAS40 AL End */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_AL_END;
+            desc->part_count = 0;
+        } else if (!memcmp(&data[1], "\x17\xFF", 2)) {
+            /* CAS40 End */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_END;
+            desc->part_count = 0;
+        } else if (!memcmp(&data[1], "A1", 2)) {
+            /* CAS40 Dynamic Graph */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] > 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "AA", 2)) {
+            /* CAS40 Dynamic Graph in Bulk */
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] > 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "AD", 2)) {
+            /* CAS40 All Memories */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->last_part_repeat = ((size_t)data[5] << 8) | data[6];
+            desc->part_sizes[0] = 22;
+        } else if (!memcmp(&data[1], "AL", 2)) {
+            /* CAS40 All */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_AL;
+            desc->part_count = 0;
+        } else if (!memcmp(&data[1], "AM", 2)) {
+            /* CAS40 Variable Memories */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->last_part_repeat = ((size_t)data[5] << 8) | data[6];
+            desc->part_sizes[0] = 22;
+        } else if (!memcmp(&data[1], "BU", 2)) {
+            /* CAS40 Backup */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            if (!memcmp(&data[3], "TYPEA00", 7))
+                desc->part_sizes[0] = 32768;
+            else if (!memcmp(&data[3], "TYPEA02", 7))
+                desc->part_sizes[0] = 32768;
+        } else if (!memcmp(&data[1], "DC", 2)) {
+            /* CAS40 Color Screenshot. */
+            unsigned int width = data[3], height = data[4];
+
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL
+                           | CAHUTE_CASIOLINK_DATA_FLAG_NO_LOG;
+            if (!memcmp(&data[5], "\x11UWF\x03", 4)) {
+                desc->last_part_repeat = 3;
+                desc->part_sizes[0] =
+                    1 + ((width >> 3) + !!(width & 7)) * height;
+            }
+        } else if (!memcmp(&data[1], "DD", 2)) {
+            /* CAS40 Monochrome Screenshot. */
+            unsigned int width = data[3], height = data[4];
+
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL
+                           | CAHUTE_CASIOLINK_DATA_FLAG_NO_LOG;
+            if (!memcmp(&data[5], "\x10\x44WF", 4))
+                desc->part_sizes[0] = ((width >> 3) + !!(width & 7)) * height;
+        } else if (!memcmp(&data[1], "DM", 2)) {
+            /* CAS40 Defined Memories */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->last_part_repeat = ((size_t)data[5] << 8) | data[6];
+            desc->part_sizes[0] = 22;
+        } else if (!memcmp(&data[1], "EN", 2)) {
+            /* CAS40 Single Editor Program */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "EP", 2)) {
+            /* CAS40 Single Password Protected Editor Program */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "F1", 2)) {
+            /* CAS40 Single Function */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "F6", 2)) {
+            /* CAS40 Multiple Functions */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "FN", 2)) {
+            /* CAS40 Single Editor Program in Bulk */
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "FP", 2)) {
+            /* CAS40 Single Password Protected Editor Program in Bulk */
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "G1", 2)) {
+            /* CAS40 Graph Function */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "GA", 2)) {
+            /* CAS40 Graph Function in Bulk */
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "GF", 2)) {
+            /* CAS40 Factor */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = 2 + data[6] * 10;
+        } else if (!memcmp(&data[1], "GR", 2)) {
+            /* CAS40 Range */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = 92;
+        } else if (!memcmp(&data[1], "GT", 2)) {
+            /* CAS40 Function Table */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_count = 3;
+            desc->last_part_repeat = ((size_t)data[7] << 8) | data[8];
+            desc->part_sizes[0] = data[6];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+
+            desc->part_sizes[1] = 32;
+            desc->part_sizes[2] = 22;
+        } else if (!memcmp(&data[1], "M1", 2)) {
+            /* CAS40 Single Matrix */
+            unsigned int width = data[5], height = data[6];
+
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = 14;
+            desc->last_part_repeat =
+                width * height + 1; /* Sentinel data part. */
+        } else if (!memcmp(&data[1], "MA", 2)) {
+            /* CAS40 Single Matrix in Bulk */
+            unsigned int width = data[5], height = data[6];
+
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = 14;
+            desc->last_part_repeat = width * height;
+        } else if (!memcmp(&data[1], "P1", 2)) {
+            /* CAS40 Single Numbered Program. */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+        } else if (!memcmp(&data[1], "PD", 2)) {
+            /* CAS40 Polynomial Equation */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_sizes[0] = data[6] * 10 + 12;
+        } else if (!memcmp(&data[1], "PZ", 2)) {
+            /* CAS40 Multiple Numbered Programs */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_count = 2;
+            desc->part_sizes[0] = 190;
+            desc->part_sizes[1] = ((size_t)data[4] << 8) | data[5];
+            if (desc->part_sizes[1] >= 2)
+                desc->part_sizes[1] -= 2;
+        } else if (!memcmp(&data[1], "RT", 2)) {
+            /* CAS40 Recursion Table */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->part_count = 3;
+            desc->last_part_repeat = ((size_t)data[7] << 8) | data[8];
+            desc->part_sizes[0] = data[6];
+            if (desc->part_sizes[0] >= 2)
+                desc->part_sizes[0] -= 2;
+
+            desc->part_sizes[1] = 22;
+            desc->part_sizes[2] = 32;
+        } else if (!memcmp(&data[1], "SD", 2)) {
+            /* CAS40 Simultaneous Equations */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->last_part_repeat = data[5] * data[6] + 1;
+            desc->part_sizes[0] = 14;
+        } else if (!memcmp(&data[1], "SR", 2)) {
+            /* CAS40 Paired Variable Data */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->last_part_repeat = ((size_t)data[5] << 8) | data[6];
+            desc->part_sizes[0] = 32;
+        } else if (!memcmp(&data[1], "SS", 2)) {
+            /* CAS40 Single Variable Data */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            desc->last_part_repeat = ((size_t)data[5] << 8) | data[6];
+            desc->part_sizes[0] = 22;
+        }
+
+        break;
+
+    case CAHUTE_CASIOLINK_VARIANT_CAS50:
+        if (!memcmp(&data[1], "END\xFF", 4)) {
+            /* End packet for CAS50. */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_END;
+            desc->part_count = 0;
+        } else if (!memcmp(&data[1], "VAL", 4)) {
+            unsigned int height = ((unsigned int)data[7] << 8) | data[8];
+            unsigned int width = ((unsigned int)data[9] << 8) | data[10];
+
+            /* Variable data use size as W*H, or only W, or only H depending
+             * on the case. */
+            if (!width)
+                width = 1;
+
+            desc->part_sizes[0] = 14;
+            desc->last_part_repeat = height * width;
+        } else {
+            /* For other packets, the size should always be located at
+             * offset 6 of the header, i.e. offset 7 of the buffer. */
+            desc->part_sizes[0] = ((size_t)data[7] << 24)
+                                  | ((size_t)data[8] << 16)
+                                  | ((size_t)data[9] << 8) | data[10];
+
+            if (desc->part_sizes[0] > 2)
+                desc->part_sizes[0] -= 2;
+            else
+                desc->part_count = 0;
+
+            if (!memcmp(&data[1], "MEM\0BU", 6)) {
+                /* Backups are guaranteed to be the final (and only) file
+                 * sent in the communication. */
+                desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_FINAL;
+            }
+        }
+        break;
+
+    case CAHUTE_CASIOLINK_VARIANT_CAS100:
+        if (!memcmp(&data[1], "BKU1", 4)) {
+            /* Backup packet for CAS100. */
+            desc->part_sizes[0] = ((size_t)data[9] << 24)
+                                  | ((size_t)data[10] << 16)
+                                  | ((size_t)data[11] << 8) | data[12];
+        } else if (!memcmp(&data[1], "END1", 4)) {
+            /* End packet for CAS100. */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_END;
+            desc->part_count = 0;
+        } else if (!memcmp(&data[1], "MCS1", 4)) {
+            /* Main memory packet for CAS100. */
+            desc->part_sizes[0] = ((size_t)data[8] << 8) | data[9];
+            if (!desc->part_sizes[0])
+                desc->part_count = 0;
+        } else if (!memcmp(&data[1], "MDL1", 4)) {
+            /* Initialization packet for CAS100. */
+            desc->flags |= CAHUTE_CASIOLINK_DATA_FLAG_MDL;
+            desc->part_count = 0;
+        } else if (!memcmp(&data[1], "SET1", 4)) {
+            /* TODO */
+            desc->part_count = 0;
+        }
+
+        break;
+
+    default:
+        msg(ll_error, "Unhandled variant 0x%08X.", variant);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    if (desc->part_count && !desc->part_sizes[0]) {
+        /* 'part_count' and 'part_sizes[0]' were left to their default values
+         * of 1 and 0 respectively, which means they have not been set to
+         * a found type. */
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    return CAHUTE_OK;
+}
+
+/**
+ * Decode a CASIOLINK data.
+ *
+ * @param final_datap Pointer to the data to create.
+ * @param file File object to read from.
+ * @param offsetp Pointer to the offset in the file to read from, to set to
+ *        the offset after the data afterwards.
+ * @param variant Variant to read the data with.
+ * @param check_data Whether to check type and checksums for the data parts.
+ * @return Error, or 0 if successful.
+ */
+CAHUTE_EXTERN(int)
+cahute_casiolink_decode_data(
+    cahute_data **final_datap,
+    cahute_file *file,
+    unsigned long *offsetp,
+    int variant,
+    int check_data
+) {
+    cahute_data *data = NULL;
+    cahute_data **datap = &data;
+    cahute_u8 header_buf[50];
+    size_t header_size = 40;
+    cahute_casiolink_data_description desc;
+    unsigned long offset = *offsetp;
+    int err;
+
+    /* Read the header from the buffer, and extract the variant if need be. */
+    if (variant == CAHUTE_CASIOLINK_VARIANT_AUTO) {
+        err = cahute_read_from_file(file, offset, header_buf, 40);
+        if (err)
+            goto fail;
+
+        variant = cahute_casiolink_determine_header_variant(header_buf);
+        if (variant == CAHUTE_CASIOLINK_VARIANT_CAS50) {
+            err =
+                cahute_read_from_file(file, offset + 40, &header_buf[40], 10);
+            if (err)
+                goto fail;
+
+            header_size = 50;
+        }
+    } else {
+        header_size = variant == CAHUTE_CASIOLINK_VARIANT_CAS50 ? 50 : 40;
+
+        err = cahute_read_from_file(file, offset, header_buf, header_size);
+        if (err)
+            goto fail;
+    }
+
+    offset += header_size;
+
+    /* Only check the header if not already checked, i.e. in the case of files
+     * and not in the case of links. */
+    if (check_data) {
+        unsigned int obtained_checksum = header_buf[header_size - 1];
+        unsigned int expected_checksum;
+
+        if (header_buf[0] != PACKET_TYPE_HEADER) {
+            msg(ll_error,
+                "Header type 0x%02X is not the expected 0x%02X.",
+                header_buf[0],
+                PACKET_TYPE_HEADER);
+            err = CAHUTE_ERROR_CORRUPT;
+            goto fail;
+        }
+
+        expected_checksum =
+            cahute_casiolink_checksum(&header_buf[1], header_size - 2);
+        if (header_buf[header_size - 1] != expected_checksum) {
+            msg(ll_error,
+                "Header checksum 0x%02X is different from expected checksum "
+                "%02X.",
+                obtained_checksum,
+                expected_checksum);
+            err = CAHUTE_ERROR_CORRUPT;
+            goto fail;
+        }
+    }
+
+    /* We need to get the data description in order to at least place the
+     * offset after the current header and data part, even if it is not
+     * implemented, in order for file reading to use CAHUTE_ERROR_IMPL errors
+     * to skip unimplemented file types.
+     *
+     * NOTE: We only update ``*offsetp`` here and NOT ``offset``, because
+     * ``offset`` is actually used in data decoding later on in the
+     * function. */
+    err = cahute_casiolink_determine_data_description(
+        header_buf,
+        variant,
+        &desc
+    );
+    if (err)
+        goto fail;
+
+    {
+        unsigned long total_size = 0;
+        size_t part_i;
+
+        if (desc.part_count) {
+            for (part_i = 0; part_i < desc.part_count - 1; part_i++)
+                total_size += desc.part_sizes[part_i] + 2;
+
+            total_size += (desc.part_sizes[desc.part_count - 1] + 2)
+                          * desc.last_part_repeat;
+        }
+
+        *offsetp = offset + total_size;
+    }
+
+    /* Only check data if not already checked, i.e. in the case of files and
+     * not in the case of links (where all data is not available in one go,
+     * i.e. the receiver must determine the data description, check the packet
+     * type and checksums and acknowledge every part of the data). */
+    if (check_data) {
+        unsigned long offset_check = offset;
+
+        if (desc.part_count) {
+            cahute_u8 tmp_buf[256];
+            size_t part_i, total_parts;
+
+            total_parts = desc.part_count - 1 + desc.last_part_repeat;
+            for (part_i = 0; part_i < total_parts; part_i++) {
+                size_t part_size =
+                    desc.part_sizes
+                        [part_i >= desc.part_count ? desc.part_count - 1
+                                                   : part_i];
+                unsigned int checksum = 0;
+
+                err = cahute_read_from_file(file, offset_check++, tmp_buf, 1);
+                if (err)
+                    goto fail;
+
+                if (tmp_buf[0] != desc.packet_type) {
+                    err = CAHUTE_ERROR_CORRUPT;
+                    goto fail;
+                }
+
+                /* NOTE: Since we read in a buffered mode and not in a full
+                 * buffer mode, we reproduce the behaviour of
+                 * ``cahute_casiolink_checksum()`` ourselves here. */
+                while (part_size) {
+                    size_t to_read = part_size > sizeof(tmp_buf)
+                                         ? sizeof(tmp_buf)
+                                         : part_size;
+                    size_t i;
+
+                    err = cahute_read_from_file(
+                        file,
+                        offset_check,
+                        tmp_buf,
+                        to_read
+                    );
+                    if (err)
+                        goto fail;
+
+                    offset_check += to_read;
+                    for (i = 0; i < to_read; i++)
+                        checksum += tmp_buf[i];
+
+                    part_size -= to_read;
+                }
+
+                err = cahute_read_from_file(file, offset_check++, tmp_buf, 1);
+                if (err)
+                    goto fail;
+
+                if (tmp_buf[0] != ((~checksum + 1) & 255)) {
+                    err = CAHUTE_ERROR_CORRUPT;
+                    goto fail;
+                }
+            }
+        }
+    }
+
+    /* File decoding time!
+     * The file type decoding can count on the following variables to be
+     * available and set:
+     *
+     * - ``variant`` and ``desc``, if need be.
+     * - ``header_buf``, of 40 or 50 bytes as documented in ``header_size``.
+     * - ``file`` and ``offset``, the offset being set to the offset right
+     *   after the complete header (i.e. at the first data part, if there are
+     *   some).
+     *
+     * From here, either the file type decoding goes along or goes to "fail",
+     * which assumes "err" to be set, or it goes to "data_ready", with
+     * the following variables expected to be set:
+     *
+     * - ``datap`` to the pointer where to set the next data, or to one of
+     *   the data that could lead to the last pointer by going through the
+     *   chain;
+     * - ``data`` to the pointer to the first data read, to set as the
+     *   result of the function. */
+    switch (variant) {
+    case CAHUTE_CASIOLINK_VARIANT_CAS40:
+        if (!memcmp(&header_buf[1], "P1", 2)) {
+            size_t program_size = ((size_t)header_buf[4] << 8) | header_buf[5];
+
+            /* CAS40 Single Numbered Program. */
+            err = cahute_create_program_from_file(
+                datap,
+                CAHUTE_TEXT_ENCODING_LEGACY_8,
+                NULL, /* No program name, this is anonymous. */
+                0,
+                NULL, /* No password. */
+                0,
+                file,
+                offset + 1,
+                program_size
+            );
+            if (err)
+                goto fail;
+
+            goto data_ready;
+        }
+
+        if (!memcmp(&header_buf[1], "PZ", 2)) {
+            cahute_u8 programs_header[190];
+            cahute_u8 const *buf = programs_header;
+            cahute_u8 const *names = pz_program_names;
+            int i = 0;
+
+            /* CAS40 Multiple Numbered Programs
+             * This is made of 38 programs, with all 5-byte headers placed
+             * consecutively in a first data part, then all contents placed
+             * consecutively in a second data part. */
+            err =
+                cahute_read_from_file(file, offset + 1, programs_header, 190);
+            if (err)
+                goto fail;
+
+            offset += 193; /* Content, 2 packet types, 1 checksum. */
+            for (i = 1; i < 39; i++) {
+                size_t program_length = ((size_t)buf[1] << 8) | buf[2];
+
+                if (program_length >= 2)
+                    program_length -= 2;
+
+                err = cahute_create_program_from_file(
+                    datap,
+                    CAHUTE_TEXT_ENCODING_LEGACY_8,
+                    names++,
+                    1,
+                    NULL, /* No password. */
+                    0,
+                    file,
+                    offset,
+                    program_length
+                );
+                if (err)
+                    goto fail;
+
+                datap = &(*datap)->cahute_data_next;
+                buf += 5;
+                offset += program_length;
+            }
+
+            goto data_ready;
+        }
+
+        break;
+
+    case CAHUTE_CASIOLINK_VARIANT_CAS50:
+        if (!memcmp(&header_buf[1], "TXT", 4)) {
+            size_t data_size = ((size_t)header_buf[7] << 24)
+                               | ((size_t)header_buf[8] << 16)
+                               | ((size_t)header_buf[9] << 8) | header_buf[10];
+
+            if (data_size >= 2)
+                data_size -= 2;
+
+            if (!memcmp(&header_buf[5], "PG", 2)) {
+                err = cahute_create_program_from_file(
+                    datap,
+                    CAHUTE_TEXT_ENCODING_LEGACY_8,
+                    &header_buf[11],
+                    8,
+                    &header_buf[27],
+                    8,
+                    file,
+                    offset + 1,
+                    data_size
+                );
+
+                if (err)
+                    goto fail;
+
+                goto data_ready;
+            }
+        }
+        break;
+
+    case CAHUTE_CASIOLINK_VARIANT_CAS100:
+        if (!memcmp(&header_buf[1], "MCS1", 4)) {
+            size_t size = ((size_t)header_buf[8] << 8) | header_buf[9];
+
+            err = cahute_mcs_decode_data(
+                datap,
+                &header_buf[19],
+                8,
+                NULL, /* MCS1 packet does not present a directory. */
+                0,
+                &header_buf[11],
+                8,
+                file,
+                offset + 1,
+                size,
+                header_buf[10]
+            );
+            if (err && err != CAHUTE_ERROR_IMPL)
+                goto fail;
+
+            goto data_ready;
+        }
+        break;
+
+    default:
+        msg(ll_error, "Unhandled variant 0x%08X.", variant);
+        err = CAHUTE_ERROR_UNKNOWN;
+        goto fail;
+    }
+
+    msg(ll_error, "Unhandled data with the following header:");
+    mem(ll_error, header_buf, header_size);
+
+fail:
+    cahute_destroy_data(data);
+    return err;
+
+data_ready:
+    while (*datap)
+        datap = &(*datap)->cahute_data_next;
+
+    /* NOTE: ``*offsetp`` was updated earlier, to be correctly set even in
+     * the case of invalid or unsupported data types. */
+    *datap = *final_datap;
+    *final_datap = data;
+
+    return CAHUTE_OK;
+}
+
+/* ---
+ * Protocol related utilities.
+ * --- */
+
 /**
  * Answer a received CAS100 MDL1 header with the appropriate header,
  * then apply the serial settings provided within the header, then
@@ -208,15 +887,11 @@ CAHUTE_LOCAL(int)
 cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
     cahute_u8 *buf = link->data_buffer;
     size_t buf_capacity = link->data_buffer_capacity;
-    size_t buf_size, part_count = 1, part_repeat = 1;
-    size_t part_sizes[5];
+    size_t buf_size;
     int packet_type, err, variant = 0, checksum, checksum_alt;
-    int log_part_data = 1, is_al_end = 0, is_end = 0, is_final = 0;
-    int expected_data_packet_type = PACKET_TYPE_HEADER;
+    cahute_casiolink_data_description desc;
 
 restart_reception:
-    part_sizes[0] = 0;
-
     do {
         err = cahute_read_from_link(
             link,
@@ -280,32 +955,15 @@ restart_reception:
         msg(ll_info, "Received the following header:");
         mem(ll_info, buf, buf_size);
     } else {
-        /* We want to try to determine the currently selected variant based
-         * on the header's content. */
-        if (!memcmp(&buf[1], "ADN1", 4) || !memcmp(&buf[1], "ADN2", 4)
-            || !memcmp(&buf[1], "BKU1", 4) || !memcmp(&buf[1], "END1", 4)
-            || !memcmp(&buf[1], "FCL1", 4) || !memcmp(&buf[1], "FMV1", 4)
-            || !memcmp(&buf[1], "MCS1", 4) || !memcmp(&buf[1], "MDL1", 4)
-            || !memcmp(&buf[1], "REQ1", 4) || !memcmp(&buf[1], "REQ2", 4)
-            || !memcmp(&buf[1], "SET1", 4)) {
-            /* The type seems to be a CAS100 header type we can use. */
-            variant = CAHUTE_CASIOLINK_VARIANT_CAS100;
-
-            msg(ll_info, "Variant is determined to be CAS100.");
+        variant = cahute_casiolink_determine_header_variant(buf);
+        switch (variant) {
+        case CAHUTE_CASIOLINK_VARIANT_CAS40:
+            msg(ll_info, "Variant is determined to be CAS40.");
             msg(ll_info, "Received the following header:");
             mem(ll_info, buf, 40);
-        } else if (
-            !memcmp(&buf[1], "END\xFF", 4) || !memcmp(&buf[1], "FNC", 4)
-            || !memcmp(&buf[1], "IMG", 4) || !memcmp(&buf[1], "MEM", 4)
-            || !memcmp(&buf[1], "REQ", 4) || !memcmp(&buf[1], "TXT", 4)
-            || !memcmp(&buf[1], "VAL", 4)) {
-            /* The type seems to be a CAS50 header type.
-             * This means that we actually have 10 more bytes to read for
-             * a full header.
-             *
-             * NOTE: The '4' in the memcmp() calls above are intentional,
-             * as the NUL character ('\0) is actually considered as part of
-             * the CAS50 header type. */
+            break;
+
+        case CAHUTE_CASIOLINK_VARIANT_CAS50:
             msg(ll_info, "Variant is determined to be CAS50.");
 
             err = cahute_read_from_link(
@@ -324,17 +982,20 @@ restart_reception:
             }
 
             buf_size += 10;
-            variant = CAHUTE_CASIOLINK_VARIANT_CAS50;
 
             msg(ll_info, "Received the following header:");
             mem(ll_info, buf, 50);
-        } else {
-            /* By default, we consider the header to be a CAS40 header. */
-            variant = CAHUTE_CASIOLINK_VARIANT_CAS40;
+            break;
 
-            msg(ll_info, "Variant is determined to be CAS40.");
+        case CAHUTE_CASIOLINK_VARIANT_CAS100:
+            msg(ll_info, "Variant is determined to be CAS100.");
             msg(ll_info, "Received the following header:");
             mem(ll_info, buf, 40);
+            break;
+
+        default:
+            msg(ll_error, "Unknown variant %d.", variant);
+            return CAHUTE_ERROR_UNKNOWN;
         }
     }
 
@@ -363,291 +1024,8 @@ restart_reception:
         }
     }
 
-    /* We have a variant and a full header from which we can determine the
-     * type and, especially, the size of the associated data.
-     *
-     * NOTE: These sections can either define:
-     *
-     * - 'part_sizes[0]' only, if there's only one part.
-     * - 'part_sizes[...]' and 'part_count' if there's multiple parts.
-     * - 'part_count' to 0 if there's no data part associated with the
-     *    header.
-     *
-     * Note that if 'part_repeat' is set, it represents how much times the
-     * last data size is read. */
-    switch (variant) {
-    case CAHUTE_CASIOLINK_VARIANT_CAS40:
-        if (!memcmp(&buf[1], "\x17\x17", 2)) {
-            /* CAS40 AL End */
-            part_count = 0;
-            is_al_end = 1;
-        } else if (!memcmp(&buf[1], "\x17\xFF", 2)) {
-            /* CAS40 End */
-            part_count = 0;
-            is_end = 1;
-        } else if (!memcmp(&buf[1], "A1", 2)) {
-            /* CAS40 Dynamic Graph */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] > 2)
-                part_sizes[0] -= 2;
-
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "AA", 2)) {
-            /* CAS40 Dynamic Graph in Bulk */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] > 2)
-                part_sizes[0] -= 2;
-        } else if (!memcmp(&buf[1], "AD", 2)) {
-            /* CAS40 All Memories */
-            part_repeat = ((size_t)buf[5] << 8) | buf[6];
-            part_sizes[0] = 22;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "AL", 2)) {
-            /* CAS40 All */
-            part_count = 0;
-            link->flags |= CAHUTE_LINK_FLAG_ALMODE;
-        } else if (!memcmp(&buf[1], "AM", 2)) {
-            /* CAS40 Variable Memories */
-            part_repeat = ((size_t)buf[5] << 8) | buf[6];
-            part_sizes[0] = 22;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "BU", 2)) {
-            /* CAS40 Backup */
-            if (!memcmp(&buf[3], "TYPEA00", 7))
-                part_sizes[0] = 32768;
-            else if (!memcmp(&buf[3], "TYPEA02", 7))
-                part_sizes[0] = 32768;
-
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "DC", 2)) {
-            /* CAS40 Color Screenshot. */
-            unsigned int width = buf[3], height = buf[4];
-
-            if (!memcmp(&buf[5], "\x11UWF\x03", 4)) {
-                part_repeat = 3;
-                part_sizes[0] = 1 + ((width >> 3) + !!(width & 7)) * height;
-            }
-
-            log_part_data = 0;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "DD", 2)) {
-            /* CAS40 Monochrome Screenshot. */
-            unsigned int width = buf[3], height = buf[4];
-
-            if (!memcmp(&buf[5], "\x10\x44WF", 4))
-                part_sizes[0] = ((width >> 3) + !!(width & 7)) * height;
-
-            log_part_data = 0;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "DM", 2)) {
-            /* CAS40 Defined Memories */
-            part_repeat = ((size_t)buf[5] << 8) | buf[6];
-            part_sizes[0] = 22;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "EN", 2)) {
-            /* CAS40 Single Editor Program */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "EP", 2)) {
-            /* CAS40 Single Password Protected Editor Program */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "F1", 2)) {
-            /* CAS40 Single Function */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "F6", 2)) {
-            /* CAS40 Multiple Functions */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "FN", 2)) {
-            /* CAS40 Single Editor Program in Bulk */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-        } else if (!memcmp(&buf[1], "FP", 2)) {
-            /* CAS40 Single Password Protected Editor Program in Bulk */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-        } else if (!memcmp(&buf[1], "G1", 2)) {
-            /* CAS40 Graph Function */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "GA", 2)) {
-            /* CAS40 Graph Function in Bulk */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-        } else if (!memcmp(&buf[1], "GF", 2)) {
-            /* CAS40 Factor */
-            part_sizes[0] = 2 + buf[6] * 10;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "GR", 2)) {
-            /* CAS40 Range */
-            part_sizes[0] = 92;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "GT", 2)) {
-            /* CAS40 Function Table */
-            part_count = 3;
-            part_repeat = ((size_t)buf[7] << 8) | buf[8];
-            part_sizes[0] = buf[6];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-
-            part_sizes[1] = 32;
-            part_sizes[2] = 22;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "M1", 2)) {
-            /* CAS40 Single Matrix */
-            unsigned int width = buf[5], height = buf[6];
-
-            part_sizes[0] = 14;
-            part_repeat = width * height + 1; /* Sentinel data part. */
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "MA", 2)) {
-            /* CAS40 Single Matrix in Bulk */
-            unsigned int width = buf[5], height = buf[6];
-
-            part_sizes[0] = 14;
-            part_repeat = width * height;
-        } else if (!memcmp(&buf[1], "P1", 2)) {
-            /* CAS40 Single Numbered Program. */
-            part_sizes[0] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "PD", 2)) {
-            /* CAS40 Polynomial Equation */
-            part_sizes[0] = buf[6] * 10 + 12;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "PZ", 2)) {
-            /* CAS40 Multiple Numbered Programs */
-            part_count = 2;
-            part_sizes[0] = 190;
-            part_sizes[1] = ((size_t)buf[4] << 8) | buf[5];
-            if (part_sizes[1] >= 2)
-                part_sizes[1] -= 2;
-
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "RT", 2)) {
-            /* CAS40 Recursion Table */
-            part_count = 3;
-            part_repeat = ((size_t)buf[7] << 8) | buf[8];
-            part_sizes[0] = buf[6];
-            if (part_sizes[0] >= 2)
-                part_sizes[0] -= 2;
-
-            part_sizes[1] = 22;
-            part_sizes[2] = 32;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "SD", 2)) {
-            /* CAS40 Simultaneous Equations */
-            part_repeat = buf[5] * buf[6] + 1;
-            part_sizes[0] = 14;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "SR", 2)) {
-            /* CAS40 Paired Variable Data */
-            part_repeat = ((size_t)buf[5] << 8) | buf[6];
-            part_sizes[0] = 32;
-            is_final = 1;
-        } else if (!memcmp(&buf[1], "SS", 2)) {
-            /* CAS40 Single Variable Data */
-            part_repeat = ((size_t)buf[5] << 8) | buf[6];
-            part_sizes[0] = 22;
-            is_final = 1;
-        }
-
-        break;
-
-    case CAHUTE_CASIOLINK_VARIANT_CAS50:
-        if (!memcmp(&buf[1], "END\xFF", 4)) {
-            /* End packet for CAS50. */
-            part_count = 0;
-            is_end = 1;
-        } else if (!memcmp(&buf[1], "VAL", 4)) {
-            unsigned int height = ((unsigned int)buf[7] << 8) | buf[8];
-            unsigned int width = ((unsigned int)buf[9] << 8) | buf[10];
-
-            /* Variable data use size as W*H, or only W, or only H depending
-             * on the case. */
-            if (!width)
-                width = 1;
-
-            part_sizes[0] = 14;
-            part_repeat = height * width;
-        } else {
-            /* For other packets, the size should always be located at
-             * offset 6 of the header, i.e. offset 7 of the buffer. */
-            part_sizes[0] = ((size_t)buf[7] << 24) | ((size_t)buf[8] << 16)
-                            | ((size_t)buf[9] << 8) | buf[10];
-
-            if (part_sizes[0] > 2)
-                part_sizes[0] -= 2;
-            else
-                part_count = 0;
-
-            if (!memcmp(&buf[1], "MEM\0BU", 6)) {
-                /* Backups are guaranteed to be the final (and only) file
-                 * sent in the communication. */
-                is_final = 1;
-            }
-        }
-        break;
-
-    case CAHUTE_CASIOLINK_VARIANT_CAS100:
-        if (!memcmp(&buf[1], "BKU1", 4)) {
-            /* Backup packet for CAS100. */
-            part_sizes[0] = ((size_t)buf[9] << 24) | ((size_t)buf[10] << 16)
-                            | ((size_t)buf[11] << 8) | buf[12];
-        } else if (!memcmp(&buf[1], "END1", 4)) {
-            /* End packet for CAS100. */
-            part_count = 0;
-            is_end = 1;
-        } else if (!memcmp(&buf[1], "MCS1", 4)) {
-            /* Main memory packet for CAS100. */
-            part_sizes[0] = ((size_t)buf[8] << 8) | buf[9];
-            if (!part_sizes[0])
-                part_count = 0;
-        } else if (!memcmp(&buf[1], "MDL1", 4)) {
-            /* Initialization packet for CAS100. */
-            err = cahute_casiolink_handle_mdl1(link);
-            if (err)
-                return err;
-
-            /* From here, we go back to the beginning. */
-            goto restart_reception;
-        } else if (!memcmp(&buf[1], "SET1", 4)) {
-            /* TODO */
-            part_count = 0;
-        }
-
-        break;
-
-    default:
-        msg(ll_error, "Unhandled variant 0x%08X.", variant);
-        return CAHUTE_ERROR_UNKNOWN;
-    }
-
-    if (part_count && !part_sizes[0]) {
-        /* 'part_count' and 'part_sizes[0]' were left to their default values
-         * of 1 and 0 respectively, which means they have not been set to
-         * a found type. */
+    err = cahute_casiolink_determine_data_description(buf, variant, &desc);
+    if (err) {
         cahute_u8 send_buf[1] = {PACKET_TYPE_INVALID_DATA};
 
         /* The type has not been recognized, therefore we cannot determine
@@ -661,12 +1039,24 @@ restart_reception:
         );
     }
 
-    if (part_count) {
+    if (desc.flags & CAHUTE_CASIOLINK_DATA_FLAG_MDL) {
+        err = cahute_casiolink_handle_mdl1(link);
+        if (err)
+            return err;
+
+        /* From here, we go back to the beginning. */
+        goto restart_reception;
+    }
+
+    if (desc.part_count) {
         size_t total_size = buf_size;
         size_t part_i;
 
-        for (part_i = 0; part_i < part_count; part_i++)
-            total_size += part_sizes[part_i] * part_repeat;
+        for (part_i = 0; part_i < desc.part_count - 1; part_i++)
+            total_size += desc.part_sizes[part_i] + 2;
+
+        total_size +=
+            (desc.part_sizes[desc.part_count - 1] + 2) * desc.last_part_repeat;
 
         if (total_size > buf_capacity) {
             msg(ll_error,
@@ -698,8 +1088,7 @@ restart_reception:
             return err;
     }
 
-    if (part_count) {
-        cahute_u8 tmp_buf[2];
+    if (desc.part_count) {
         size_t part_i, index, total;
 
         /* There is data to be read.
@@ -712,10 +1101,11 @@ restart_reception:
         buf = &buf[buf_size];
 
         index = 1;
-        total = part_count - 1 + part_repeat;
+        total = desc.part_count - 1 + desc.last_part_repeat;
         for (part_i = 0; part_i < total; part_i++, index++) {
             size_t part_size =
-                part_sizes[part_i >= part_count ? part_count - 1 : part_i];
+                desc.part_sizes
+                    [part_i >= desc.part_count ? desc.part_count - 1 : part_i];
 
             msg(ll_info,
                 "Reading data part %d/%d (%" CAHUTE_PRIuSIZE "o).",
@@ -725,7 +1115,7 @@ restart_reception:
 
             err = cahute_read_from_link(
                 link,
-                tmp_buf,
+                buf,
                 1,
                 TIMEOUT_PACKET_CONTENTS,
                 TIMEOUT_PACKET_CONTENTS
@@ -735,16 +1125,17 @@ restart_reception:
             if (err)
                 return err;
 
-            if (tmp_buf[0] != expected_data_packet_type) {
+            if (*buf != desc.packet_type) {
                 msg(ll_error,
-                    "Expected 0x3A (':') packet type, got 0x%02X.",
+                    "Expected 0x%02X packet type, got 0x%02X.",
+                    desc.packet_type,
                     buf[0]);
                 return CAHUTE_ERROR_UNKNOWN;
             }
 
             if (part_size) {
                 size_t part_size_left = part_size;
-                cahute_u8 *p = buf;
+                cahute_u8 *p = &buf[1];
 
                 /* Use a loop to be able to follow the transfer progress
                  * using logs. */
@@ -767,16 +1158,14 @@ restart_reception:
                     part_size_left -= to_read;
                     p += to_read;
                 }
-            }
 
-            if (part_size) {
                 /* For color screenshots, sometimes the first byte is not
                  * taken into account in the checksum calculation, as it's
                  * metadata for the sheet and not the "actual data" of the
                  * sheet. But sometimes it also gets the checksum right!
                  * In any case, we want to compute and check both checksums
                  * to see if at least one matches. */
-                checksum = cahute_casiolink_checksum(buf, part_size);
+                checksum = cahute_casiolink_checksum(&buf[1], part_size);
                 checksum_alt =
                     cahute_casiolink_checksum(buf + 1, part_size - 1);
             } else {
@@ -787,7 +1176,7 @@ restart_reception:
             /* Read and check the checksum. */
             err = cahute_read_from_link(
                 link,
-                tmp_buf + 1,
+                &buf[1 + part_size],
                 1,
                 TIMEOUT_PACKET_CONTENTS,
                 TIMEOUT_PACKET_CONTENTS
@@ -797,13 +1186,14 @@ restart_reception:
             if (err)
                 return err;
 
-            if (checksum != tmp_buf[1] && checksum_alt != tmp_buf[1]) {
+            if (checksum != buf[1 + part_size]
+                && checksum_alt != buf[1 + part_size]) {
                 cahute_u8 const send_buf[] = {PACKET_TYPE_INVALID_DATA};
 
                 msg(ll_warn,
                     "Invalid checksum (expected: 0x%02X, computed: "
                     "0x%02X).",
-                    tmp_buf[1],
+                    buf[part_size],
                     checksum);
                 mem(ll_info, buf, part_size);
 
@@ -830,26 +1220,32 @@ restart_reception:
                 "Data part %d/%d received and acknowledged.",
                 index,
                 total);
-            if (log_part_data
+            if ((~desc.flags & CAHUTE_CASIOLINK_DATA_FLAG_NO_LOG)
                 && part_size <= 4096) /* Let's not flood the terminal. */
                 mem(ll_info, buf, part_size);
 
-            buf += part_size;
-            buf_size += part_size;
+            buf += part_size + 2;
+            buf_size += part_size + 2;
         }
     }
 
     link->protocol_state.casiolink.last_variant = variant;
     link->data_buffer_size = buf_size;
 
-    if (is_al_end || (is_end && (~link->flags & CAHUTE_LINK_FLAG_ALMODE))) {
+    if (desc.flags & CAHUTE_CASIOLINK_DATA_FLAG_AL)
+        link->flags |= CAHUTE_LINK_FLAG_ALMODE;
+
+    if ((desc.flags & CAHUTE_CASIOLINK_DATA_FLAG_AL_END)
+        || ((desc.flags & CAHUTE_CASIOLINK_DATA_FLAG_END)
+            && (~link->flags & CAHUTE_LINK_FLAG_ALMODE))) {
         /* The packet was an end packet. */
         link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
         msg(ll_info, "Received data was a sentinel!");
         return CAHUTE_ERROR_TERMINATED;
     }
 
-    if (is_final && (~link->flags & CAHUTE_LINK_FLAG_ALMODE)) {
+    if ((desc.flags & CAHUTE_CASIOLINK_DATA_FLAG_FINAL)
+        && (~link->flags & CAHUTE_LINK_FLAG_ALMODE)) {
         /* The packet was a final one in the communication. */
         link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
         msg(ll_info, "Received data was final!");
@@ -1140,7 +1536,8 @@ cahute_casiolink_receive_data(
     cahute_data **datap,
     unsigned long timeout
 ) {
-    cahute_u8 const *buf = link->data_buffer;
+    cahute_file file;
+    unsigned long offset = 0;
     int err;
 
     do {
@@ -1153,126 +1550,22 @@ cahute_casiolink_receive_data(
         if (err)
             return err;
 
-        switch (link->protocol_state.casiolink.last_variant) {
-        case CAHUTE_CASIOLINK_VARIANT_CAS40:
-            if (!memcmp(&buf[1], "P1", 2))
-                return cahute_create_program(
-                    datap,
-                    CAHUTE_TEXT_ENCODING_LEGACY_8,
-                    NULL, /* No program name, this is anonymous. */
-                    0,
-                    NULL, /* No password. */
-                    0,
-                    &buf[40],
-                    link->data_buffer_size - 41
-                );
+        cahute_populate_file_from_memory(
+            &file,
+            link->data_buffer,
+            link->data_buffer_size
+        );
+        offset = 0;
 
-            if (!memcmp(&buf[1], "PZ", 2)) {
-                cahute_data *data = NULL;
-                cahute_u8 const *content, *names = pz_program_names;
-                int i = 0;
-
-                /* We want to copy all 38 programs. */
-                buf = &buf[40];
-                content = &buf[190];
-
-                *datap = data;
-                for (i = 1; i < 39; i++) {
-                    size_t program_length = ((size_t)buf[1] << 8) | buf[2];
-
-                    err = cahute_create_program(
-                        datap,
-                        CAHUTE_TEXT_ENCODING_LEGACY_8,
-                        names++,
-                        1,
-                        NULL, /* No password. */
-                        0,
-                        content,
-                        program_length ? program_length - 1 : 0
-                    );
-                    if (err) {
-                        cahute_destroy_data(data);
-                        return err;
-                    }
-
-                    datap = &(*datap)->cahute_data_next;
-                    buf += 5;
-                    content += program_length;
-                }
-
-                *datap = data;
-                return CAHUTE_OK;
-            }
-
-            break;
-
-        case CAHUTE_CASIOLINK_VARIANT_CAS50:
-            if (!memcmp(&buf[1], "TXT", 4)) {
-                size_t data_size = ((size_t)buf[7] << 24)
-                                   | ((size_t)buf[8] << 16)
-                                   | ((size_t)buf[9] << 8) | buf[10];
-                size_t name_size = 8;
-                size_t pw_size = 8;
-
-                if (data_size >= 2)
-                    data_size -= 2;
-
-                for (; name_size && buf[10 + name_size] == 255; name_size--)
-                    ;
-                for (; pw_size && buf[26 + pw_size] == 255; pw_size--)
-                    ;
-
-                if (!memcmp(&buf[5], "PG", 2))
-                    return cahute_create_program(
-                        datap,
-                        CAHUTE_TEXT_ENCODING_LEGACY_8,
-                        &buf[11],
-                        name_size,
-                        &buf[27],
-                        pw_size,
-                        &buf[50],
-                        data_size
-                    );
-            }
-            break;
-
-        case CAHUTE_CASIOLINK_VARIANT_CAS100:
-            if (!memcmp(&buf[1], "MCS1", 4)) {
-                cahute_u8 const *p;
-                size_t name_size, group_size;
-
-                for (p = &buf[11]; p < &buf[19] && *p != 0xFF; p++)
-                    ;
-                name_size = (size_t)(p - &buf[11]);
-
-                for (p = &buf[19]; p < &buf[27] && *p != 0xFF; p++)
-                    ;
-                group_size = (size_t)(p - &buf[19]);
-
-                err = cahute_mcs_decode_data(
-                    datap,
-                    &buf[19],
-                    group_size,
-                    NULL, /* MCS1 packet does not present a directory. */
-                    0,
-                    &buf[11],
-                    name_size,
-                    &buf[40],
-                    link->data_buffer_size - 40,
-                    buf[10]
-                );
-                if (err != CAHUTE_ERROR_IMPL)
-                    return err;
-            }
-            /* TODO */
-            break;
-
-        default:
-            msg(ll_error,
-                "Unhandled variant 0x%08X.",
-                link->protocol_state.casiolink.last_variant);
-            return CAHUTE_ERROR_UNKNOWN;
-        }
+        err = cahute_casiolink_decode_data(
+            datap,
+            &file,
+            &offset,
+            link->protocol_state.casiolink.last_variant,
+            0 /* Already checked in ``cahute_casiolink_receive_raw_data()`` */
+        );
+        if (!err || err != CAHUTE_ERROR_IMPL)
+            return err;
 
         /* If the data was final, we still need to break here. */
         if (link->flags & CAHUTE_LINK_FLAG_TERMINATED)
