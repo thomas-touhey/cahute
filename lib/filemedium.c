@@ -151,6 +151,11 @@ write_to_current_offset_in_medium(
      * A ``bytes_written`` value of 0 is interpreted as an unknown
      * error. */
     switch (medium->type) {
+    case CAHUTE_FILE_MEDIUM_NONE:
+        /* Special medium type in which the write operation on the read
+         * buffer is actually enough. */
+        break;
+
 #ifdef CAHUTE_FILE_MEDIUM_POSIX
     case CAHUTE_FILE_MEDIUM_POSIX: {
         cahute_ssize ret;
@@ -344,6 +349,12 @@ move_to_offset(
     /* The implementation must ask for relocation to ``off``, and
      * if the new offset is obtained, set it to ``new_off``. */
     switch (medium->type) {
+    case CAHUTE_FILE_MEDIUM_NONE:
+        /* Special medium type in which the offsets MUST NOT actually
+         * move, since the read buffer is actually the real memory buffer. */
+        new_off = 0;
+        break;
+
 #ifdef CAHUTE_FILE_MEDIUM_POSIX
     case CAHUTE_FILE_MEDIUM_POSIX: {
         off_t loff = (off_t)off;

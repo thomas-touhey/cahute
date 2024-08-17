@@ -148,6 +148,38 @@ fail:
 }
 
 /**
+ * Populate an existing file structure with memory related data.
+ *
+ * NOTE: This is an internal function only.
+ *
+ * WARNING: cahute_close_file() MUST NOT be called with such a resource.
+ *
+ * @param file File structure to populate.
+ * @param buf Buffer to read or write from.
+ * @param size Size of the buffer.
+ * @return Error, or 0 if successful.
+ */
+CAHUTE_EXTERN(void)
+cahute_populate_file_from_memory(
+    cahute_file *file,
+    cahute_u8 *buf,
+    size_t size
+) {
+    file->flags = 0;
+    file->type = 0;
+    file->extension[0] = 0;
+    file->medium.type = CAHUTE_FILE_MEDIUM_NONE;
+    file->medium.flags =
+        (CAHUTE_FILE_MEDIUM_FLAG_WRITE | CAHUTE_FILE_MEDIUM_FLAG_READ
+         | CAHUTE_FILE_MEDIUM_FLAG_SEEK | CAHUTE_FILE_MEDIUM_FLAG_SIZE);
+    file->medium.offset = 0;
+    file->medium.read_offset = 0;
+    file->medium.read_size = size;
+    file->medium.file_size = (unsigned long)size;
+    file->medium.read_buffer = buf;
+}
+
+/**
  * Open a file on the current system, for reading.
  *
  * @param filep Pointer to the file to open.

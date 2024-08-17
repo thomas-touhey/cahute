@@ -649,6 +649,11 @@ struct cahute_link {
 #define CAHUTE_FILE_MEDIUM_FLAG_SEEK  0x00000004 /* Can seek on medium. */
 #define CAHUTE_FILE_MEDIUM_FLAG_SIZE  0x00000008 /* File size is avail. */
 
+/* Special medium which does not implement a read, write or seek method.
+ * It actually directly uses the read buffer, and keeps everything in
+ * memory using it. */
+#define CAHUTE_FILE_MEDIUM_NONE 0
+
 #if POSIX_ENABLED
 # define CAHUTE_FILE_MEDIUM_POSIX 1
 #endif
@@ -743,6 +748,15 @@ struct cahute_file {
     int type;
     char extension[5];
 };
+
+/* Internal function to declare a file for a memory buffer, without having
+ * to use dynamic memory. */
+CAHUTE_EXTERN(void)
+cahute_populate_file_from_memory(
+    cahute_file *file,
+    cahute_u8 *buf,
+    size_t size
+);
 
 /* ---
  * Miscellaneous functions, defined in misc.c
