@@ -247,16 +247,16 @@ Known types for this container format are the following:
       - :ref:`file-format-g3a`
     * - ``USBPower\x31\0\x10\0\x10\0``
       - *N/A*
-      - :ref:`file-format-mainmem`
+      - :ref:`file-format-mainmem` (fx-CP)
     * - ``USBPower\x49\0\x10\0\x10\0``
       - *N/A*
       - :ref:`file-format-g1e`
     * - ``USBPower\x62\0\x10\0\x10\0``
       - *N/A*
-      - :ref:`file-format-mainmem`
+      - :ref:`file-format-mainmem` (fx-9860G)
     * - ``USBPower\x75\0\x10\0\x10\0``
       - *N/A*
-      - :ref:`file-format-mainmem`
+      - :ref:`file-format-mainmem` (fx-CG)
     * - ``USBPower\x7D\0\x10\0\x10\0``
       - *N/A*
       - :ref:`file-format-g3p`

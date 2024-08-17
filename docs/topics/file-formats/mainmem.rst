@@ -15,9 +15,9 @@ fx-CP and/or fx-CG. It can be identified using:
   - ``G3R`` (fx-CG with settings).
 * The CASIO container subtype (see :ref:`file-format-standardheader`), among:
 
-  - ``USBPower\x49\0\x10\0\x10\0`` (fx-9860G with or without settings);
-  - ``USBPower\x75\0\x10\0\x10\0`` (fx-CP with or without settings);
-  - ``USBPower\x7D\0\x10\0\x10\0`` (fx-CG with or without settings).
+  - ``USBPower\x62\0\x10\0\x10\0`` (fx-9860G with or without settings);
+  - ``USBPower\x31\0\x10\0\x10\0`` (fx-CP with or without settings);
+  - ``USBPower\x75\0\x10\0\x10\0`` (fx-CG with or without settings).
 
 Such files contain files from the calculator's main memory, including
 settings, programs, lists, pictures, captures, matrixes, and so on.
