@@ -269,26 +269,30 @@ move_to_offset(
          * we prefer to fail explicitely here. */
         msg(ll_error,
             "Cannot %s %" CAHUTE_PRIuSIZE
-            "at offset %lu, since it would "
+            " bytes %s offset %lu, since it would "
             "cause the file offset to reach undefined values.",
             write ? "write" : "read",
-            size,
-            off);
-        return CAHUTE_ERROR_SIZE;
+            off,
+            write ? "at" : "from");
+        return write ? CAHUTE_ERROR_SIZE : CAHUTE_ERROR_TRUNC;
     }
 
     if ((medium->flags & CAHUTE_FILE_MEDIUM_FLAG_SIZE)
-        && off > medium->file_size - size) {
+        && (size > medium->file_size || off > medium->file_size - size)) {
         /* Our file interface requires setting the file size explicitely
          * if writing further than the current file size. */
         msg(ll_error,
             "Cannot %s %" CAHUTE_PRIuSIZE
-            "at offset %lu, since it would "
-            "cause the file offset to go past the %lu file size.",
+            " bytes %s offset %lu, since it would "
+            "cause the file offset to go %lu bytes past the file size"
+            " of %lu bytes.",
             write ? "write" : "read",
             size,
-            off);
-        return CAHUTE_ERROR_SIZE;
+            write ? "at" : "from",
+            off,
+            off + size - medium->file_size,
+            medium->file_size);
+        return write ? CAHUTE_ERROR_SIZE : CAHUTE_ERROR_TRUNC;
     }
 
     /* If we're already at the right offset, there is no need to explicitely
@@ -439,7 +443,7 @@ cahute_read_from_file_medium(
         size_t to_copy = medium->read_size;
 
         /* We want to copy what exists from the current read buffer. */
-        if (to_copy > size) {
+        if (to_copy >= size) {
             memcpy(buf, &medium->read_buffer[start_offset], size);
             return CAHUTE_OK;
         }
@@ -453,30 +457,8 @@ cahute_read_from_file_medium(
     /* There is still content to be read, so we want to move the cursor to
      * the offset we want to read now. */
     err = move_to_offset(medium, off, size, 0);
-    if (err == CAHUTE_ERROR_SIZE)
-        return CAHUTE_ERROR_TRUNC;
-    else if (err)
+    if (err)
         return err;
-
-    /* While moving to the offset, we may have gone further than the actual
-     * expected offset, so we need to check here if we have some bytes to
-     * complete from the current read buffer. */
-    if (off < medium->read_offset + medium->read_size
-        && off >= medium->read_offset) {
-        size_t start_offset = off - medium->read_offset;
-        size_t to_copy = medium->read_size;
-
-        /* We want to copy what exists from the current read buffer. */
-        if (to_copy > size) {
-            memcpy(buf, &medium->read_buffer[start_offset], size);
-            return CAHUTE_OK;
-        }
-
-        memcpy(buf, &medium->read_buffer[start_offset], to_copy);
-        off += to_copy;
-        buf += to_copy;
-        size -= to_copy;
-    }
 
     /* We can discard the current read buffer in any case. */
     medium->read_offset = medium->offset;
