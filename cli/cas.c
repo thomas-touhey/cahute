@@ -40,11 +40,26 @@
  * @return Return code.
  */
 CAHUTE_LOCAL(int) read_data(struct args const *args, cahute_data **datap) {
-    cahute_link *link;
     int err, ret = 1;
 
     switch (args->in.type) {
-    case MEDIUM_COM:
+    case MEDIUM_FILE: {
+        err = cahute_get_data_from_file(args->in.data.file.file, datap);
+
+        if (err) {
+            fprintf(
+                stderr,
+                "Could not decode data (%s).\n",
+                cahute_get_error_name(err)
+            );
+            goto fail;
+        }
+        ret = 0;
+    } break;
+
+    case MEDIUM_COM: {
+        cahute_link *link;
+
         err = cahute_open_serial_link(
             &link,
             CAHUTE_SERIAL_RECEIVER | args->in.data.com.serial_flags,
@@ -52,7 +67,11 @@ CAHUTE_LOCAL(int) read_data(struct args const *args, cahute_data **datap) {
             args->in.data.com.serial_speed
         );
         if (err) {
-            fprintf(stderr, "Could not open the serial link (0x%04X).\n", err);
+            fprintf(
+                stderr,
+                "Could not open the serial link (%s).\n",
+                cahute_get_error_name(err)
+            );
             goto fail;
         }
 
@@ -71,14 +90,18 @@ CAHUTE_LOCAL(int) read_data(struct args const *args, cahute_data **datap) {
             if (err == CAHUTE_ERROR_TERMINATED)
                 break;
 
-            fprintf(stderr, "Could not receive data (0x%04X).\n", err);
+            fprintf(
+                stderr,
+                "Could not receive data (%s).\n",
+                cahute_get_error_name(err)
+            );
             cahute_close_link(link);
             goto fail;
         }
 
         cahute_close_link(link);
         ret = 0;
-        break;
+    } break;
     }
 
 fail:

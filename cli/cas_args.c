@@ -238,56 +238,6 @@ static int decode_conversion(char *raw, int *srcp, int *dstp) {
 }
 
 /**
- * Determine a medium type from a file path.
- *
- * @param path File or device path.
- * @param typep Medium type pointer.
- * @return 0 if no error, other otherwise.
- */
-static int determine_medium_type(char const *path, int *typep) {
-    /* Detect serial devices on Windows or POSIX. */
-    if (!memcmp(path, "/dev/", 5)
-        || (!memcmp(path, "COM", 3) && isdigit(path[3]))) {
-        *typep = MEDIUM_COM;
-        return 0;
-    }
-
-    /* Determine the medium type from the file extension. */
-    {
-        char ext[5];
-        size_t len = strlen(path);
-
-        len = strlen(path);
-        if (len < 5)
-            return 1;
-
-        ext[0] = tolower(path[len - 4]);
-        ext[1] = tolower(path[len - 3]);
-        ext[2] = tolower(path[len - 2]);
-        ext[3] = tolower(path[len - 1]);
-        ext[4] = '\0';
-
-        if (!strcmp(ext, ".cas"))
-            *typep = MEDIUM_CAS;
-        else if (!strcmp(ext, ".ctf") || !strcmp(ext, ".txt"))
-            *typep = MEDIUM_CTF;
-        else if (!strcmp(ext, ".fxp"))
-            *typep = MEDIUM_FXP;
-        else if (!strcmp(ext, ".bmp"))
-            *typep = MEDIUM_BMP;
-        else if (!strcmp(ext, ".gif"))
-            *typep = MEDIUM_GIF;
-        else
-            goto end;
-
-        return 1;
-    }
-
-end:
-    return 0;
-}
-
-/**
  * Parse options regarding a medium (for input or output).
  *
  * @param db Database to parse medium data from.
@@ -304,48 +254,93 @@ static int parse_medium_params(
 ) {
     struct casrc_setting *dstg = NULL;
     struct casrc_setting *ostg = get_casrc_setting(db, prefix);
+    cahute_file *file = NULL;
+    int err;
 
     {
         char const *type_suffix = NULL;
+        unsigned long file_type;
         char buf[10];
 
-        if (get_casrc_setting_property(NULL, ostg, "ctf"))
-            medium->type = MEDIUM_CTF;
-        else if (get_casrc_setting_property(NULL, ostg, "cas"))
-            medium->type = MEDIUM_CAS;
-        else if (get_casrc_setting_property(NULL, ostg, "fxp"))
-            medium->type = MEDIUM_FXP;
-        else if (get_casrc_setting_property(NULL, ostg, "bmp"))
-            medium->type = MEDIUM_BMP;
-        else if (get_casrc_setting_property(NULL, ostg, "gif"))
-            medium->type = MEDIUM_GIF;
-        else if (get_casrc_setting_property(NULL, ostg, "com"))
+        /* TODO: Add the flags/format tip for opening the file. */
+        if (get_casrc_setting_property(NULL, ostg, "ctf")) {
+            medium->type = MEDIUM_FILE;
+        } else if (get_casrc_setting_property(NULL, ostg, "cas")) {
+            medium->type = MEDIUM_FILE;
+        } else if (get_casrc_setting_property(NULL, ostg, "fxp")) {
+            medium->type = MEDIUM_FILE;
+        } else if (get_casrc_setting_property(NULL, ostg, "bmp")) {
+            medium->type = MEDIUM_FILE;
+        } else if (get_casrc_setting_property(NULL, ostg, "gif")) {
+            medium->type = MEDIUM_FILE;
+        } else if (get_casrc_setting_property(NULL, ostg, "com")) {
             medium->type = MEDIUM_COM;
-        else if (path && !determine_medium_type(path, &medium->type)) {
+        } else if (path && (!memcmp(path, "/dev/", 5) || (!memcmp(path, "COM", 3) && isdigit(path[3])))) {
+            medium->type = MEDIUM_COM;
         } else {
             fprintf(stderr, "Missing medium type for %s.\n", prefix);
             return 1;
         }
 
-        switch (medium->type) {
-        case MEDIUM_CTF:
-            type_suffix = "ctf";
-            break;
-        case MEDIUM_CAS:
-            type_suffix = "cas";
-            break;
-        case MEDIUM_FXP:
-            type_suffix = "fxp";
-            break;
-        case MEDIUM_BMP:
-            type_suffix = "bmp";
-            break;
-        case MEDIUM_GIF:
-            type_suffix = "gif";
-            break;
-        case MEDIUM_COM:
+        if (medium->type == MEDIUM_COM)
             type_suffix = "com";
-            break;
+        else if (!strcmp(prefix, "in")) {
+            err = cahute_open_file_for_reading(
+                &file,
+                0,
+                path,
+                CAHUTE_PATH_TYPE_CLI
+            );
+            if (err) {
+                fprintf(
+                    stderr,
+                    "Could not open input file (%s).\n",
+                    cahute_get_error_name(err)
+                );
+                return 1;
+            }
+
+            err = cahute_guess_file_type(file, &file_type);
+            if (err)
+                file_type = CAHUTE_FILE_TYPE_UNKNOWN;
+
+            medium->data.file.file = file;
+            medium->data.file.type = file_type;
+
+            switch (file_type) {
+            case CAHUTE_FILE_TYPE_MAINMEM:
+                /* No options related to fx-9860G main memory archives yet. */
+                break;
+
+            case CAHUTE_FILE_TYPE_CTF:
+                type_suffix = "ctf";
+                break;
+
+            case CAHUTE_FILE_TYPE_CASIOLINK:
+                type_suffix = "cas";
+                break;
+
+            case CAHUTE_FILE_TYPE_FXPROGRAM:
+                type_suffix = "fxp";
+                break;
+
+            case CAHUTE_FILE_TYPE_BITMAP:
+                type_suffix = "bmp";
+                break;
+
+            case CAHUTE_FILE_TYPE_GIF:
+                type_suffix = "gif";
+                break;
+
+            default:
+                fprintf(stderr, "Could not determine input file type.\n");
+                return 1;
+            }
+        } else {
+            /* TODO: We need to support extension detection in either the
+             * library or here. */
+            fprintf(stderr, "File output is not supported yet.\n");
+            goto fail;
         }
 
         if (type_suffix) {
@@ -355,46 +350,54 @@ static int parse_medium_params(
     }
 
     switch (medium->type) {
-    case MEDIUM_CTF:
-        medium->data.ctf.glossary =
-            get_casrc_setting_property(dstg, ostg, "glossary") != NULL;
-        medium->data.ctf.nice =
-            get_casrc_setting_property(dstg, ostg, "nice") != NULL;
-        break;
+    case MEDIUM_FILE:
+        switch (medium->data.file.type) {
+        case CAHUTE_FILE_TYPE_CTF:
+            medium->data.file.options.ctf.glossary =
+                get_casrc_setting_property(dstg, ostg, "glossary") != NULL;
+            medium->data.file.options.ctf.nice =
+                get_casrc_setting_property(dstg, ostg, "nice") != NULL;
+            break;
 
-    case MEDIUM_CAS:
-        if (get_casrc_setting_property(dstg, ostg, "7700")
-            || get_casrc_setting_property(dstg, ostg, "9700")
-            || get_casrc_setting_property(dstg, ostg, "9800"))
-            medium->data.cas.header_format = HEADER_FORMAT_CAS40;
-        else if (
-            get_casrc_setting_property(dstg, ostg, "9750")
-            || get_casrc_setting_property(dstg, ostg, "9850")
-            || get_casrc_setting_property(dstg, ostg, "9950")
-        )
-            medium->data.cas.header_format = HEADER_FORMAT_CAS50;
-        else if (
-            get_casrc_setting_property(dstg, ostg, "raw")
-            || get_casrc_setting_property(dstg, ostg, "uncooked")
-        )
-            medium->data.cas.header_format = HEADER_FORMAT_RAW;
-        else
-            medium->data.cas.header_format = HEADER_FORMAT_UNKNOWN;
+        case CAHUTE_FILE_TYPE_CASIOLINK:
+            if (get_casrc_setting_property(dstg, ostg, "7700")
+                || get_casrc_setting_property(dstg, ostg, "9700")
+                || get_casrc_setting_property(dstg, ostg, "9800"))
+                medium->data.file.options.cas.header_format =
+                    HEADER_FORMAT_CAS40;
+            else if (
+                get_casrc_setting_property(dstg, ostg, "9750")
+                || get_casrc_setting_property(dstg, ostg, "9850")
+                || get_casrc_setting_property(dstg, ostg, "9950")
+            )
+                medium->data.file.options.cas.header_format =
+                    HEADER_FORMAT_CAS50;
+            else if (
+                get_casrc_setting_property(dstg, ostg, "raw")
+                || get_casrc_setting_property(dstg, ostg, "uncooked")
+            )
+                medium->data.file.options.cas.header_format =
+                    HEADER_FORMAT_RAW;
+            else
+                medium->data.file.options.cas.header_format =
+                    HEADER_FORMAT_UNKNOWN;
 
-        medium->data.cas.status =
-            get_casrc_setting_property(dstg, ostg, "status") != NULL;
-        break;
+            medium->data.file.options.cas.status =
+                get_casrc_setting_property(dstg, ostg, "status") != NULL;
+            break;
 
-    case MEDIUM_BMP:
-        medium->data.bmp.inverse =
-            (get_casrc_setting_property(dstg, ostg, "inv") != NULL
-             && get_casrc_setting_property(dstg, ostg, "inverse") != NULL);
-        break;
+        case CAHUTE_FILE_TYPE_BITMAP:
+            medium->data.file.options.bmp.inverse =
+                (get_casrc_setting_property(dstg, ostg, "inv") != NULL
+                 && get_casrc_setting_property(dstg, ostg, "inverse") != NULL);
+            break;
 
-    case MEDIUM_GIF:
-        medium->data.gif.inverse =
-            (get_casrc_setting_property(dstg, ostg, "inv") != NULL
-             && get_casrc_setting_property(dstg, ostg, "inverse") != NULL);
+        case CAHUTE_FILE_TYPE_GIF:
+            medium->data.file.options.gif.inverse =
+                (get_casrc_setting_property(dstg, ostg, "inv") != NULL
+                 && get_casrc_setting_property(dstg, ostg, "inverse") != NULL);
+            break;
+        }
         break;
 
     case MEDIUM_COM: {
@@ -469,6 +472,12 @@ static int parse_medium_params(
     }
 
     return 0;
+
+fail:
+    if (file)
+        cahute_close_file(file);
+
+    return 1;
 }
 
 /**
@@ -900,6 +909,9 @@ fail:
  */
 void free_args(struct args *args) {
     struct conversion *conv;
+
+    if (args->in.type == MEDIUM_FILE)
+        cahute_close_file(args->in.data.file.file);
 
     if (args->debug_fp) {
         cahute_reset_log_func();

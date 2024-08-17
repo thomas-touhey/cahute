@@ -43,12 +43,8 @@
 
 /* Input or output type. */
 #define MEDIUM_UNKNOWN 0
-#define MEDIUM_CTF     1
-#define MEDIUM_CAS     2
-#define MEDIUM_FXP     4
-#define MEDIUM_BMP     8
-#define MEDIUM_GIF     16
-#define MEDIUM_COM     32
+#define MEDIUM_FILE    1
+#define MEDIUM_COM     2
 
 /* CASIOLINK model. */
 #define HEADER_FORMAT_UNKNOWN 0
@@ -75,7 +71,7 @@
  * @property glossary Flag to write the glossary to the output file.
  * @property nice Whether to use the "nice" token instead of the default one.
  */
-struct ctf_medium {
+struct ctf_file_medium_options {
     int glossary;
     int nice;
 };
@@ -86,7 +82,7 @@ struct ctf_medium {
  * @property header_format Header format for every entry in the CASIOLINK file.
  * @property status Whether to emit a message when a block is read or written.
  */
-struct cas_medium {
+struct cas_file_medium_options {
     int header_format;
     int status;
 };
@@ -96,7 +92,7 @@ struct cas_medium {
  *
  * @property inverse Whether to read or write BMP in reverse order.
  */
-struct bmp_medium {
+struct bmp_file_medium_options {
     int inverse;
 };
 
@@ -105,8 +101,36 @@ struct bmp_medium {
  *
  * @property inverse Whether to read or write GIF in reverse order.
  */
-struct gif_medium {
+struct gif_file_medium_options {
     int inverse;
+};
+
+/**
+ * Additional options for the file medium, depending on the file type.
+ *
+ * @property ctf CTF file options.
+ * @property cas CASIOLINK file options.
+ * @property bmp Bitmap file options.
+ * @property gif GIF file options.
+ */
+union file_medium_options {
+    struct ctf_file_medium_options ctf;
+    struct cas_file_medium_options cas;
+    struct bmp_file_medium_options bmp;
+    struct gif_file_medium_options gif;
+};
+
+/**
+ * Additional data for the file medium.
+ *
+ * @property file File object.
+ * @property type File type.
+ * @property options Options.
+ */
+struct file_medium {
+    cahute_file *file;
+    unsigned long type;
+    union file_medium_options options;
 };
 
 /**
@@ -131,17 +155,11 @@ struct com_medium {
 /**
  * Medium available data.
  *
- * @property ctf Additional data for CTF medium.
- * @property cas Additional data for CASIOLINK file.
- * @property bmp Additional data for Bitmap image.
- * @property gif Additional data for GIF image.
+ * @property file Additional data for the input file.
  * @property com Additional data for serial port.
  */
 union medium_data {
-    struct ctf_medium ctf;
-    struct cas_medium cas;
-    struct bmp_medium bmp;
-    struct gif_medium gif;
+    struct file_medium file;
     struct com_medium com;
 };
 
