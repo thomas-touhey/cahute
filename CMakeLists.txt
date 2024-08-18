@@ -30,12 +30,12 @@ set(LOGLEVEL $ENV{LOGLEVEL} CACHE STRING "Default logging level")
 # longer the case, this option will be ineffective.
 option(ENABLE_INCOMPLETE_CAS "Whether to build incomplete CaS or not." OFF)
 
-if(NOT "${LOGLEVEL}" MATCHES "|none|info|warning|error|fatal")
+if(NOT "${LOGLEVEL}" MATCHES "|info|warning|error|fatal|none")
     message(SEND_ERROR "LOGLEVEL should be one of [info, warning, error, fatal, none]")
 endif()
 
 if(NOT LOGLEVEL)
-    set(LOGLEVEL "fatal")
+    set(LOGLEVEL "warning")
 endif()
 
 # ---
