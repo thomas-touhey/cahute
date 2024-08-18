@@ -821,6 +821,15 @@ cahute_set_serial_params_to_link_medium(
     if (medium->serial_flags == flags && medium->serial_speed == speed)
         return CAHUTE_OK;
 
+    msg(ll_info,
+        "Setting serial parameters to %lu%c%d.",
+        speed,
+        (flags & CAHUTE_SERIAL_PARITY_MASK) == CAHUTE_SERIAL_PARITY_ODD ? 'O'
+        : (flags & CAHUTE_SERIAL_PARITY_MASK) == CAHUTE_SERIAL_PARITY_EVEN
+            ? 'E'
+            : 'N',
+        (flags & CAHUTE_SERIAL_STOP_MASK) == CAHUTE_SERIAL_STOP_TWO ? 2 : 1);
+
     switch (medium->type) {
 #ifdef CAHUTE_LINK_MEDIUM_POSIX_SERIAL
     case CAHUTE_LINK_MEDIUM_POSIX_SERIAL: {
