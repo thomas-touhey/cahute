@@ -37,11 +37,17 @@
  * the response to a presence check in the context of a normal timeout is
  * expected.
  * TIMEOUT_PACKET_CONTENTS is the timeout in between bytes for a packet, after
- * the first byte of a packet has been received, in any circumstances. */
-#define TIMEOUT_PACKET_START    10000 /* 10 seconds. */
-#define TIMEOUT_PACKET_INIT     500   /* 500 ms (.5 seconds). */
-#define TIMEOUT_PACKET_TIMEOUT  10000 /* 10 seconds. */
-#define TIMEOUT_PACKET_CONTENTS 2000  /* 2 seconds. */
+ * the first byte of a packet has been received, in any circumstances.
+ * TIMEOUT_COMMAND_RESPONSE is the default timeout for the response to a
+ * command packet.
+ * TIMEOUT_OPTIMIZE_RESPONSE is the timeout for the response to an
+ * "Optimize filesystem" (51) command. */
+#define TIMEOUT_PACKET_START      10000 /* 10 seconds. */
+#define TIMEOUT_PACKET_INIT       500   /* 500 ms (.5 seconds). */
+#define TIMEOUT_PACKET_TIMEOUT    10000 /* 10 seconds. */
+#define TIMEOUT_PACKET_CONTENTS   2000  /* 2 seconds. */
+#define TIMEOUT_COMMAND_RESPONSE  10000 /* 10 seconds. */
+#define TIMEOUT_OPTIMIZE_RESPONSE 30000 /* 30 seconds. */
 
 #define IS_ASCII_HEX_DIGIT(C) \
     (((C) >= '0' && (C) <= '9') || ((C) >= 'A' && (C) <= 'F'))
@@ -690,6 +696,7 @@ cahute_seven_send_basic(
  * @param subtype Numeric subtype (*ST*) of the packet to send.
  * @param data Data to send.
  * @param data_size Size of the data to send.
+ * @param timeout Timeout in which to expect the response to the packet.
  * @return Cahute error.
  */
 CAHUTE_LOCAL(int)
@@ -699,7 +706,8 @@ cahute_seven_send_extended(
     int type,
     int subtype,
     cahute_u8 const *data,
-    size_t data_size
+    size_t data_size,
+    unsigned long timeout
 ) {
     cahute_u8 packet[SEVEN_MAX_PACKET_SIZE];
 
@@ -730,7 +738,7 @@ cahute_seven_send_extended(
         flags,
         packet,
         10 + data_size,
-        TIMEOUT_PACKET_START
+        timeout
     );
 }
 
@@ -751,6 +759,7 @@ cahute_seven_send_extended(
  * @param param4 Fourth parameter, NULL if not relevant.
  * @param param5 Fifth parameter, NULL if not relevant.
  * @param param6 Sixth parameter, NULL if not relevant.
+ * @param timeout Timeout for the command.
  * @return Cahute error, or 0 if no error has occurred.
  */
 CAHUTE_LOCAL(int)
@@ -765,7 +774,8 @@ cahute_seven_send_command(
     char const *param3,
     char const *param4,
     char const *param5,
-    char const *param6
+    char const *param6,
+    unsigned long timeout
 ) {
     cahute_u8 buf[256], *p = buf;
     size_t length1 = param1 ? strlen(param1) : 0;
@@ -839,7 +849,8 @@ cahute_seven_send_command(
         PACKET_TYPE_COMMAND,
         code,
         buf,
-        (size_t)(p - buf)
+        (size_t)(p - buf),
+        timeout
     );
 }
 
@@ -1143,7 +1154,8 @@ cahute_seven_send_data(
             PACKET_TYPE_DATA,
             link->protocol_state.seven.last_command,
             buf,
-            264
+            264,
+            TIMEOUT_PACKET_TIMEOUT
         );
         if (err)
             return err;
@@ -1182,7 +1194,8 @@ cahute_seven_send_data(
             PACKET_TYPE_DATA,
             link->protocol_state.seven.last_command,
             buf,
-            264
+            264,
+            TIMEOUT_PACKET_TIMEOUT
         );
         if (err) {
             if (shifted) {
@@ -1228,7 +1241,8 @@ cahute_seven_send_data(
         PACKET_TYPE_DATA,
         link->protocol_state.seven.last_command,
         buf,
-        8 + last_packet_size
+        8 + last_packet_size,
+        TIMEOUT_PACKET_TIMEOUT
     );
     if (err)
         return err;
@@ -1325,7 +1339,8 @@ cahute_seven_send_data_from_buf(
             PACKET_TYPE_DATA,
             link->protocol_state.seven.last_command,
             buf,
-            264
+            264,
+            TIMEOUT_PACKET_TIMEOUT
         );
         if (err)
             return err;
@@ -1352,7 +1367,8 @@ cahute_seven_send_data_from_buf(
             PACKET_TYPE_DATA,
             link->protocol_state.seven.last_command,
             buf,
-            264
+            264,
+            TIMEOUT_PACKET_TIMEOUT
         );
         if (err) {
             if (shifted) {
@@ -1395,7 +1411,8 @@ cahute_seven_send_data_from_buf(
         PACKET_TYPE_DATA,
         link->protocol_state.seven.last_command,
         buf,
-        8 + last_packet_size
+        8 + last_packet_size,
+        TIMEOUT_PACKET_TIMEOUT
     );
     if (err)
         return err;
@@ -1973,7 +1990,8 @@ CAHUTE_EXTERN(int) cahute_seven_discover(cahute_link *link) {
         NULL,
         NULL,
         NULL,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -2106,7 +2124,8 @@ cahute_seven_receive_data(
                 PACKET_TYPE_ACK,
                 PACKET_SUBTYPE_ACK_EXTENDED,
                 fake_device_info,
-                sizeof(fake_device_info)
+                sizeof(fake_device_info),
+                TIMEOUT_PACKET_TIMEOUT
             );
             if (err)
                 return err;
@@ -2512,7 +2531,8 @@ cahute_seven_negotiate_serial_params(
         stopbits,
         NULL,
         NULL,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -2570,7 +2590,8 @@ cahute_seven_get_file_type(
         NULL,
         NULL,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -2675,7 +2696,8 @@ cahute_seven_request_storage_capacity(
         NULL,
         NULL,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -2747,7 +2769,8 @@ cahute_seven_optimize_storage(cahute_link *link, char const *storage) {
         NULL,
         NULL,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_OPTIMIZE_RESPONSE
     );
     if (err)
         return err;
@@ -2848,7 +2871,8 @@ cahute_seven_send_file_to_storage(
         NULL,
         NULL,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -2947,7 +2971,8 @@ cahute_seven_request_file_from_storage(
         NULL,
         NULL,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         goto fail;
@@ -3056,7 +3081,8 @@ cahute_seven_copy_file_on_storage(
         target_directory,
         target_name,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -3099,7 +3125,8 @@ cahute_seven_list_storage_entries(
         NULL,
         NULL,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -3241,7 +3268,8 @@ cahute_seven_delete_file_from_storage(
         NULL,
         NULL,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -3272,7 +3300,8 @@ cahute_seven_reset_storage(cahute_link *link, char const *storage) {
         NULL,
         NULL,
         storage,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -3318,7 +3347,8 @@ cahute_seven_backup_rom(
         NULL,
         NULL,
         NULL,
-        NULL
+        NULL,
+        TIMEOUT_COMMAND_RESPONSE
     );
     if (err)
         return err;
@@ -3465,7 +3495,8 @@ cahute_seven_upload_and_run_program(
         PACKET_TYPE_COMMAND,
         0x56,
         command_payload,
-        24
+        24,
+        TIMEOUT_PACKET_TIMEOUT
     );
     if (err)
         return err;
@@ -3528,7 +3559,8 @@ cahute_seven_flash_sector_using_fxremote_method(
             PACKET_TYPE_COMMAND,
             0x70,
             buf,
-            0x404
+            0x404,
+            TIMEOUT_PACKET_TIMEOUT
         );
         if (err)
             return err;
@@ -3554,7 +3586,8 @@ cahute_seven_flash_sector_using_fxremote_method(
             PACKET_TYPE_COMMAND,
             0x70,
             buf,
-            8 + upload_left
+            8 + upload_left,
+            TIMEOUT_PACKET_TIMEOUT
         );
         if (err)
             return err;
@@ -3582,7 +3615,8 @@ cahute_seven_flash_sector_using_fxremote_method(
         PACKET_TYPE_COMMAND,
         0x71,
         buf,
-        12
+        12,
+        TIMEOUT_PACKET_TIMEOUT
     );
     if (err)
         return err;
@@ -3656,7 +3690,8 @@ cahute_seven_flash_system_using_fxremote_method(
             PACKET_TYPE_COMMAND,
             0x72,
             buf,
-            4
+            4,
+            TIMEOUT_PACKET_TIMEOUT
         );
         if (err)
             return err;
