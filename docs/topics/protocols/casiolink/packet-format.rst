@@ -14,11 +14,20 @@ follows it.
       - Name
       - Description
       - Payload
+    * - ``0x01``
+      - ``COMMAND``
+      - The sender sends a command to the receiver. Only used with CAS300
+        variant.
+      - :ref:`casiolink-command-packet`
+    * - ``0x02``
+      - ``DATA300``
+      - A party sends data to another party. Only used with CAS300 variant.
+      - :ref:`casiolink-data300-packet`
     * - ``0x06``
       - ``ACKNOWLEDGE``
       - The receiver accepts the data packet, confirms overwrite, or the
         sender confirms overwrite.
-      - *(none)*
+      - :ref:`casiolink-acknowledge-packet`
     * - ``0x13``
       - ``ESTABLISHED``
       - The receiver acknowledges connection establishment.
@@ -32,6 +41,12 @@ follows it.
       - ``START``
       - The sender requests a non-interactive connection.
       - *(none)*
+    * - ``0x18``
+      - ``TERMINATE``
+      - The sender requests communication termination. Only used with CAS300
+        variant; alternative for other variants is an END, AL END header, of
+        final data type.
+      - :ref:`casiolink-terminate-packet`
     * - ``0x21`` (``!``)
       - ``ALREADY_EXISTS``
       - The receiver requests overwrite confirmation from the sender.
@@ -66,26 +81,160 @@ follows it.
       - The receiver aborts the transfer due to errors in the header.
       - *(none)*
 
+.. _casiolink-command-packet:
+
+``0x01`` -- Command packet
+--------------------------
+
+This packet only exists with the CAS300 variant, and has the following
+payload:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Packet identifier (*ID*)
+      - Identifier of the packet the other party acknowledges.
+      - 2-char :ref:`seven-ascii-hex` value.
+    * - 2 (0x02)
+      - 4 B
+      - Payload size (*PZ*)
+      - Size of the payload.
+      - 4-char :ref:`seven-ascii-hex` value.
+    * - 6 (0x06)
+      - *PZ* B
+      - Payload (*P*)
+      - Payload of the command.
+      - :ref:`0x5C padded <seven-5c-padding>` content.
+    * - 6 + *PZ*
+      - 2 B
+      - Checksum (*CS*)
+      -
+      - 2-char :ref:`seven-ascii-hex` value.
+
+The checksum can be obtained or verified by summing all bytes going from
+*PZ* to *P*, and adding 1 to its bitwise complement.
+
+See :ref:`casiolink-cas300-commands` for more information about commands.
+
+.. _casiolink-data300-packet:
+
+``0x02`` -- Data packet
+-----------------------
+
+This packet only exists with the CAS300 variant, and has the following
+payload:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Packet identifier (*ID*)
+      - Identifier of the packet the other party acknowledges.
+      - 2-char :ref:`seven-ascii-hex` value.
+    * - 2 (0x02)
+      - 4 B
+      - Payload size (*PZ*)
+      - Size of the payload.
+      - 4-char :ref:`seven-ascii-hex` value.
+    * - 6 (0x06)
+      - *PZ* B
+      - Payload (*P*)
+      - Payload of the command.
+      - :ref:`0x5C padded <seven-5c-padding>` content.
+    * - 6 + *PZ*
+      - 2 B
+      - Checksum (*CS*)
+      -
+      - 2-char :ref:`seven-ascii-hex` value.
+
+The checksum can be obtained or verified by summing all bytes going from
+*PZ* to *P*, and adding 1 to its bitwise complement.
+
+.. _casiolink-acknowledge-packet:
+
+``0x06`` -- Acknowledge packet
+------------------------------
+
+This packet has no payload with the CAS40, CAS50 and CAS100 variants.
+
+With CAS300 variant, it has the following variant:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Packet identifier (*ID*)
+      - Identifier of the packet the other party acknowledges.
+      - 2-char :ref:`seven-ascii-hex` value.
+
+.. _casiolink-terminate-packet:
+
+``0x18`` -- Terminate packet
+----------------------------
+
+This packet only exists with the CAS300 variant, and has the following payload:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Offset
+      - Size
+      - Field name
+      - Description
+      - Values
+    * - 0 (0x00)
+      - 2 B
+      - Packet identifier (*ID*)
+      -
+      - 2-char :ref:`seven-ascii-hex` value, set to ``0x11``.
+    * - 2 (0x02)
+      - 4 B
+      -
+      -
+      - 4-char :ref:`seven-ascii-hex` value, among the following:
+
+        * ``0x0000``: terminated from the calculator.
+        * ``0x0004``: terminated from the host.
+
 .. _casiolink-cas40-header-format:
 
-CAS40 header format
--------------------
+``0x3A`` -- Header (CAS40 variant)
+----------------------------------
 
 This data payload uses the same format as CASIOLINK CAS40 main memory files;
 see :ref:`casiolink-cas40` for more information.
 
 .. _casiolink-cas50-header-format:
 
-CAS50 header format
--------------------
+``0x3A`` -- Header (CAS50 variant)
+----------------------------------
 
 This data payload uses the same format as CASIOLINK CAS50 main memory files;
 see :ref:`casiolink-cas50` for more information.
 
 .. _casiolink-cas100-header-format:
 
-CAS100 header format
---------------------
+``0x3A`` -- Header (CAS100 variant)
+-----------------------------------
 
 This header format covers headers used with the AlgebraFX / Graph 100.
 Such headers are 39-bytes long (excluding the basic purpose byte), but

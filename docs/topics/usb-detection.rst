@@ -11,18 +11,32 @@ identifiers (VID/PID) can be used:
 
     * - ``idVendor``
       - ``idProduct``
+      - ``iManufacturer``
+      - ``bcdUSB``
       - ``bInterfaceClass``
       - ``bInterfaceSubclass``
       - ``bInterfaceProtocol``
       - Description
     * - ``07cf``
       - ``6101``
+      - ``CASIO COMPUTER CO., LTD.``
+      - ``0x0100``
+      - ``255`` (Vendor-Specific)
+      - ``0``
+      - ``0``
+      - Classpad 300 / 330 (+)
+    * - ``07cf``
+      - ``6101``
+      - ``CESG502``
+      - ``0x0110``
       - ``255`` (Vendor-Specific)
       - ``0``
       - ``0``
       - Graph 35+/75/85/95, fx-9860G Slim, Classpad 300
     * - ``07cf``
       - ``6102``
+      - ``CASIO MassStorage Device``
+      - ``0x0110``
       - ``8`` (Mass Storage)
       - ``0``
       - ``0``
