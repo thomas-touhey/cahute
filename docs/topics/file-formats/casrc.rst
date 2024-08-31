@@ -297,6 +297,14 @@ selected input or output format is a serial port.
         This is an extended option, that does not exist in the original
         CaS source.
 
+``cp``, ``cp300``, ``cp330``, ``cp330+``
+    If set, use the Classpad 300 / 330 (+) protocol.
+
+    .. warning::
+
+        This is an extended option, that does not exist in the original
+        CaS source.
+
 ``raw``
     If set, use the raw header and payload format.
 
@@ -318,6 +326,14 @@ selected input or output format is a serial port.
         CaS source.
 
     By default, the baud rate depends on the selected model.
+
+``stop``
+    Stop bits, which can be set to either ``1`` or ``2``.
+
+    .. warning::
+
+        This is an extended option, that does not exist in the original
+        CaS source.
 
 ``dtr``
     If set, enable DTR on the serial connection.

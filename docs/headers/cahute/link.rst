@@ -261,6 +261,10 @@ Link management related function declarations
 
         See :ref:`casiolink-cas100-header-format` for more information.
 
+    .. c:macro:: CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS300
+
+        Use or expect CAS300 variant.
+
     Since the number of stop bits may be selectable on the calculator, it
     can also be selected manually, amongst the following:
 
@@ -351,6 +355,11 @@ Link management related function declarations
           - ``OFF``
           - ``TWO``
           - ``DISABLED``
+        * - ``CASIOLINK`` / ``CAS300``
+          - 38400
+          - ``OFF``
+          - ``ONE``
+          - ``ENABLED``
         * - ``SEVEN``
           - 9600
           - ``OFF``

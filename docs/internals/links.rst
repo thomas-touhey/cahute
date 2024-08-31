@@ -268,6 +268,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_CASIOLINK`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
@@ -301,6 +302,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_CASIOLINK`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
@@ -385,6 +387,12 @@ Available protocols are:
     This can be selected by the user in order to use the medium functions
     more directly, through the ones referenced in
     :ref:`header-cahute-link-medium`.
+
+.. c:macro:: CAHUTE_LINK_PROTOCOL_USB_CASIOLINK
+
+    CASIOLINK over USB bulk transport.
+
+    See :ref:`protocol-casiolink` for more information.
 
 .. c:macro:: CAHUTE_LINK_PROTOCOL_USB_SEVEN
 
@@ -487,22 +495,38 @@ In this section, we will describe the behaviour of link opening functions.
         :width: 100%
 
         * - (in) Intf. class
+          - (in) ``bcdUSB``
           - (in) ``OHP`` flag
           - (out) Medium
           - (out) Protocol
         * - 8
+          -
           - absent
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB_UMS`
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE`
         * - 8
+          -
           - present
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB_UMS`
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`
         * - 255
+          - ``0x100``
+          - present
+          - **FAIL**
+          - **FAIL**
+        * - 255
+          - ``0x100``
+          - absent
+          - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB`
+          - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_CASIOLINK` w/
+            :c:macro:`CAHUTE_CASIOLINK_VARIANT_CAS300`
+        * - 255
+          -
           - absent
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB`
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`
         * - 255
+          -
           - present
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB`
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`

@@ -77,12 +77,37 @@ CAHUTE_INLINE(char const *) get_protocol_name(int protocol) {
         return "Protocol 7.00 Screenstreaming (serial)";
     case CAHUTE_LINK_PROTOCOL_USB_NONE:
         return "Generic (USB)";
+    case CAHUTE_LINK_PROTOCOL_USB_CASIOLINK:
+        return "CASIOLINK (USB)";
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
         return "Protocol 7.00 (USB)";
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
         return "Protocol 7.00 Screenstreaming (USB)";
     case CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE:
         return "USB Mass Storage";
+    default:
+        return "(unknown)";
+    }
+}
+
+/**
+ * Get the name of a CASIOLINK variant.
+ *
+ * @param variant CASIOLINK variant identifier, as a constant.
+ * @return Textual name of the CASIOLINK variant.
+ */
+CAHUTE_INLINE(char const *) get_casiolink_variant_name(int variant) {
+    switch (variant) {
+    case CAHUTE_CASIOLINK_VARIANT_AUTO:
+        return "auto";
+    case CAHUTE_CASIOLINK_VARIANT_CAS40:
+        return "CAS40";
+    case CAHUTE_CASIOLINK_VARIANT_CAS50:
+        return "CAS50";
+    case CAHUTE_CASIOLINK_VARIANT_CAS100:
+        return "CAS100";
+    case CAHUTE_CASIOLINK_VARIANT_CAS300:
+        return "CAS300";
     default:
         return "(unknown)";
     }
@@ -218,25 +243,54 @@ fail:
  *
  * @param link Link to initialize.
  * @param protocolp Pointer to the protocol to set.
+ * @param casiolink_variantp Pointer to the CASIOLINK variant to set.
  * @return Cahute error, or 0 if successful.
  */
 CAHUTE_LOCAL(int)
-determine_protocol_as_sender(cahute_link *link, int *protocolp) {
-    cahute_u8 buf[6];
+determine_protocol_as_sender(
+    cahute_link *link,
+    int *protocolp,
+    int *casiolink_variantp
+) {
+    cahute_u8 buf[48];
     size_t received = 1;
     int err, attempts;
 
-    for (attempts = 3; attempts; attempts--) {
-        /* Try writing a Protocol 7.00 check packet to see if we get an
-         * answer. */
-        msg(ll_info, "Sending the Protocol 7.00 check packet:");
-        mem(ll_info, seven_check_packet, 6);
+    *casiolink_variantp = CAHUTE_CASIOLINK_VARIANT_AUTO;
 
-        err = cahute_send_on_link_medium(&link->medium, seven_check_packet, 6);
+    for (attempts = 3; attempts; attempts--) {
+        /* Try writing only the 0x05 part of the Protocol 7.00 check packet
+         * first, to see if the calculator reacts. If this is the case,
+         * we have a Classpad 300 / 330 (+). */
+        msg(ll_info,
+            "Sending a CAS300 check packet, or partial Protocol 7.00 check "
+            "packet:");
+        mem(ll_info, seven_check_packet, 2);
+
+        err = cahute_send_on_link_medium(&link->medium, seven_check_packet, 2);
         if (err)
             return err;
 
-        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 800, 0);
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 100, 0);
+        if (!err)
+            break;
+        else if (err != CAHUTE_ERROR_TIMEOUT_START)
+            return err;
+
+        /* Try completing the packet into a Protocol 7.00 check packet to see
+         * if we get an answer. */
+        msg(ll_info, "Sending the rest of the Protocol 7.00 check packet:");
+        mem(ll_info, &seven_check_packet[2], 4);
+
+        err = cahute_send_on_link_medium(
+            &link->medium,
+            &seven_check_packet[2],
+            4
+        );
+        if (err)
+            return err;
+
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 700, 0);
         if (!err)
             break;
         else if (err != CAHUTE_ERROR_TIMEOUT_START)
@@ -265,7 +319,14 @@ determine_protocol_as_sender(cahute_link *link, int *protocolp) {
         return CAHUTE_ERROR_NOT_FOUND;
     }
 
-    if (buf[0] == 0x06) {
+    if (buf[0] == 0x05) {
+        /* This is a Classpad 300 / 330 (+) answering our Protocol 7.00
+         * initial check packet with their own check packet. We're expecting
+         * a packet identifier after this. */
+        *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
+        *casiolink_variantp = CAHUTE_CASIOLINK_VARIANT_CAS300;
+        return CAHUTE_OK;
+    } else if (buf[0] == 0x06) {
         /* This is the beginning of a Protocol 7.00 ack packet.
          * We want to read the rest of the packet to ensure that
          * everything is correct. */
@@ -466,10 +527,30 @@ open_link_from_medium(
         link->flags |= CAHUTE_LINK_FLAG_RECEIVER;
 
     if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_AUTO) {
+        int new_casiolink_variant = CAHUTE_CASIOLINK_VARIANT_AUTO;
+
         if (flags & PROTOCOL_FLAG_RECEIVER)
             err = determine_protocol_as_receiver(link, &protocol);
         else
-            err = determine_protocol_as_sender(link, &protocol);
+            err = determine_protocol_as_sender(
+                link,
+                &protocol,
+                &new_casiolink_variant
+            );
+
+        if (new_casiolink_variant != CAHUTE_CASIOLINK_VARIANT_AUTO) {
+            if (casiolink_variant != CAHUTE_CASIOLINK_VARIANT_AUTO
+                && new_casiolink_variant != casiolink_variant) {
+                msg(ll_error,
+                    "Expected CASIOLINK variant %s, but got %s through "
+                    "protocol discovery.",
+                    get_casiolink_variant_name(casiolink_variant),
+                    get_casiolink_variant_name(new_casiolink_variant));
+                goto fail;
+            }
+
+            casiolink_variant = new_casiolink_variant;
+        }
 
         if (err)
             goto fail;
@@ -481,10 +562,19 @@ open_link_from_medium(
 
     link->protocol = protocol;
 
-    msg(ll_info,
-        "Using %s over %s.",
-        get_protocol_name(protocol),
-        get_medium_name(link->medium.type));
+    if (protocol != CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK
+        && protocol != CAHUTE_LINK_PROTOCOL_USB_CASIOLINK)
+        msg(ll_info,
+            "Using %s over %s.",
+            get_protocol_name(protocol),
+            get_medium_name(link->medium.type));
+    else
+        msg(ll_info,
+            "Using %s (%s variant) over %s",
+            get_protocol_name(protocol),
+            get_casiolink_variant_name(casiolink_variant),
+            get_medium_name(link->medium.type));
+
     msg(ll_info,
         "Playing the role of %s.",
         flags & PROTOCOL_FLAG_RECEIVER ? "receiver / passive side"
@@ -496,6 +586,7 @@ open_link_from_medium(
         break;
 
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+    case CAHUTE_LINK_PROTOCOL_USB_CASIOLINK:
         casiolink_state = &link->protocol_state.casiolink;
 
         if (link->data_buffer_capacity < CASIOLINK_MINIMUM_BUFFER_SIZE) {
@@ -510,9 +601,20 @@ open_link_from_medium(
 
         casiolink_state->flags = 0;
         casiolink_state->variant = casiolink_variant;
+        casiolink_state->last_variant = 0;
+        casiolink_state->cas300_type = 0;
+        casiolink_state->cas300_next_id = 0;
+        casiolink_state->cas300_payload_size = 0;
 
         if (~flags & PROTOCOL_FLAG_NOCHECK) {
             err = cahute_casiolink_initiate(link);
+            if (err)
+                goto fail;
+        }
+
+        if ((~flags & PROTOCOL_FLAG_RECEIVER)
+            && (~flags & PROTOCOL_FLAG_NODISC)) {
+            err = cahute_casiolink_discover(link);
             if (err)
                 goto fail;
         }
@@ -1299,6 +1401,10 @@ cahute_open_serial_link(
             casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS100;
             break;
 
+        case CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS300:
+            casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS300;
+            break;
+
         default:
             CAHUTE_RETURN_IMPL("Unsupported CASIOLINK variant.");
         }
@@ -1307,14 +1413,26 @@ cahute_open_serial_link(
     switch (flags & CAHUTE_SERIAL_STOP_MASK) {
     case 0:
         /* We use a default value depending on the protocol and variant. */
-        if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN
-            || protocol == CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP
-            || (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK
-                && casiolink_variant == CAHUTE_CASIOLINK_VARIANT_CAS100))
-            flags |= CAHUTE_SERIAL_STOP_TWO;
-        else
-            flags |= CAHUTE_SERIAL_STOP_ONE;
+        switch (protocol) {
+        case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+            switch (casiolink_variant) {
+            case CAHUTE_CASIOLINK_VARIANT_CAS100:
+                flags |= CAHUTE_SERIAL_STOP_TWO;
+                break;
 
+            default:
+                flags |= CAHUTE_SERIAL_STOP_ONE;
+            }
+            break;
+
+        case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
+        case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
+            flags |= CAHUTE_SERIAL_STOP_TWO;
+            break;
+
+        default:
+            flags |= CAHUTE_SERIAL_STOP_ONE;
+        }
         break;
 
     case CAHUTE_SERIAL_STOP_ONE:
@@ -1335,7 +1453,12 @@ cahute_open_serial_link(
     switch (flags & CAHUTE_SERIAL_XONXOFF_MASK) {
     case 0:
         /* We disable XON/XOFF software control by default. */
-        flags |= CAHUTE_SERIAL_XONXOFF_DISABLE;
+        if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK
+            && casiolink_variant == CAHUTE_CASIOLINK_VARIANT_CAS300)
+            flags |= CAHUTE_SERIAL_XONXOFF_ENABLE;
+        else
+            flags |= CAHUTE_SERIAL_XONXOFF_DISABLE;
+
         break;
 
     case CAHUTE_SERIAL_XONXOFF_DISABLE:
@@ -1360,14 +1483,26 @@ cahute_open_serial_link(
     switch (speed) {
     case 0:
         /* We use a default value depending on the protocol. */
-        if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK
-            && casiolink_variant == CAHUTE_CASIOLINK_VARIANT_CAS100)
-            speed = 38400;
-        else if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK && casiolink_variant == CAHUTE_CASIOLINK_VARIANT_CAS40)
-            speed = 4800;
-        else
-            speed = 9600;
+        switch (protocol) {
+        case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+            switch (casiolink_variant) {
+            case CAHUTE_CASIOLINK_VARIANT_CAS40:
+                speed = 4800;
+                break;
 
+            case CAHUTE_CASIOLINK_VARIANT_CAS100:
+            case CAHUTE_CASIOLINK_VARIANT_CAS300:
+                speed = 38400;
+                break;
+
+            default:
+                speed = 9600;
+            }
+            break;
+
+        default:
+            speed = 9600;
+        }
         break;
 
     case 300:
@@ -1595,6 +1730,7 @@ cahute_open_usb_link(
     cahute_ssize device_count;
     int i, libusberr, bulk_in = -1, bulk_out = -1;
     int medium_type = 0, protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
+    int casiolink_variant = 0;
     unsigned long open_flags = 0;
     unsigned long unsupported_flags;
     int err = CAHUTE_ERROR_UNKNOWN;
@@ -1682,19 +1818,48 @@ cahute_open_usb_link(
         interface_descriptor = config_descriptor->interface[0].altsetting;
         interface_class = interface_descriptor->bInterfaceClass;
 
-        if (interface_class == 8)
+        /* By default the protocol is USB_SEVEN.
+         * We need to distinguish here between SEVEN, SEVEN_OHP,
+         * USB_MASS_STORAGE and CASIOLINK with variant CAS300.
+         *
+         * Note that both CASIOLINK with variant CAS300 and USB_SEVEN
+         * over bulk-only both present themselves with 07cf:6101 and
+         * interface class 0xff (255). While they both present two different
+         * iManufacturer strings, we can't use this here because it requires
+         * opening the device using libusb_open(), which may result in
+         * LIBUSB_ERROR_NOT_SUPPORTED on some platforms including Win32,
+         * for which we need to use either CESG502 or SCSI system functions
+         * directly.
+         *
+         * There some other differences that are less reliable, such as bcdUSB
+         * being 0x0100 on Classpads, and 0x0110 on fx-9860G and derivatives,
+         * so we try to use that for now. */
+
+        if (interface_class == 8) {
+            /* Only fx-CG and compatible bear this. */
             medium_type = CAHUTE_LINK_MEDIUM_LIBUSB_UMS;
-        else if (interface_class == 255)
+            if (flags & CAHUTE_USB_OHP)
+                protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
+        } else if (interface_class == 255) {
             medium_type = CAHUTE_LINK_MEDIUM_LIBUSB;
-        else {
+
+            if (device_descriptor.idProduct == 0x6101
+                && device_descriptor.bcdUSB == 0x100) {
+                /* The device is considered to be a Classpad. */
+                if (flags & CAHUTE_USB_OHP) {
+                    msg(ll_error,
+                        "No OHP protocol supported for the Classpad.");
+                    goto fail;
+                }
+
+                protocol = CAHUTE_LINK_PROTOCOL_USB_CASIOLINK;
+                casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS300;
+            } else if (flags & CAHUTE_USB_OHP)
+                protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
+        } else {
             msg(ll_error, "Unsupported interface class %d", interface_class);
             goto fail;
         }
-
-        if (flags & CAHUTE_USB_OHP)
-            protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
-        else if (medium_type == CAHUTE_LINK_MEDIUM_LIBUSB_UMS)
-            protocol = CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE;
 
         /* Find bulk in and out endpoints.
          * This search is in case they vary between host platforms. */
@@ -1987,7 +2152,7 @@ ready:
         0, /* Serial flags -- unused. */
         0, /* Serial speed -- unused. */
         protocol,
-        0
+        casiolink_variant
     );
 
 fail:
@@ -2021,11 +2186,14 @@ fail:
  */
 CAHUTE_INLINE(char const *) get_usb_detection_type_name(int type) {
     switch (type) {
+    case CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300:
+        return "Classpad 300 / 330 (+) or compatible calculator (CAS300)";
+
     case CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN:
-        return "fx-9860G compatible calculator (Protocol 7.00)";
+        return "fx-9860G or compatible calculator (Protocol 7.00)";
 
     case CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI:
-        return "fx-CG compatible calculator (SCSI)";
+        return "fx-CG or compatible calculator (SCSI)";
 
     default:
         return "unknown";
@@ -2149,6 +2317,7 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
             break;
 
         case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+        case CAHUTE_LINK_PROTOCOL_USB_CASIOLINK:
             cahute_casiolink_terminate(link);
             break;
 

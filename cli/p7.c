@@ -177,7 +177,8 @@ static int open_link(cahute_link **linkp, struct args const *args) {
 
     if (args->serial_name) {
         /* The user has selected a serial link! */
-        flags = args->serial_flags | CAHUTE_SERIAL_PROTOCOL_SEVEN;
+        flags = args->serial_flags | CAHUTE_SERIAL_PROTOCOL_CASIOLINK
+                | CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS300;
         if (args->no_init)
             flags |= CAHUTE_SERIAL_NOCHECK;
         if (args->no_term)
@@ -255,7 +256,8 @@ static int print_device_info(cahute_link *link) {
         info->cahute_device_info_cpuid
     );
     printf("Environnement ID: %s\n", info->cahute_device_info_hwid);
-    printf("Product ID: %s\n", info->cahute_device_info_product_id);
+    if (info->cahute_device_info_product_id[0])
+        printf("Product ID: %s\n", info->cahute_device_info_product_id);
 
     /* Preprogrammed ROM */
     if (info->cahute_device_info_flags & CAHUTE_DEVICE_INFO_FLAG_PREPROG) {
@@ -274,32 +276,40 @@ static int print_device_info(cahute_link *link) {
         "ROM capacity: %luKiB\n",
         info->cahute_device_info_flash_rom_capacity / 1024
     );
-    printf(
-        "RAM capacity: %luKiB\n",
-        info->cahute_device_info_ram_capacity / 1024
-    );
+    if (info->cahute_device_info_ram_capacity > 0)
+        printf(
+            "RAM capacity: %luKiB\n",
+            info->cahute_device_info_ram_capacity / 1024
+        );
 
     /* Bootcode */
     if (info->cahute_device_info_flags & CAHUTE_DEVICE_INFO_FLAG_BOOTCODE) {
         printf(
-            "Bootcode version: %s",
+            "Bootcode version: %s\n",
             info->cahute_device_info_bootcode_version
         );
-        printf(
-            "\nBootcode offset: 0x%08lX\n",
-            info->cahute_device_info_bootcode_offset
-        );
-        printf(
-            "Bootcode size: %luKiB\n",
-            info->cahute_device_info_bootcode_size / 1024
-        );
+        if (info->cahute_device_info_bootcode_offset > 0)
+            printf(
+                "Bootcode offset: 0x%08lX\n",
+                info->cahute_device_info_bootcode_offset
+            );
+        if (info->cahute_device_info_bootcode_size > 0)
+            printf(
+                "Bootcode size: %luKiB\n",
+                info->cahute_device_info_bootcode_size / 1024
+            );
     }
 
     /* OS */
     if (info->cahute_device_info_flags & CAHUTE_DEVICE_INFO_FLAG_OS) {
-        printf("OS version: %s", info->cahute_device_info_os_version);
-        printf("\nOS offset: 0x%08lX\n", info->cahute_device_info_os_offset);
-        printf("OS size: %luKiB\n", info->cahute_device_info_os_size / 1024);
+        printf("OS version: %s\n", info->cahute_device_info_os_version);
+        if (info->cahute_device_info_os_offset > 0)
+            printf("OS offset: 0x%08lX\n", info->cahute_device_info_os_offset);
+        if (info->cahute_device_info_os_size > 0)
+            printf(
+                "OS size: %luKiB\n",
+                info->cahute_device_info_os_size / 1024
+            );
     }
 
     /* Miscallenous information */

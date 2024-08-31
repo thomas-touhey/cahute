@@ -7,6 +7,10 @@ int my_callback(void *cookie, cahute_usb_detection_entry const *entry) {
     char const *type_name;
 
     switch (entry->cahute_usb_detection_entry_type) {
+    case CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300:
+        type_name = "Classpad 300 / 330 (+) or compatible";
+        break;
+
     case CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN:
         type_name = "fx-9860G or compatible";
         break;

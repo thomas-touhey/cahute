@@ -236,6 +236,7 @@ cahute_receive_data(
 
     switch (link->protocol) {
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+    case CAHUTE_LINK_PROTOCOL_USB_CASIOLINK:
         return cahute_casiolink_receive_data(link, datap, timeout);
 
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
@@ -272,6 +273,7 @@ cahute_receive_screen(
 
     switch (link->protocol) {
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+    case CAHUTE_LINK_PROTOCOL_USB_CASIOLINK:
         return cahute_casiolink_receive_screen(link, frame, timeout);
 
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
@@ -429,6 +431,7 @@ cahute_get_device_info(cahute_link *link, cahute_device_info **infop) {
 
         switch (link->protocol) {
         case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
+        case CAHUTE_LINK_PROTOCOL_USB_CASIOLINK:
             /* With CASIOLINK, we may have received device information at
              * some point. */
             err = cahute_casiolink_make_device_info(

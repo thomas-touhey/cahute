@@ -330,6 +330,7 @@ cahute__log_win_error(
 #define CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP 4
 
 #define CAHUTE_LINK_PROTOCOL_USB_NONE         11
+#define CAHUTE_LINK_PROTOCOL_USB_CASIOLINK    12
 #define CAHUTE_LINK_PROTOCOL_USB_SEVEN        13
 #define CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP    14
 #define CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE 15
@@ -339,6 +340,7 @@ cahute__log_win_error(
 #define CAHUTE_CASIOLINK_VARIANT_CAS40  1
 #define CAHUTE_CASIOLINK_VARIANT_CAS50  2
 #define CAHUTE_CASIOLINK_VARIANT_CAS100 3
+#define CAHUTE_CASIOLINK_VARIANT_CAS300 4
 
 #if defined(CAHUTE_LINK_MEDIUM_POSIX_SERIAL)
 /**
@@ -479,12 +481,33 @@ struct cahute_link_medium {
 /* Absolute minimum buffer size for CASIOLINK. */
 #define CASIOLINK_MINIMUM_BUFFER_SIZE 50
 
-/* Raw device information size for CASIOLINK, most specifically the
- * CAS100 variant. */
-#define CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE 33
+/* Raw device information size for CASIOLINK.
+ * CAS100 device information is 33 bytes long.
+ * CAS300 device information is 49 bytes long. */
+#define CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE 49
 
-/* Flags to describe whether device information was obtained or not. */
+/* Flag to describe whether device information was obtained or not. */
 #define CASIOLINK_FLAG_DEVICE_INFO_OBTAINED 0x00000001UL
+
+/* Flag to describe whether the obtained device info was of CAS300 type
+ * (49 bytes long), or CAS100 type (33 bytes long). */
+#define CASIOLINK_FLAG_DEVICE_INFO_CAS300 0x00000002UL
+
+/* Maximum size of raw data that can come from a CAS100 command or data packet.
+ * Calculators have an obligatory 9 bytes of metadata (1 byte packet type,
+ * 2 byte packet identifier, 4 byte payload size, and 2 byte checksum),
+ * and seem to support payloads to up to 512 raw bytes (1024 encoded bytes).
+ *
+ * Payloads corresponding to commands have a minimum of 4 bytes, and occupies
+ * the first 4 bytes with the command identifier.
+ *
+ * NOTE: It is unsure if the 4 bytes of the command are actually counted in the
+ *       512 bytes or not. By security (mostly on reception), we consider that
+ *       it does not, and therefore, the maximum packet size is 9 + 4 + 1024,
+ *       resulting in 1037 bytes. */
+#define CASIOLINK_CAS300_MAX_PAYLOAD_SIZE         512U
+#define CASIOLINK_CAS300_MAX_ENCODED_PAYLOAD_SIZE 1024U
+#define CASIOLINK_CAS300_MAX_PACKET_SIZE          1037U
 
 /* Maximum size of raw data that can come from an extended packet.
  * Calculators support data packets with up to 256 raw bytes (512 encoded
@@ -508,6 +531,14 @@ struct cahute_link_medium {
  * @property flags Flags for the CASIOLINK peer state.
  * @property variant Variant with which to force data frame interpretation.
  * @property last_variant Variant for the last data frame.
+ * @property cas300_type Type of the last packet.
+ * @property cas300_next_id Next identifier to use with CAS300 packets.
+ * @property cas300_subtype Command number in the last received CAS300 packet.
+ * @property cas300_payload_size Payload size of the last received CAS300
+ *           command or data packet.
+ * @property cas300_packet_id Packet identifier of the last received
+ *           CAS300 packet.
+ * @property cas300_payload Payload of the last received CAS300 packet.
  * @property raw_device_info Raw device information buffer, so that data
  *           can be extracted later if actual device information is requested.
  */
@@ -516,7 +547,14 @@ struct cahute_casiolink_state {
 
     int variant;
     int last_variant;
+    int cas300_type;
+    int cas300_next_id;
 
+    unsigned int cas300_subtype;
+    size_t cas300_payload_size;
+
+    cahute_u8 cas300_packet_id[2];
+    cahute_u8 cas300_payload[CASIOLINK_CAS300_MAX_PAYLOAD_SIZE];
     cahute_u8 raw_device_info[CASIOLINK_RAW_DEVICE_INFO_BUFFER_SIZE];
 };
 
@@ -924,6 +962,8 @@ cahute_casiolink_decode_data(
  * --- */
 
 CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link);
+
+CAHUTE_EXTERN(int) cahute_casiolink_discover(cahute_link *link);
 
 CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link);
 

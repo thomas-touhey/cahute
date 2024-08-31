@@ -322,10 +322,14 @@ cahute_detect_usb(
         if (interface_class == 8)
             entry.cahute_usb_detection_entry_type =
                 CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI;
-        else if (interface_class == 255)
-            entry.cahute_usb_detection_entry_type =
-                CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN;
-        else
+        else if (interface_class == 255) {
+            if (device_descriptor.bcdUSB == 0x100)
+                entry.cahute_usb_detection_entry_type =
+                    CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300;
+            else
+                entry.cahute_usb_detection_entry_type =
+                    CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN;
+        } else
             continue;
 
         entry.cahute_usb_detection_entry_bus =

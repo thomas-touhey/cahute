@@ -3,25 +3,6 @@
 
 This header declares device detection related utilities for Cahute.
 
-Macro definitions
------------------
-
-``CAHUTE_USB_DETECTION_ENTRY_TYPE_*`` are constants representing the type of
-device identified using the USB descriptor.
-
-.. c:macro:: CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN
-
-    The device is an fx-9860G or compatible calculator, using Protocol 7.00
-    directly through bulk transfers.
-
-    Note that the fx-CG calculators sometimes use identify as an fx-9860G
-    for os updating or some types of screenstreaming.
-
-.. c:macro:: CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI
-
-    The device is an fx-CG or compatible calculator, using SCSI with extensions
-    to communicate using Protocol 7.00 through vendor-specific commands.
-
 Type definitions
 ----------------
 
@@ -51,16 +32,29 @@ Type definitions
 
         Entry type, amongst the following:
 
+        .. c:macro:: CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300
+
+            The device is a Classpad 300 / 330 (+) or compatible calculator,
+            using the CAS300 variant of the CASIOLINK protocol over
+            bulk transfers.
+
         .. c:macro:: CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN
 
-            The device is a Protocol 7.00 device over bulk.
+            The device is an fx-9860G or compatible calculator, using
+            Protocol 7.00 or Protocol 7.00 Screenstreaming over
+            bulk transfers.
 
-            See :ref:`protocol-seven` for more details.
+            Note that the fx-CG calculators sometimes use identify as an
+            fx-9860G for OS updating or some types of screenstreaming.
+
+            See :ref:`protocol-seven` and :ref:`protocol-seven-ohp`
+            for more details.
 
         .. c:macro:: CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI
 
             The device is a USB Mass Storage device with proprietary
-            extensions to communicate using Protocol 7.00.
+            extensions to communicate using Protocol 7.00 or
+            Protocol 7.00 Screenstreaming.
 
             See :ref:`protocol-ums` for more details.
 

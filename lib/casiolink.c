@@ -29,6 +29,10 @@
 #include <string.h>
 #include "internals.h"
 
+#define IS_ASCII_HEX_DIGIT(C) \
+    (((C) >= '0' && (C) <= '9') || ((C) >= 'A' && (C) <= 'F'))
+#define ASCII_HEX_TO_NIBBLE(C) ((C) >= 'A' ? (C) - 'A' + 10 : (C) - '0')
+
 /* 1-character program names for the PZ CAS40 data.
  * \xCD is ro and \xCE is theta. */
 CAHUTE_LOCAL_DATA(cahute_u8 const *)
@@ -44,21 +48,34 @@ default_mdl1_payload =
     (cahute_u8 const *)":MDL1GY351\xFF" "000000N1.03\0\0\x01\0\0\0\x04\0\0\0"
     "\x01\0\x03\xFF\xFF\xFF\xFF\0";
 
+/* The 0002 command for Classpad 300 / 330 (+) used for initialization when
+ * in sender / control mode. */
+CAHUTE_LOCAL_DATA(cahute_u8 const *)
+default_cas300_0002_payload =
+    (cahute_u8 const *)"CP430\xFF\xFF\xFF" "00.00.0(0305000001.01.0016M"
+    "\xFF\xFF\xFF\xFF\xFF" "8M\xFF\xFF\xFF\xFF\xFF\xFF\x81";
+
 /* TIMEOUT_INIT is the timeout before reading the response to the START
  * packet, at link initiation.
  * TIMEOUT_PACKET_TYPE is the timeout before reading the packet type, i.e.
  * the first byte, while TIMEOUT_PACKET_CONTENTS is the timeout before
  * reading any of the following bytes. */
-#define TIMEOUT_INIT            500
-#define TIMEOUT_PACKET_CONTENTS 2000
+#define TIMEOUT_INIT                   500
+#define TIMEOUT_PACKET_CONTENTS        2000
+#define TIMEOUT_CAS300_ACK             1000
+#define TIMEOUT_CAS300_PACKET_CONTENTS 500
 
-#define PACKET_TYPE_ACK          0x06
-#define PACKET_TYPE_ESTABLISHED  0x13
-#define PACKET_TYPE_START        0x16
-#define PACKET_TYPE_INVALID_DATA 0x24
-#define PACKET_TYPE_CORRUPTED    0x2B
-#define PACKET_TYPE_HEADER       0x3A
-#define PACKET_TYPE_DATA         0x3E
+#define PACKET_TYPE_CAS300_COMMAND 0x01
+#define PACKET_TYPE_CAS300_DATA    0x02
+#define PACKET_TYPE_CAS300_CHECK   0x05
+#define PACKET_TYPE_ACK            0x06
+#define PACKET_TYPE_ESTABLISHED    0x13
+#define PACKET_TYPE_START          0x16
+#define PACKET_TYPE_CAS300_TERM    0x18
+#define PACKET_TYPE_INVALID_DATA   0x24
+#define PACKET_TYPE_CORRUPTED      0x2B
+#define PACKET_TYPE_HEADER         0x3A
+#define PACKET_TYPE_DATA           0x3E
 
 /**
  * Compute a checksum for a zone.
@@ -77,8 +94,152 @@ cahute_casiolink_checksum(cahute_u8 const *data, size_t size) {
     return (~checksum + 1) & 255;
 }
 
+/**
+ * Copy a string from a payload to a buffer, while null-terminating it
+ * and detecting 0xFF characters as end of strings.
+ *
+ * SECURITY: The destination buffer is expected to be at least
+ * ``max_size + 1`` long.
+ *
+ * @param bufp Pointer to the buffer pointer for where to copy the data.
+ *        This method will increment the pointer to after the end of the
+ *        copied string with the null terminator, so that other strings or
+ *        pieces of data can be copied after.
+ * @param raw Raw data from which to get the string.
+ * @param max_size Maximum size to read from raw data.
+ * @return Pointer to the obtained string.
+ */
+CAHUTE_INLINE(char *)
+cahute_casiolink_store_string(
+    char **bufp,
+    cahute_u8 const *raw,
+    size_t max_size
+) {
+    char *buf = *bufp, *result = buf;
+
+    for (; max_size--; raw++) {
+        int byte = *raw;
+
+        if (!byte || byte >= 128)
+            break;
+
+        *(unsigned char *)buf++ = byte;
+    }
+
+    *buf++ = '\0';
+    *bufp = buf;
+    return result;
+}
+
+/**
+ * Apply 0x5C padding to source data and write to a destination buffer.
+ *
+ * SECURITY: The destination buffer is assumed to have at least data_size*2
+ * bytes available. Assertions regarding the data size must be done in the
+ * caller.
+ *
+ * @param buf Destination buffer.
+ * @param data Source data to apply padding to.
+ * @param data_size Size of the source data to apply padding to.
+ * @return Size of the unpadded data.
+ */
+CAHUTE_INLINE(int)
+cahute_casiolink_pad(cahute_u8 *buf, cahute_u8 const *data, size_t data_size) {
+    cahute_u8 *orig = buf;
+    cahute_u8 const *p;
+
+    for (p = data; data_size--; p++) {
+        int byte = *p;
+
+        if (byte < 32) {
+            *buf++ = '\\';
+            *buf++ = 32 + byte;
+        } else if (byte == '\\') {
+            *buf++ = '\\';
+            *buf++ = '\\';
+        } else
+            *buf++ = byte;
+    }
+
+    return (size_t)(buf - orig);
+}
+
+/**
+ * Apply reverse 0x5C padding to source data and write to a destination buffer.
+ *
+ * This functions reads the original buffer size by using ``*buf_sizep``, and
+ * sets ``*buf_sizep`` to the number of actual bytes at the end.
+ *
+ * @param buf Destination buffer.
+ * @param buf_size Maximum capacity in the destination buffer.
+ * @param data Source data to apply reverse padding to.
+ * @param data_size Size of the source data to apply padding to.
+ * @return Error code, or 0 if ok.
+ */
+CAHUTE_INLINE(int)
+cahute_casiolink_unpad(
+    cahute_u8 *buf,
+    size_t *buf_sizep,
+    cahute_u8 const *data,
+    size_t data_size
+) {
+    cahute_u8 *orig = buf;
+    cahute_u8 const *p;
+    size_t buf_size = *buf_sizep;
+    size_t orig_data_size = data_size;
+
+    for (p = data; buf_size && data_size; p++, data_size--, buf_size--) {
+        int byte = *p;
+
+        if (byte == '\\') {
+            /* If we've arrived at the end, we ignore the char. */
+            if (data_size <= 1)
+                break;
+
+            byte = *++p;
+            data_size--;
+
+            *buf++ = byte == '\\' ? '\\' : byte - 32;
+        } else
+            *buf++ = byte;
+    }
+
+    if (data_size) {
+        /* ``data_size`` characters could not be converted because the
+         * destination buffer was full.
+         * Note that ``*buf_sizep`` does not need to be changed here, because
+         * it actually represents both the capacity and the actual used
+         * space in the destination buffer, since it's full. */
+        msg(ll_error,
+            "%" CAHUTE_PRIuSIZE "o/%" CAHUTE_PRIuSIZE
+            "o to unpad after "
+            "filling a buffer of %" CAHUTE_PRIuSIZE "o!",
+            data_size,
+            orig_data_size,
+            *buf_sizep);
+        return CAHUTE_ERROR_SIZE;
+    }
+
+    *buf_sizep = (size_t)(buf - orig);
+    return CAHUTE_OK;
+}
+
+/**
+ * Compute an 2-byte ASCII-HEX number representation on a given buffer.
+ *
+ * @param buf Buffer on which to represent the number.
+ * @param number Number to represent.
+ */
+CAHUTE_INLINE(void)
+cahute_casiolink_set_ascii_hex(cahute_u8 *buf, unsigned int number) {
+    unsigned int higher = (number >> 4) & 15, lower = number & 15;
+
+    buf[0] = higher > 9 ? 'A' + higher - 10 : '0' + higher;
+    buf[1] = lower > 9 ? 'A' + lower - 10 : '0' + lower;
+}
+
 /* ---
- * Common utilities to decode CASIOLINK data.
+ * Common utilities to decode CAS40, CAS50 or CAS100 header and data.
  * --- */
 
 /**
@@ -756,6 +917,462 @@ data_ready:
  * Protocol related utilities.
  * --- */
 
+#define cahute_casiolink_cas300_receive_packet(LINK, TIMEOUT) \
+    cahute_casiolink_cas300_receive_packet_cont((LINK), -1, (TIMEOUT))
+
+/**
+ * Receive a CAS300 packet.
+ *
+ * Note that we don't actually check that the packet identifier is ASCII-HEX
+ * here, we just ensure we copy it properly when emitting the corresponding
+ * acknowledgement.
+ *
+ * @param link Link to use.
+ * @param first_byte First byte to include; -1 if no first byte is present.
+ * @param timeout Timeout for the first byte.
+ * @return Cahute error.
+ */
+CAHUTE_LOCAL(int)
+cahute_casiolink_cas300_receive_packet_cont(
+    cahute_link *link,
+    int first_byte,
+    unsigned long timeout
+) {
+    cahute_u8 buf[CASIOLINK_CAS300_MAX_PACKET_SIZE];
+    size_t payload_size;
+    int packet_type, packet_subtype, err;
+
+    /* Set the packet identifier, just so that we don't copy uninitialized
+     * data later. */
+    buf[1] = 0;
+    buf[2] = 0;
+
+    for (;; first_byte = -1) {
+        size_t raw_payload_size;
+
+        if (first_byte >= 0)
+            buf[0] = first_byte;
+        else {
+            err = cahute_receive_on_link_medium(
+                &link->medium,
+                buf,
+                1,
+                timeout,
+                timeout
+            );
+            if (err)
+                return err;
+        }
+
+        /* Sometimes the Classpad sends NUL or CHECK bytes in a loop until
+         * it doesn't, so we want to filter for it here. */
+        packet_type = buf[0];
+        if (!packet_type || packet_type == PACKET_TYPE_CAS300_CHECK) {
+            msg(ll_warn,
+                "Got the following packet type, skipping: 0x%02X",
+                packet_type);
+            continue;
+        }
+
+        payload_size = 0;
+        packet_subtype = 0;
+
+        if (packet_type == PACKET_TYPE_ACK) {
+            err = cahute_receive_on_link_medium(
+                &link->medium,
+                &buf[1],
+                2,
+                TIMEOUT_CAS300_PACKET_CONTENTS,
+                TIMEOUT_CAS300_PACKET_CONTENTS
+            );
+            if (err)
+                goto fail;
+
+            msg(ll_info, "Received the following packet from the device:");
+            mem(ll_info, buf, 3);
+            break;
+        }
+
+        if (packet_type == PACKET_TYPE_CAS300_TERM) {
+            err = cahute_receive_on_link_medium(
+                &link->medium,
+                &buf[1],
+                6,
+                TIMEOUT_CAS300_PACKET_CONTENTS,
+                TIMEOUT_CAS300_PACKET_CONTENTS
+            );
+            if (err)
+                goto fail;
+
+            if (!IS_ASCII_HEX_DIGIT(buf[3]) || !IS_ASCII_HEX_DIGIT(buf[4])
+                || !IS_ASCII_HEX_DIGIT(buf[5])
+                || !IS_ASCII_HEX_DIGIT(buf[6])) {
+                msg(ll_error, "Invalid CAS300 %s termination packet:");
+                ;
+                mem(ll_error, buf, 7);
+                goto fail;
+            }
+
+            msg(ll_info, "Received the following packet from the device:");
+            mem(ll_info, buf, 7);
+
+            packet_subtype = (ASCII_HEX_TO_NIBBLE(buf[3]) << 12)
+                             | (ASCII_HEX_TO_NIBBLE(buf[4]) << 8)
+                             | (ASCII_HEX_TO_NIBBLE(buf[5]) << 4)
+                             | ASCII_HEX_TO_NIBBLE(buf[6]);
+            break;
+        }
+
+        if ((packet_type != PACKET_TYPE_CAS300_COMMAND
+             && packet_type != PACKET_TYPE_CAS300_DATA)) {
+            msg(ll_error, "Invalid CAS300 packet type: 0x%02X", packet_type);
+            goto fail;
+        }
+
+        /* Commands are at least 13 bytes long, data packets are at least
+         * 9 bytes long; but for the sake of not corrupting the link in case
+         * of command payloads being too short (less than 4 bytes), we want to
+         * read the entire packet first, then check the command payload size
+         * and format. */
+        err = cahute_receive_on_link_medium(
+            &link->medium,
+            &buf[1],
+            8,
+            TIMEOUT_CAS300_PACKET_CONTENTS,
+            TIMEOUT_CAS300_PACKET_CONTENTS
+        );
+        if (err)
+            goto fail;
+
+        if (!IS_ASCII_HEX_DIGIT(buf[3]) || !IS_ASCII_HEX_DIGIT(buf[4])
+            || !IS_ASCII_HEX_DIGIT(buf[5]) || !IS_ASCII_HEX_DIGIT(buf[6])) {
+            msg(ll_error,
+                "Invalid CAS300 %s start:",
+                packet_type == PACKET_TYPE_CAS300_COMMAND ? "command"
+                                                          : "data packet");
+            ;
+            mem(ll_error, buf, 7);
+            goto fail;
+        }
+
+        raw_payload_size =
+            ((ASCII_HEX_TO_NIBBLE(buf[3]) << 12)
+             | (ASCII_HEX_TO_NIBBLE(buf[4]) << 8)
+             | (ASCII_HEX_TO_NIBBLE(buf[5]) << 4)
+             | ASCII_HEX_TO_NIBBLE(buf[6]));
+        if (raw_payload_size > CASIOLINK_CAS300_MAX_ENCODED_PAYLOAD_SIZE) {
+            msg(ll_error,
+                "CAS300 %" CAHUTE_PRIuSIZE
+                " payload size too big for internal buffers:",
+                raw_payload_size);
+            mem(ll_error, buf, 7);
+            goto fail;
+        }
+
+        if (raw_payload_size) {
+            err = cahute_receive_on_link_medium(
+                &link->medium,
+                &buf[9],
+                raw_payload_size,
+                TIMEOUT_CAS300_PACKET_CONTENTS,
+                TIMEOUT_CAS300_PACKET_CONTENTS
+            );
+            if (err)
+                goto fail;
+        }
+
+        /* Check the packet checksum before anything else. */
+        if (!IS_ASCII_HEX_DIGIT(buf[7 + raw_payload_size])
+            || !IS_ASCII_HEX_DIGIT(buf[8 + raw_payload_size])) {
+            msg(ll_error, "CAS300 checksum is of invalid format:");
+            mem(ll_error, buf, 9 + raw_payload_size);
+            err = CAHUTE_ERROR_CORRUPT;
+            goto fail;
+        }
+
+        {
+            unsigned long expected_checksum =
+                (ASCII_HEX_TO_NIBBLE(buf[7 + raw_payload_size]) << 4)
+                | ASCII_HEX_TO_NIBBLE(buf[8 + raw_payload_size]);
+            unsigned long obtained_checksum =
+                cahute_casiolink_checksum(&buf[3], 4 + raw_payload_size);
+
+            if (expected_checksum != obtained_checksum) {
+                msg(ll_error,
+                    "Checksum 0x%02X differs from checksum 0x%02X present in "
+                    "CAS300 packet:",
+                    obtained_checksum,
+                    expected_checksum);
+                mem(ll_error, buf, 9 + raw_payload_size);
+                err = CAHUTE_ERROR_CORRUPT;
+                goto fail;
+            }
+        }
+
+        msg(ll_info, "Received the following packet from the device:");
+        mem(ll_info, buf, 9 + raw_payload_size);
+
+        /* The received packet is valid, we want to acknowledge it. */
+        {
+            cahute_u8 const *raw_payload = &buf[7];
+
+            if (packet_type == PACKET_TYPE_CAS300_COMMAND) {
+                if (raw_payload_size < 4 || !IS_ASCII_HEX_DIGIT(raw_payload[0])
+                    || !IS_ASCII_HEX_DIGIT(raw_payload[1])
+                    || !IS_ASCII_HEX_DIGIT(raw_payload[2])
+                    || !IS_ASCII_HEX_DIGIT(raw_payload[3])) {
+                    msg(ll_error, "Invalid CAS300 command packet:");
+                    mem(ll_error, buf, 9 + raw_payload_size);
+                    goto fail;
+                }
+
+                packet_subtype = (ASCII_HEX_TO_NIBBLE(raw_payload[0]) << 12)
+                                 | (ASCII_HEX_TO_NIBBLE(raw_payload[1]) << 8)
+                                 | (ASCII_HEX_TO_NIBBLE(raw_payload[2]) << 4)
+                                 | ASCII_HEX_TO_NIBBLE(raw_payload[3]);
+
+                raw_payload += 4;
+                raw_payload_size -= 4;
+            } else
+                link->protocol_state.casiolink.cas300_subtype = 0;
+
+            if (raw_payload_size) {
+                payload_size = CASIOLINK_CAS300_MAX_PAYLOAD_SIZE;
+                err = cahute_casiolink_unpad(
+                    link->protocol_state.casiolink.cas300_payload,
+                    &payload_size,
+                    raw_payload,
+                    raw_payload_size
+                );
+                if (err)
+                    goto fail;
+            }
+        }
+
+        break;
+    }
+
+    link->protocol_state.casiolink.last_variant =
+        CAHUTE_CASIOLINK_VARIANT_CAS300;
+    link->protocol_state.casiolink.cas300_type = packet_type;
+    link->protocol_state.casiolink.cas300_subtype = packet_subtype;
+    link->protocol_state.casiolink.cas300_payload_size = payload_size;
+    link->protocol_state.casiolink.cas300_packet_id[0] = buf[1];
+    link->protocol_state.casiolink.cas300_packet_id[1] = buf[2];
+
+    /* Acknowledge the received packet. */
+    if (packet_type != PACKET_TYPE_ACK) {
+        cahute_u8 ack_buf[3];
+
+        ack_buf[0] = PACKET_TYPE_ACK;
+        ack_buf[1] = buf[1];
+        ack_buf[2] = buf[2];
+
+        msg(ll_info, "Sending the following acknowledgement to the device:");
+        mem(ll_info, ack_buf, 3);
+
+        err = cahute_send_on_link_medium(&link->medium, ack_buf, 3);
+        if (err)
+            goto fail;
+    }
+
+    payload_size = link->protocol_state.casiolink.cas300_payload_size;
+    switch (buf[0]) {
+    case PACKET_TYPE_CAS300_TERM:
+        msg(ll_info, "Interpreted as termination packet.");
+        link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
+        err = CAHUTE_ERROR_TERMINATED;
+        goto fail;
+
+    case PACKET_TYPE_CAS300_COMMAND:
+        if (payload_size) {
+            msg(ll_info,
+                "Interpreted as command %04X with the following payload:",
+                link->protocol_state.casiolink.cas300_subtype);
+            mem(ll_info,
+                link->protocol_state.casiolink.cas300_payload,
+                payload_size);
+        } else
+            msg(ll_info,
+                "Interpreted as command %04X with no payload.",
+                link->protocol_state.casiolink.cas300_subtype);
+
+        break;
+
+    case PACKET_TYPE_CAS300_DATA:
+        msg(ll_info,
+            "Interpreted as data packet of %" CAHUTE_PRIuSIZE "B.",
+            payload_size);
+        break;
+    }
+
+    return CAHUTE_OK;
+
+fail:
+    if (!err)
+        return CAHUTE_ERROR_UNKNOWN;
+    else if (err == CAHUTE_ERROR_TIMEOUT_START)
+        return CAHUTE_ERROR_TIMEOUT;
+
+    return err;
+}
+
+/**
+ * Send a CAS300 command.
+ *
+ * @param link Link to use.
+ * @param command Command to send.
+ * @param payload Payload to include with the command.
+ * @param payload_size Size of the payload to include with the command.
+ * @return Cahute error.
+ */
+CAHUTE_LOCAL(int)
+cahute_casiolink_cas300_send_command(
+    cahute_link *link,
+    unsigned int command,
+    cahute_u8 const *payload,
+    size_t payload_size
+) {
+    cahute_u8 buf[CASIOLINK_CAS300_MAX_PACKET_SIZE];
+    size_t padded_size;
+    int packet_id, err;
+
+    if (payload_size > CASIOLINK_CAS300_MAX_PAYLOAD_SIZE)
+        return CAHUTE_ERROR_SIZE;
+
+    packet_id = link->protocol_state.casiolink.cas300_next_id;
+    link->protocol_state.casiolink.cas300_next_id = (packet_id + 1) & 255;
+
+    padded_size = 0;
+    if (payload_size)
+        padded_size = cahute_casiolink_pad(&buf[11], payload, payload_size);
+
+    buf[0] = 0x01;
+    cahute_casiolink_set_ascii_hex(&buf[1], packet_id);
+    cahute_casiolink_set_ascii_hex(&buf[3], (padded_size + 4) >> 8);
+    cahute_casiolink_set_ascii_hex(&buf[5], (padded_size + 4) & 255);
+    cahute_casiolink_set_ascii_hex(&buf[7], command >> 8);
+    cahute_casiolink_set_ascii_hex(&buf[9], command & 255);
+    cahute_casiolink_set_ascii_hex(
+        &buf[11 + padded_size],
+        cahute_casiolink_checksum(&buf[3], padded_size + 8)
+    );
+
+    msg(ll_info, "Sending the following packet to the device:");
+    mem(ll_info, buf, padded_size + 13);
+
+    err = cahute_send_on_link_medium(&link->medium, buf, padded_size + 13);
+    if (err)
+        return err;
+
+    /* Receive the ACK with the same packet identifier. */
+    /* TODO: can we receive invalid acknowledgements here? */
+    do {
+        err = cahute_casiolink_cas300_receive_packet_cont(
+            link,
+            -1,
+            TIMEOUT_CAS300_ACK
+        );
+        if (err == CAHUTE_ERROR_TIMEOUT_START) {
+            msg(ll_info, "Re-sending the following packet to the device:");
+            mem(ll_info, buf, padded_size + 13);
+            err = cahute_send_on_link_medium(
+                &link->medium,
+                buf,
+                padded_size + 13
+            );
+            if (err)
+                return err;
+
+            continue;
+        }
+
+        if (err)
+            return err;
+
+        if (link->protocol_state.casiolink.cas300_type != PACKET_TYPE_ACK
+            || memcmp(
+                link->protocol_state.casiolink.cas300_packet_id,
+                &buf[1],
+                2
+            ))
+            continue;
+
+        break;
+    } while (1);
+
+    return CAHUTE_OK;
+}
+
+/**
+ * Send a CAS300 data packet.
+ *
+ * @param link Link to use.
+ * @param payload Payload to include with the command.
+ * @param payload_size Size of the payload to include with the command.
+ * @return Cahute error.
+ */
+CAHUTE_LOCAL(int)
+cahute_casiolink_cas300_send_data_packet(
+    cahute_link *link,
+    unsigned int command,
+    cahute_u8 const *payload,
+    size_t payload_size
+) {
+    cahute_u8 buf[CASIOLINK_CAS300_MAX_PACKET_SIZE];
+    size_t padded_size;
+    int packet_id, err;
+
+    if (payload_size > CASIOLINK_CAS300_MAX_PAYLOAD_SIZE)
+        return CAHUTE_ERROR_SIZE;
+
+    packet_id = link->protocol_state.casiolink.cas300_next_id;
+    link->protocol_state.casiolink.cas300_next_id = (packet_id + 1) & 255;
+
+    padded_size = 0;
+    if (payload_size)
+        padded_size = cahute_casiolink_pad(&buf[7], payload, payload_size);
+
+    buf[0] = 0x02;
+    cahute_casiolink_set_ascii_hex(&buf[1], packet_id);
+    cahute_casiolink_set_ascii_hex(&buf[3], (padded_size + 4) >> 8);
+    cahute_casiolink_set_ascii_hex(&buf[5], (padded_size + 4) & 255);
+    cahute_casiolink_set_ascii_hex(
+        &buf[7 + padded_size],
+        cahute_casiolink_checksum(&buf[3], padded_size + 4)
+    );
+
+    msg(ll_info, "Sending the following packet to the device:");
+    mem(ll_info, buf, padded_size + 9);
+
+    err = cahute_send_on_link_medium(&link->medium, buf, padded_size + 9);
+    if (err)
+        return err;
+
+    /* Receive the ACK with the same packet identifier. */
+    /* TODO: timeouts! */
+    /* TODO: can we receive invalid acknowledgements here? */
+    do {
+        err = cahute_casiolink_cas300_receive_packet_cont(
+            link,
+            -1,
+            TIMEOUT_CAS300_ACK
+        );
+        if (err)
+            return err;
+
+        if (link->protocol_state.casiolink.cas300_type != PACKET_TYPE_ACK
+            || memcmp(
+                link->protocol_state.casiolink.cas300_packet_id,
+                &buf[1],
+                2
+            ))
+            continue;
+    } while (0);
+
+    return CAHUTE_OK;
+}
+
 /**
  * Answer a received CAS100 MDL1 header with the appropriate header,
  * then apply the serial settings provided within the header, then
@@ -904,6 +1521,9 @@ restart_reception:
             return err;
 
         packet_type = buf[0];
+        if (packet_type == 0)
+            continue;
+
         if (packet_type == PACKET_TYPE_START) {
             cahute_u8 const send_buf[] = {PACKET_TYPE_ESTABLISHED};
 
@@ -918,15 +1538,75 @@ restart_reception:
             continue;
         }
 
-        if (packet_type != PACKET_TYPE_HEADER) {
-            msg(ll_info,
-                "Expected 0x3A (':') packet type, got 0x%02X.",
-                packet_type);
+        break;
+    } while (1);
+
+    if (packet_type == PACKET_TYPE_CAS300_COMMAND
+        || packet_type == PACKET_TYPE_CAS300_DATA
+        || packet_type == PACKET_TYPE_CAS300_TERM) {
+        int first_byte = packet_type;
+
+        if (link->protocol_state.casiolink.variant
+                != CAHUTE_CASIOLINK_VARIANT_AUTO
+            && link->protocol_state.casiolink.variant
+                   != CAHUTE_CASIOLINK_VARIANT_CAS300) {
+            msg(ll_error,
+                "Got what appears to be a CAS300 packet, but variant "
+                "is not CAS300 or auto.");
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        break;
-    } while (1);
+        for (;; first_byte = -1) {
+            err = cahute_casiolink_cas300_receive_packet_cont(
+                link,
+                first_byte,
+                0
+            );
+            if (err)
+                return err;
+
+            if (link->protocol_state.casiolink.cas300_type
+                != PACKET_TYPE_CAS300_COMMAND) {
+                msg(ll_error, "Expected a command here.");
+                return CAHUTE_ERROR_UNKNOWN;
+            }
+
+            switch (link->protocol_state.casiolink.cas300_subtype) {
+            case 0x0003:
+                /* TODO: Find out what this command does to the link exactly,
+                 * as this is not yet known. */
+                msg(ll_error,
+                    "Command 0003 received, communication is now corrupted.");
+                link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
+                return CAHUTE_ERROR_IRRECOV;
+
+            case 0x0011:
+                /* We can send our dummy model information. */
+                err = cahute_casiolink_cas300_send_command(
+                    link,
+                    0x0002,
+                    default_cas300_0002_payload,
+                    41
+                );
+                if (err)
+                    return err;
+
+                break;
+
+            default:
+                CAHUTE_RETURN_IMPL("Unimplemented command for reception.");
+            }
+        }
+
+        return CAHUTE_OK;
+    }
+
+    if (packet_type != PACKET_TYPE_HEADER) {
+        msg(ll_info,
+            "Expected 0x3A (':') packet type, got 0x%02X.",
+            packet_type);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
 
     /* The header is at least 40 bytes long, including the packet type, so
      * we want to read at least that. */
@@ -1269,9 +1949,13 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 
     if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
         /* Expect an initiation flow. */
-        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 0, 0);
-        if (err)
-            return err;
+        buf[0] = 0;
+
+        while (!buf[0]) {
+            err = cahute_receive_on_link_medium(&link->medium, buf, 1, 0, 0);
+            if (err)
+                return err;
+        }
 
         if (buf[0] != PACKET_TYPE_START) {
             msg(ll_error,
@@ -1479,6 +2163,61 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 }
 
 /**
+ * Discover device information, for the CAS300 variant.
+ *
+ * Note that this function is to be called while being the sender only.
+ *
+ * @param link Link in which to discover device information.
+ * @return Cahute error.
+ */
+CAHUTE_EXTERN(int) cahute_casiolink_discover(cahute_link *link) {
+    int err;
+
+    if (link->protocol_state.casiolink.variant
+        != CAHUTE_CASIOLINK_VARIANT_CAS300)
+        return CAHUTE_OK;
+
+    err = cahute_casiolink_cas300_send_command(link, 0x0011, NULL, 0);
+    if (err)
+        return err;
+
+    err = cahute_casiolink_cas300_receive_packet(link, 0);
+    if (err)
+        return err;
+
+    if (link->protocol_state.casiolink.cas300_type != 0x01) {
+        msg(ll_error,
+            "Expected a CAS300 command, got 0x%02X.",
+            link->protocol_state.casiolink.cas300_type);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    if (link->protocol_state.casiolink.cas300_subtype != 0x0002) {
+        msg(ll_error,
+            "Expected 0x0002 command, got 0x%04X.",
+            link->protocol_state.casiolink.cas300_subtype);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    if (link->protocol_state.casiolink.cas300_payload_size != 49) {
+        msg(ll_error,
+            "Expected a 49-byte payload, got %" CAHUTE_PRIuSIZE,
+            link->protocol_state.casiolink.cas300_payload_size);
+        return CAHUTE_ERROR_UNKNOWN;
+    }
+
+    memcpy(
+        link->protocol_state.casiolink.raw_device_info,
+        link->protocol_state.casiolink.cas300_payload,
+        link->protocol_state.casiolink.cas300_payload_size
+    );
+    link->protocol_state.casiolink.flags |=
+        (CASIOLINK_FLAG_DEVICE_INFO_OBTAINED
+         | CASIOLINK_FLAG_DEVICE_INFO_CAS300);
+    return CAHUTE_OK;
+}
+
+/**
  * Terminate the connection, for any CASIOLINK variant.
  *
  * This must be called while the link is in sender / active mode.
@@ -1489,49 +2228,90 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
     cahute_u8 buf[50];
     size_t buf_size;
+    int err;
 
     if (link->flags & CAHUTE_LINK_FLAG_TERMINATED)
         return CAHUTE_OK;
 
-    buf_size = 40;
-    memset(buf, 0xFF, 50);
-    buf[0] = ':';
+    if (link->protocol_state.casiolink.variant
+        == CAHUTE_CASIOLINK_VARIANT_CAS300) {
+        buf[0] = PACKET_TYPE_CAS300_TERM;
+        cahute_casiolink_set_ascii_hex(
+            &buf[1],
+            link->protocol_state.casiolink.cas300_next_id
+        );
+        buf[3] = '0';
+        buf[4] = '0';
+        buf[5] = '0';
+        buf[6] = '4';
 
-    switch (link->protocol_state.casiolink.variant) {
-    case CAHUTE_CASIOLINK_VARIANT_CAS40:
-        buf[1] = 0x17;
-        buf[2] = 0xFF;
-        break;
+        msg(ll_info, "Sending the following packet to the device:");
+        mem(ll_info, buf, 6);
 
-    case CAHUTE_CASIOLINK_VARIANT_CAS50:
-        buf[1] = 'E';
-        buf[2] = 'N';
-        buf[3] = 'D';
-        buf[4] = 0xFF;
+        err = cahute_send_on_link_medium(&link->medium, buf, 7);
+        if (err)
+            return err;
 
-        buf_size = 50;
-        break;
+        /* TODO: Timeouts! */
+        err = cahute_receive_on_link_medium(&link->medium, &buf[7], 3, 0, 0);
+        if (err)
+            return err;
 
-    case CAHUTE_CASIOLINK_VARIANT_CAS100:
-        buf[1] = 'E';
-        buf[2] = 'N';
-        buf[3] = 'D';
-        buf[4] = '1';
-        break;
+        if (buf[7] != PACKET_TYPE_ACK || buf[8] != buf[1]
+            || buf[9] != buf[2]) {
+            msg(ll_error, "Unhandled termination response:");
+            mem(ll_error, &buf[7], 3);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
 
-    default:
-        msg(ll_error,
-            "Unhandled variant 0x%08X.",
-            link->protocol_state.casiolink.variant);
-        return CAHUTE_ERROR_UNKNOWN;
+        msg(ll_info, "Received the following acknowledgement:");
+        mem(ll_info, &buf[7], 3);
+    } else {
+        buf_size = 40;
+        memset(buf, 0xFF, 50);
+        buf[0] = ':';
+
+        switch (link->protocol_state.casiolink.variant) {
+        case CAHUTE_CASIOLINK_VARIANT_CAS40:
+            buf[1] = 0x17;
+            buf[2] = 0xFF;
+            break;
+
+        case CAHUTE_CASIOLINK_VARIANT_CAS50:
+            buf[1] = 'E';
+            buf[2] = 'N';
+            buf[3] = 'D';
+            buf[4] = 0xFF;
+
+            buf_size = 50;
+            break;
+
+        case CAHUTE_CASIOLINK_VARIANT_CAS100:
+            buf[1] = 'E';
+            buf[2] = 'N';
+            buf[3] = 'D';
+            buf[4] = '1';
+            break;
+
+        default:
+            msg(ll_error,
+                "Unhandled variant 0x%08X.",
+                link->protocol_state.casiolink.variant);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        buf[buf_size - 1] = cahute_casiolink_checksum(&buf[1], buf_size - 2);
+
+        msg(ll_info, "Sending the following end packet:");
+        mem(ll_info, buf, buf_size);
+
+        err = cahute_send_on_link_medium(&link->medium, buf, buf_size);
+        if (err)
+            return err;
     }
 
-    buf[buf_size - 1] = cahute_casiolink_checksum(&buf[1], buf_size - 2);
-
-    msg(ll_info, "Sending the following end packet:");
-    mem(ll_info, buf, buf_size);
-
-    return cahute_send_on_link_medium(&link->medium, buf, buf_size);
+    link->flags |= CAHUTE_LINK_FLAG_TERMINATED;
+    return CAHUTE_OK;
 }
 
 /**
@@ -1683,34 +2463,25 @@ cahute_casiolink_receive_screen(
 }
 
 /**
- * Produce generic device information using the optionally stored
- * device information.
+ * Produce generic device information using CAS100 device information.
  *
- * @param link Link from which to get the cached EACK response.
  * @param infop Pointer to set to the allocated device information structure.
+ * @param raw_info Raw information to read from, expected to be 33 bytes long.
  * @return Cahute error, or 0 if no error has occurred.
  */
-CAHUTE_EXTERN(int)
-cahute_casiolink_make_device_info(
-    cahute_link *link,
-    cahute_device_info **infop
+CAHUTE_LOCAL(int)
+cahute_casiolink_make_cas100_device_info(
+    cahute_device_info **infop,
+    cahute_u8 const *raw_info
 ) {
-    cahute_device_info *info = NULL;
+    cahute_device_info *info;
     char *buf;
-    cahute_u8 const *raw_info;
-
-    if (~link->protocol_state.casiolink.flags
-        & CASIOLINK_FLAG_DEVICE_INFO_OBTAINED) {
-        /* We don't have a 'generic device information'. */
-        CAHUTE_RETURN_IMPL("No generic device with CASIOLINK.");
-    }
 
     info = malloc(sizeof(cahute_device_info) + 20);
     if (!info)
         return CAHUTE_ERROR_ALLOC;
 
     buf = (void *)(&info[1]);
-    raw_info = link->protocol_state.seven.raw_device_info;
 
     info->cahute_device_info_flags = CAHUTE_DEVICE_INFO_FLAG_OS;
     info->cahute_device_info_rom_capacity = 0;
@@ -1750,4 +2521,128 @@ cahute_casiolink_make_device_info(
 
     *infop = info;
     return CAHUTE_OK;
+}
+
+/**
+ * Produce generic device information using CAS300 device information.
+ *
+ * @param infop Pointer to set to the allocated device information structure.
+ * @param raw_info Raw information to read from, expected to be 49 bytes long.
+ * @return Cahute error, or 0 if no error has occurred.
+ */
+CAHUTE_LOCAL(int)
+cahute_casiolink_make_cas300_device_info(
+    cahute_device_info **infop,
+    cahute_u8 const *raw_info
+) {
+    cahute_device_info *info = NULL;
+    char *buf;
+    char rawsize_buf[9], *rawsize = rawsize_buf;
+    char rawver_buf[17], *rawver = rawver_buf;
+
+    info = malloc(sizeof(cahute_device_info) + 46);
+    if (!info)
+        return CAHUTE_ERROR_ALLOC;
+
+    buf = (void *)(&info[1]);
+
+    info->cahute_device_info_flags =
+        CAHUTE_DEVICE_INFO_FLAG_BOOTCODE | CAHUTE_DEVICE_INFO_FLAG_OS;
+    info->cahute_device_info_rom_capacity = 0;
+    info->cahute_device_info_rom_version = "";
+
+    /* Flash ROM capacity is presented in a human-readable format,
+     * we want to try to determine the machine-readable format here. */
+    cahute_casiolink_store_string(&rawsize, &raw_info[32], 8);
+    if (!strcmp(rawsize_buf, "16M"))
+        info->cahute_device_info_flash_rom_capacity = 16777216;
+    else {
+        msg(ll_error, "Unknown ROM capacity: %s", rawsize_buf);
+        goto fail;
+    }
+
+    info->cahute_device_info_ram_capacity = 0;
+
+    info->cahute_device_info_bootcode_version = buf;
+    cahute_casiolink_store_string(&buf, &raw_info[24], 8);
+
+    info->cahute_device_info_bootcode_offset = 0;
+    info->cahute_device_info_bootcode_size = 0;
+
+    /* OS version seems to be presented in a strange format, being
+     * "00.00.0(03050000" for OS 03.05.0000. We want to try to extract
+     * the OS version from that. */
+    cahute_casiolink_store_string(&rawver, &raw_info[8], 16);
+    if (strlen(rawver_buf) != 16) {
+        msg(ll_error, "Unable to extract OS version from: %s", rawver_buf);
+        goto fail;
+    }
+
+    buf[0] = rawver_buf[8];
+    buf[1] = rawver_buf[9];
+    buf[2] = '.';
+    buf[3] = rawver_buf[10];
+    buf[4] = rawver_buf[11];
+    buf[5] = '.';
+    buf[6] = rawver_buf[12];
+    buf[7] = rawver_buf[13];
+    buf[8] = rawver_buf[14];
+    buf[9] = rawver_buf[15];
+    buf[10] = 0;
+
+    info->cahute_device_info_os_version = buf;
+    buf += 12;
+
+    info->cahute_device_info_os_offset = 0;
+    info->cahute_device_info_os_size = 0;
+
+    info->cahute_device_info_product_id = "";
+    info->cahute_device_info_username = "";
+    info->cahute_device_info_organisation = "";
+
+    info->cahute_device_info_hwid = buf;
+    cahute_casiolink_store_string(&buf, &raw_info[0], 8);
+
+    info->cahute_device_info_cpuid = "";
+
+    *infop = info;
+    return CAHUTE_OK;
+
+fail:
+    if (info)
+        free(info);
+
+    return CAHUTE_ERROR_ALLOC;
+}
+
+/**
+ * Produce generic device information using the optionally stored
+ * device information.
+ *
+ * @param link Link from which to get the cached EACK response.
+ * @param infop Pointer to set to the allocated device information structure.
+ * @return Cahute error, or 0 if no error has occurred.
+ */
+CAHUTE_EXTERN(int)
+cahute_casiolink_make_device_info(
+    cahute_link *link,
+    cahute_device_info **infop
+) {
+    if (~link->protocol_state.casiolink.flags
+        & CASIOLINK_FLAG_DEVICE_INFO_OBTAINED) {
+        /* We don't have a 'generic device information'. */
+        CAHUTE_RETURN_IMPL("No generic device with CASIOLINK.");
+    }
+
+    if (link->protocol_state.casiolink.flags
+        & CASIOLINK_FLAG_DEVICE_INFO_CAS300)
+        return cahute_casiolink_make_cas300_device_info(
+            infop,
+            link->protocol_state.casiolink.raw_device_info
+        );
+
+    return cahute_casiolink_make_cas100_device_info(
+        infop,
+        link->protocol_state.casiolink.raw_device_info
+    );
 }

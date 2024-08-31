@@ -404,6 +404,7 @@ static int parse_medium_params(
         char const *raw_speed = get_casrc_setting_property(dstg, ostg, "baud");
         char const *raw_parity =
             get_casrc_setting_property(dstg, ostg, "parity");
+        char const *raw_stop = get_casrc_setting_property(dstg, ostg, "stop");
 
         medium->data.com.serial_speed = 0;
         medium->data.com.serial_flags = 0;
@@ -435,6 +436,21 @@ static int parse_medium_params(
         else
             medium->data.com.serial_flags |= CAHUTE_SERIAL_PARITY_OFF;
 
+        if (!raw_stop) { /* Extended */
+        } else if (!strcmp(raw_stop, "1"))
+            medium->data.com.serial_flags |= CAHUTE_SERIAL_STOP_ONE;
+        else if (!strcmp(raw_stop, "2"))
+            medium->data.com.serial_flags |= CAHUTE_SERIAL_STOP_TWO;
+        else {
+            fprintf(
+                stderr,
+                "Invalid property stop=%s for %s.\n",
+                raw_stop,
+                prefix
+            );
+            return 1;
+        }
+
         if (get_casrc_setting_property(dstg, ostg, "dtr"))
             medium->data.com.serial_flags |= CAHUTE_SERIAL_DTR_HANDSHAKE;
         else
@@ -461,6 +477,13 @@ static int parse_medium_params(
             medium->data.com.serial_flags |=
                 CAHUTE_SERIAL_PROTOCOL_CASIOLINK
                 | CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS100;
+        else if (get_casrc_setting_property(dstg, ostg, "cp") /* Extended */
+         || get_casrc_setting_property(dstg, ostg, "cp300")
+         || get_casrc_setting_property(dstg, ostg, "cp330")
+         || get_casrc_setting_property(dstg, ostg, "cp330+"))
+            medium->data.com.serial_flags |=
+                CAHUTE_SERIAL_PROTOCOL_CASIOLINK
+                | CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS300;
 
         medium->data.com.pause =
             get_casrc_setting_property(dstg, ostg, "pause") != NULL;
