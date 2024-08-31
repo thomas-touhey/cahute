@@ -196,11 +196,22 @@ Link management related function declarations
 
         Use automatic protocol detection.
 
+        .. note::
+
+            This is the default value if no other protocol is specified.
+
         .. warning::
 
             This cannot be used if :c:macro:`CAHUTE_SERIAL_NOCHECK` is set,
             as we tweak the checking flow to determine the protocol of the
             other side.
+
+    .. c:macro:: CAHUTE_SERIAL_PROTOCOL_NONE
+
+        Do not use a protocol.
+
+        This renders all of the functions from :ref:`header-cahute-link-medium`
+        accessible on the created link.
 
     .. c:macro:: CAHUTE_SERIAL_PROTOCOL_CASIOLINK
 
@@ -468,6 +479,13 @@ Link management related function declarations
 
         See :ref:`protocol-seven-ohp` for more information.
 
+    .. c:macro:: CAHUTE_USB_NOPROTO
+
+        Do not use a protocol.
+
+        This renders all of the functions from :ref:`header-cahute-link-medium`
+        accessible on the created link.
+
     :param linkp: The pointer to set the opened link to.
     :param flags: The flags to set to the USB link.
     :param bus: The bus number of the USB calculator to open a link with.
@@ -504,6 +522,113 @@ Link management related function declarations
     :param flags: The flags to set the USB link.
     :return: The error, or 0 if the operation was successful.
 
+.. c:function:: void cahute_close_link(cahute_link *link)
+
+    Close and free a link.
+
+    :param link: The link to close.
+
+.. _header-cahute-link-medium:
+
+Link medium access related function declarations
+------------------------------------------------
+
+.. warning::
+
+    These functions can only be used when no protocol is used with a link,
+    i.e. when:
+
+    * :c:macro:`CAHUTE_SERIAL_PROTOCOL_NONE` is used with
+      :c:func:`cahute_open_serial_link`;
+    * :c:macro:`CAHUTE_USB_NOPROTO` is used with :c:func:`cahute_open_usb_link`
+      or :c:macro:`cahute_open_simple_usb_link`.
+
+.. c:function:: int cahute_receive_on_link(cahute_link *link, cahute_u8 *buf, \
+    size_t size, unsigned long first_timeout, unsigned long next_timeout)
+
+    Read exactly ``size`` bytes of data into the buffer.
+
+    .. warning::
+
+        This function does not provide the number of bytes that have been
+        read in case of error (with the exception of
+        :c:macro:`CAHUTE_ERROR_TIMEOUT_START`, which implies that no bytes
+        have been read).
+
+    Errors to be expected from this function are the following:
+
+    :c:macro:`CAHUTE_ERROR_TIMEOUT_START`
+        The first byte was not received in a timely manner.
+        This can only occur if ``first_timeout`` was not set to 0.
+
+    :c:macro:`CAHUTE_ERROR_TIMEOUT`
+        A byte past the first one was not received in a timely manner.
+        This can only occur if ``next_timeout`` was not set to 0.
+
+    :c:macro:`CAHUTE_ERROR_GONE`
+        The device is no longer present, usually either because the USB
+        cable has been unplugged on one end or the other, or the serial
+        adapter has been unplugged from the host.
+
+    :c:macro:`CAHUTE_ERROR_UNKNOWN`
+        The medium-specific operations have yielded an error code that
+        Cahute did not interpret. Some details can usually be found in
+        the logs.
+
+    :param link: Generic link to receive data on.
+    :param buf: Buffer in which to write the received data.
+    :param size: Size of the data to write to the buffer.
+    :param first_timeout: Maximum delay to wait before the first byte of the
+        data, in milliseconds. If this is set to 0, the first byte will be
+        awaited indefinitely.
+    :param next_timeout: Maximum delay to wait between two bytes of the data,
+        or before the last byte, in milliseconds. If this is set to 0, next
+        bytes will be awaited indefinitely.
+    :return: Error, or :c:macro:`CAHUTE_OK`.
+
+.. c:function:: int cahute_send_on_link(cahute_link *link, \
+    cahute_u8 const *buf, size_t size)
+
+    Write exactly ``size`` bytes of data to the link.
+
+    Errors to be expected from this function are the following:
+
+    :c:macro:`CAHUTE_ERROR_GONE`
+        The device is no longer present, usually either because the USB
+        cable has been unplugged on one end or the other, or the serial
+        adapter has been unplugged from the host.
+
+    :c:macro:`CAHUTE_ERROR_UNKNOWN`
+        The medium-specific operations have yielded an error code that
+        Cahute did not interpret. Some details can usually be found in
+        the logs.
+
+    :param link: Generic link to send data on.
+    :param buf: Buffer from which to read the data to send.
+    :param size: Size of the data to read and send.
+    :return: Error, or :c:macro:`CAHUTE_OK`.
+
+.. c:function:: int cahute_set_serial_params_to_link(cahute_link *link, \
+    unsigned long flags, unsigned long speed)
+
+    Set the serial parameters to the link medium.
+
+    Accepted flags are a subset of the flags for :c:func:`cahute_open_serial`:
+
+    * ``CAHUTE_SERIAL_STOP_*`` (stop bits);
+    * ``CAHUTE_SERIAL_PARITY_*`` (parity);
+    * ``CAHUTE_SERIAL_XONXOFF_*`` (XON/XOFF software control);
+    * ``CAHUTE_SERIAL_DTR_*`` (DTR hardware control);
+    * ``CAHUTE_SERIAL_RTS_*`` (RTS hardware control).
+
+    :param link: Generic link to set the serial parameters to.
+    :param flags: Flags to set to the link medium.
+    :param speed: Speed to set to the link medium.
+    :return: Error, or :c:macro:`CAHUTE_OK`.
+
+Device metadata access related function declarations
+----------------------------------------------------
+
 .. c:function:: int cahute_get_device_info(cahute_link *link, \
     cahute_device_info **infop)
 
@@ -517,12 +642,6 @@ Link management related function declarations
     :param link: The link on which to gather information.
     :param infop: The pointer to set to the information to.
     :return: The error, or 0 if the operation was successful.
-
-.. c:function:: void cahute_close_link(cahute_link *link)
-
-    Close and free a link.
-
-    :param link: The link to close.
 
 Data transfer related function declarations
 -------------------------------------------

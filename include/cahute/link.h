@@ -102,9 +102,10 @@ typedef void(cahute_progress_func)(
 
 #define CAHUTE_SERIAL_PROTOCOL_MASK      0x0000000FUL
 #define CAHUTE_SERIAL_PROTOCOL_AUTO      0x00000000UL /* Protocol detection. */
-#define CAHUTE_SERIAL_PROTOCOL_CASIOLINK 0x00000001UL /* CASIOLINK. */
-#define CAHUTE_SERIAL_PROTOCOL_SEVEN     0x00000007UL /* Protocol 7.00. */
-#define CAHUTE_SERIAL_PROTOCOL_SEVEN_OHP 0x00000009UL /* Protocol 7.00 OHP. */
+#define CAHUTE_SERIAL_PROTOCOL_NONE      0x00000001UL /* Generic protocol. */
+#define CAHUTE_SERIAL_PROTOCOL_CASIOLINK 0x00000002UL /* CASIOLINK. */
+#define CAHUTE_SERIAL_PROTOCOL_SEVEN     0x00000003UL /* Protocol 7.00. */
+#define CAHUTE_SERIAL_PROTOCOL_SEVEN_OHP 0x00000004UL /* Protocol 7.00 OHP. */
 
 /* CASIOLINK variant to select. */
 
@@ -161,6 +162,7 @@ typedef void(cahute_progress_func)(
 #define CAHUTE_USB_NOTERM   0x00000004UL /* Disable terminating handshake. */
 #define CAHUTE_USB_RECEIVER 0x00000010UL /* Act as the receiver. */
 #define CAHUTE_USB_OHP      0x00000020UL /* Use screen streaming mode. */
+#define CAHUTE_USB_NOPROTO  0x00000040UL /* Open a generic device. */
 
 CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_serial_link(
     cahute_link **cahute__linkp,
@@ -181,13 +183,44 @@ CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_simple_usb_link(
     unsigned long cahute__flags
 );
 
+CAHUTE_EXTERN(void) cahute_close_link(cahute_link *cahute__link);
+
+/* ---
+ * Link medium access.
+ * --- */
+
+CAHUTE_EXTERN(int)
+cahute_receive_on_link(
+    cahute_link *cahute__link,
+    cahute_u8 *cahute__buf,
+    size_t cahute__size,
+    unsigned long cahute__first_timeout,
+    unsigned long cahute__next_timeout
+);
+
+CAHUTE_EXTERN(int)
+cahute_send_on_link(
+    cahute_link *cahute__link,
+    cahute_u8 const *cahute__buf,
+    size_t cahute__size
+);
+
+CAHUTE_EXTERN(int)
+cahute_set_serial_params_to_link(
+    cahute_link *cahute__link,
+    unsigned long cahute__flags,
+    unsigned long cahute__speed
+);
+
+/* ---
+ * Device metadata access.
+ * --- */
+
 CAHUTE_EXTERN(int)
 cahute_get_device_info(
     cahute_link *cahute__link,
     cahute_device_info **cahute__infop
 );
-
-CAHUTE_EXTERN(void) cahute_close_link(cahute_link *cahute__link);
 
 /* ---
  * Data transfer operations.

@@ -67,12 +67,16 @@ struct simple_usb_detection_cookie {
  */
 CAHUTE_INLINE(char const *) get_protocol_name(int protocol) {
     switch (protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_NONE:
+        return "Generic (serial)";
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
         return "CASIOLINK (serial)";
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
         return "Protocol 7.00 (serial)";
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
         return "Protocol 7.00 Screenstreaming (serial)";
+    case CAHUTE_LINK_PROTOCOL_USB_NONE:
+        return "Generic (USB)";
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN:
         return "Protocol 7.00 (USB)";
     case CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP:
@@ -437,6 +441,7 @@ open_link_from_medium(
      * first. */
     switch (protocol) {
     case CAHUTE_LINK_PROTOCOL_SERIAL_AUTO:
+    case CAHUTE_LINK_PROTOCOL_SERIAL_NONE:
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN:
     case CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP:
@@ -486,6 +491,10 @@ open_link_from_medium(
                                        : "sender / active side");
 
     switch (protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_NONE:
+    case CAHUTE_LINK_PROTOCOL_USB_NONE:
+        break;
+
     case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
         casiolink_state = &link->protocol_state.casiolink;
 
@@ -1215,6 +1224,25 @@ cahute_open_serial_link(
         protocol = CAHUTE_LINK_PROTOCOL_SERIAL_AUTO;
         break;
 
+    case CAHUTE_SERIAL_PROTOCOL_NONE:
+        /* The generic protocol is being selected.
+         * We don't want to have any protocol opened and managed on the link,
+         * and instead open the direct device functions. */
+        unsupported_flags = flags
+                            & (CAHUTE_SERIAL_CASIOLINK_VARIANT_MASK
+                               | CAHUTE_SERIAL_RECEIVER | CAHUTE_SERIAL_NOCHECK
+                               | CAHUTE_SERIAL_NODISC | CAHUTE_SERIAL_NOTERM);
+        if (unsupported_flags) {
+            msg(ll_error,
+                "The following flags are not supported by the generic "
+                "protocol: 0x%08lX",
+                unsupported_flags);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        protocol = CAHUTE_LINK_PROTOCOL_SERIAL_NONE;
+        break;
+
     case CAHUTE_SERIAL_PROTOCOL_CASIOLINK:
         protocol = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
         break;
@@ -1568,6 +1596,7 @@ cahute_open_usb_link(
     int i, libusberr, bulk_in = -1, bulk_out = -1;
     int medium_type = 0, protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
     unsigned long open_flags = 0;
+    unsigned long unsupported_flags;
     int err = CAHUTE_ERROR_UNKNOWN;
 
 # if WIN32_ENABLED
@@ -1575,7 +1604,26 @@ cahute_open_usb_link(
     HANDLE overlapped_event_handle = INVALID_HANDLE_VALUE;
 # endif
 
-    if (flags & CAHUTE_USB_OHP) {
+    unsupported_flags =
+        flags
+        & ~(CAHUTE_USB_NOCHECK | CAHUTE_USB_NODISC | CAHUTE_USB_NOTERM
+            | CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP | CAHUTE_USB_NOPROTO);
+    if (unsupported_flags)
+        CAHUTE_RETURN_IMPL("At least one unsupported flag was present.");
+
+    if (flags & CAHUTE_USB_NOPROTO) {
+        unsupported_flags =
+            flags
+            & (CAHUTE_USB_NOCHECK | CAHUTE_USB_NODISC | CAHUTE_USB_NOTERM
+               | CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP);
+        if (unsupported_flags) {
+            msg(ll_error,
+                "The following flags are not supported by the generic "
+                "protocol: 0x%08lX",
+                unsupported_flags);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+    } else if (flags & CAHUTE_USB_OHP) {
         /* TODO */
         if (~flags & CAHUTE_USB_RECEIVER)
             CAHUTE_RETURN_IMPL("Sender mode not available for screenstreaming."
@@ -1928,6 +1976,8 @@ ready:
         open_flags |= PROTOCOL_FLAG_NODISC;
     if (flags & CAHUTE_USB_NOTERM)
         open_flags |= PROTOCOL_FLAG_NOTERM;
+    if (flags & CAHUTE_USB_NOPROTO)
+        protocol = CAHUTE_LINK_PROTOCOL_USB_NONE;
 
     return open_link_from_medium(
         linkp,
@@ -2094,6 +2144,10 @@ CAHUTE_EXTERN(void) cahute_close_link(cahute_link *link) {
                | CAHUTE_LINK_FLAG_RECEIVER)
         )) {
         switch (link->protocol) {
+        case CAHUTE_LINK_PROTOCOL_SERIAL_NONE:
+        case CAHUTE_LINK_PROTOCOL_USB_NONE:
+            break;
+
         case CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK:
             cahute_casiolink_terminate(link);
             break;

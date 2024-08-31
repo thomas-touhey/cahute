@@ -8,3 +8,4 @@ links with the Cahute C library directly.
     :maxdepth: 1
 
     links/open-usb-link
+    links/use-generic-serial-link

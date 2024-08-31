@@ -57,11 +57,11 @@ Most mediums support a stream-like interface with the following functions:
     Errors to be expected from this function are the following:
 
     :c:macro:`CAHUTE_ERROR_TIMEOUT_START`
-        The first byte was not received in a timely matter.
+        The first byte was not received in a timely manner.
         This can only occur if ``first_timeout`` was not set to 0.
 
     :c:macro:`CAHUTE_ERROR_TIMEOUT`
-        A byte past the first one was not received in a timely matter.
+        A byte past the first one was not received in a timely manner.
         This can only occur if ``next_timeout`` was not set to 0.
 
     :c:macro:`CAHUTE_ERROR_GONE`
@@ -89,12 +89,6 @@ Most mediums support a stream-like interface with the following functions:
     cahute_u8 const *buf, size_t size)
 
     Write exactly ``size`` bytes of data to the link.
-
-    .. note::
-
-        An alias for using the medium indirectly through a link is
-        available as ``cahute_write_to_link``, where the first argument
-        is the link instead of the medium.
 
     Errors to be expected from this function are the following:
 
@@ -205,6 +199,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_AUTO`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_NONE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP`.
@@ -217,6 +212,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_AUTO`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_NONE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP`.
@@ -242,6 +238,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_AUTO`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_NONE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP`.
@@ -275,6 +272,7 @@ Available mediums are the following:
 
     Available protocols on this medium are the following:
 
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
@@ -290,6 +288,7 @@ Available mediums are the following:
 
     Available protocols on this medium are the following:
 
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
@@ -306,6 +305,7 @@ Available mediums are the following:
 
     Available protocols on this medium are the following:
 
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
@@ -328,6 +328,7 @@ Available mediums are the following:
 
     Available protocols on this medium are the following:
 
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
@@ -349,6 +350,14 @@ Available protocols are:
     Note that this doesn't outlive link protocol initialization, and gets
     replaced by the actual protocol afterwards; see
     :ref:`internals-link-protocol-initialization` for more details.
+
+.. c:macro:: CAHUTE_LINK_PROTOCOL_SERIAL_NONE
+
+    No protocol on a serial medium.
+
+    This can be selected by the user in order to use the medium functions
+    more directly, through the ones referenced in
+    :ref:`header-cahute-link-medium`.
 
 .. c:macro:: CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK
 
@@ -373,6 +382,14 @@ Available protocols are:
     Protocol 7.00 Screenstreaming over a serial medium.
 
     See :ref:`protocol-seven-ohp` for more information.
+
+.. c:macro:: CAHUTE_LINK_PROTOCOL_USB_NONE
+
+    No protocol on a USB medium.
+
+    This can be selected by the user in order to use the medium functions
+    more directly, through the ones referenced in
+    :ref:`header-cahute-link-medium`.
 
 .. c:macro:: CAHUTE_LINK_PROTOCOL_USB_SEVEN
 
@@ -407,6 +424,7 @@ In this section, we will describe the behaviour of link opening functions.
         following:
 
         * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_AUTO`;
+        * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_NONE`;
         * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK`;
         * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN`;
         * :c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP`.
@@ -493,6 +511,12 @@ In this section, we will describe the behaviour of link opening functions.
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`
 
     See :ref:`usb-detection` for more information.
+
+    .. warning::
+
+        If :c:macro:`CAHUTE_USB_NOPROTO` flag is passed, the medium is kept,
+        but the protocol is replaced by
+        :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`.
 
     Once all metadata has been gathered, the function opens the device using
     |libusb_open|_, and attempt to claim its interface using

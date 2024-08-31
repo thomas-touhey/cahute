@@ -64,6 +64,153 @@ CAHUTE_LOCAL(int) cahute_check_link(cahute_link *link, unsigned long flags) {
 }
 
 /* ---
+ * Link medium access.
+ * --- */
+
+CAHUTE_EXTERN(int)
+cahute_receive_on_link(
+    cahute_link *link,
+    cahute_u8 *buf,
+    size_t size,
+    unsigned long first_timeout,
+    unsigned long next_timeout
+) {
+    int err;
+
+    err = cahute_check_link(link, 0);
+    if (err)
+        return err;
+
+    switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_NONE:
+    case CAHUTE_LINK_PROTOCOL_USB_NONE:
+        return cahute_receive_on_link_medium(
+            &link->medium,
+            buf,
+            size,
+            first_timeout,
+            next_timeout
+        );
+
+    default:
+        CAHUTE_RETURN_IMPL("Protocol does not support generic medium access.");
+    }
+}
+
+CAHUTE_EXTERN(int)
+cahute_send_on_link(cahute_link *link, cahute_u8 const *buf, size_t size) {
+    int err;
+
+    err = cahute_check_link(link, 0);
+    if (err)
+        return err;
+
+    switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_NONE:
+    case CAHUTE_LINK_PROTOCOL_USB_NONE:
+        return cahute_send_on_link_medium(&link->medium, buf, size);
+
+    default:
+        CAHUTE_RETURN_IMPL("Protocol does not support generic medium access.");
+    }
+}
+
+CAHUTE_EXTERN(int)
+cahute_set_serial_params_to_link(
+    cahute_link *link,
+    unsigned long flags,
+    unsigned long speed
+) {
+    unsigned long unsupported_flags = 0;
+    int err;
+
+    if (!speed)
+        speed = link->medium.serial_speed;
+
+    switch (speed) {
+    case 300:
+    case 600:
+    case 1200:
+    case 2400:
+    case 4800:
+    case 9600:
+    case 19200:
+    case 38400:
+    case 57600:
+    case 115200:
+        break;
+
+    default:
+        msg(ll_info, "Provided speed is %lu bauds.", speed);
+        CAHUTE_RETURN_IMPL("Unsupported baud rate for the serial link.");
+    }
+
+    unsupported_flags = flags
+                        & ~(CAHUTE_SERIAL_STOP_MASK | CAHUTE_SERIAL_PARITY_MASK
+                            | CAHUTE_SERIAL_XONXOFF_MASK
+                            | CAHUTE_SERIAL_DTR_MASK | CAHUTE_SERIAL_RTS_MASK);
+
+    switch (flags & CAHUTE_SERIAL_STOP_MASK) {
+    case 0:
+        flags |= link->medium.serial_flags & CAHUTE_SERIAL_STOP_MASK;
+        break;
+
+    case CAHUTE_SERIAL_STOP_ONE:
+    case CAHUTE_SERIAL_STOP_TWO:
+        break;
+
+    default:
+        unsupported_flags |= flags & CAHUTE_SERIAL_STOP_MASK;
+    }
+
+    if (!(flags & CAHUTE_SERIAL_PARITY_MASK)) {
+        /* For ease of use of the flags by the protocol-specific function,
+         * we actually want to take the current parameters. */
+        flags |= link->medium.serial_flags & CAHUTE_SERIAL_PARITY_MASK;
+    } /* No possible invalid value, 3+1 value in 2 bits. */
+
+    switch (flags & CAHUTE_SERIAL_XONXOFF_MASK) {
+    case 0:
+        flags |= link->medium.serial_flags & CAHUTE_SERIAL_XONXOFF_MASK;
+        break;
+
+    case CAHUTE_SERIAL_XONXOFF_DISABLE:
+    case CAHUTE_SERIAL_XONXOFF_ENABLE:
+        break;
+
+    default:
+        unsupported_flags |= flags & CAHUTE_SERIAL_XONXOFF_MASK;
+    }
+
+    if (!(flags & CAHUTE_SERIAL_DTR_MASK))
+        flags |= link->medium.serial_flags & CAHUTE_SERIAL_DTR_MASK;
+
+    if (!(flags & CAHUTE_SERIAL_RTS_MASK))
+        flags |= link->medium.serial_flags & CAHUTE_SERIAL_RTS_MASK;
+
+    if (unsupported_flags)
+        CAHUTE_RETURN_IMPL("At least one unsupported flag was present.");
+
+    err = cahute_check_link(link, 0);
+    if (err)
+        return err;
+
+    switch (link->protocol) {
+    case CAHUTE_LINK_PROTOCOL_SERIAL_NONE:
+        return cahute_set_serial_params_to_link_medium(
+            &link->medium,
+            flags,
+            speed
+        );
+
+    default:
+        CAHUTE_RETURN_IMPL(
+            "Protocol does not support generic serial medium access."
+        );
+    }
+}
+
+/* ---
  * Data transfer operations.
  * --- */
 
