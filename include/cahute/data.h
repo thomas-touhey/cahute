@@ -31,6 +31,8 @@
 #include "cdefs.h"
 
 CAHUTE_BEGIN_NAMESPACE
+CAHUTE_BEGIN_DECLS
+
 CAHUTE_DECLARE_TYPE(cahute_data)
 
 #define CAHUTE_DATA_TYPE_PROGRAM 1
@@ -59,8 +61,6 @@ struct cahute_data {
     int cahute_data_type;
     union cahute__data_content cahute_data_content;
 };
-
-CAHUTE_BEGIN_DECLS
 
 CAHUTE_EXTERN(void) cahute_destroy_data(cahute_data *cahute__data);
 

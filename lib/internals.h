@@ -112,8 +112,6 @@ cahute_get_amiga_timer(
  * Endianess management.
  * --- */
 
-CAHUTE_BEGIN_DECLS
-
 CAHUTE_EXTERN(cahute_u16) cahute_be16toh(cahute_u16 cahute__x);
 CAHUTE_EXTERN(cahute_u16) cahute_le16toh(cahute_u16 cahute__x);
 CAHUTE_EXTERN(cahute_u32) cahute_be32toh(cahute_u32 cahute__x);
@@ -123,8 +121,6 @@ CAHUTE_EXTERN(cahute_u16) cahute_htobe16(cahute_u16 cahute__x);
 CAHUTE_EXTERN(cahute_u16) cahute_htole16(cahute_u16 cahute__x);
 CAHUTE_EXTERN(cahute_u32) cahute_htobe32(cahute_u32 cahute__x);
 CAHUTE_EXTERN(cahute_u32) cahute_htole32(cahute_u32 cahute__x);
-
-CAHUTE_END_DECLS
 
 /* Try to get native macros. */
 #if defined(__APPLE__)

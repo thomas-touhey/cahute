@@ -31,6 +31,8 @@
 #include "cdefs.h"
 
 CAHUTE_BEGIN_NAMESPACE
+CAHUTE_BEGIN_DECLS
+
 CAHUTE_DECLARE_TYPE(cahute_serial_detection_entry)
 CAHUTE_DECLARE_TYPE(cahute_usb_detection_entry)
 
@@ -48,20 +50,18 @@ struct cahute_usb_detection_entry {
 };
 
 typedef int(cahute_detect_serial_entry_func)(
-    void *cookie,
-    cahute_serial_detection_entry const *entry
+    void *cahute__cookie,
+    cahute_serial_detection_entry const *cahute__entry
 );
 
 typedef int(cahute_detect_usb_entry_func)(
-    void *cookie,
-    cahute_usb_detection_entry const *entry
+    void *cahute__cookie,
+    cahute_usb_detection_entry const *cahute__entry
 );
 
 /* ---
  * List available devices.
  * --- */
-
-CAHUTE_BEGIN_DECLS
 
 CAHUTE_EXTERN(int)
 cahute_detect_serial(
@@ -76,7 +76,6 @@ cahute_detect_usb(
 ) CAHUTE_NONNULL(1);
 
 CAHUTE_END_DECLS
-
 CAHUTE_END_NAMESPACE
 
 #endif /* CAHUTE_DETECTION_H */

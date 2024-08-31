@@ -31,6 +31,7 @@
 #include "cdefs.h"
 
 CAHUTE_BEGIN_NAMESPACE
+CAHUTE_BEGIN_DECLS
 
 /* WARNING: When adding error codes to this file, you must also add:
  *
@@ -63,12 +64,9 @@ CAHUTE_BEGIN_NAMESPACE
 
 #define CAHUTE_ERROR_NOOW 0x0201 /* File was not overwritten. */
 
-CAHUTE_BEGIN_DECLS
-
 CAHUTE_EXTERN(char const *) cahute_get_error_name(int cahute__code);
 
 CAHUTE_END_DECLS
-
 CAHUTE_END_NAMESPACE
 
 #endif /* CAHUTE_ERROR_H */

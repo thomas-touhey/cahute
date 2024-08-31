@@ -34,6 +34,8 @@
 #include <stdio.h>
 
 CAHUTE_BEGIN_NAMESPACE
+CAHUTE_BEGIN_DECLS
+
 CAHUTE_DECLARE_TYPE(cahute_link)
 CAHUTE_DECLARE_TYPE(cahute_device_info)
 CAHUTE_DECLARE_TYPE(cahute_storage_entry)
@@ -160,8 +162,6 @@ typedef void(cahute_progress_func)(
 #define CAHUTE_USB_RECEIVER 0x00000010UL /* Act as the receiver. */
 #define CAHUTE_USB_OHP      0x00000020UL /* Use screen streaming mode. */
 
-CAHUTE_BEGIN_DECLS
-
 CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_serial_link(
     cahute_link **cahute__linkp,
     unsigned long cahute__flags,
@@ -220,9 +220,9 @@ cahute_negotiate_serial_params(
 
 CAHUTE_EXTERN(int)
 cahute_request_storage_capacity(
-    cahute_link *link,
-    char const *storage,
-    unsigned long *capacityp
+    cahute_link *cahute__link,
+    char const *cahute__storage,
+    unsigned long *cahute__capacityp
 );
 
 #define CAHUTE_SEND_FILE_FLAG_FORCE    0x00000001UL /* Force overwrite. */
@@ -257,12 +257,12 @@ cahute_request_file_from_storage(
 
 CAHUTE_EXTERN(int)
 cahute_copy_file_on_storage(
-    cahute_link *link,
-    char const *source_directory,
-    char const *source_name,
-    char const *target_directory,
-    char const *target_name,
-    char const *storage
+    cahute_link *cahute__link,
+    char const *cahute__source_directory,
+    char const *cahute__source_name,
+    char const *cahute__target_directory,
+    char const *cahute__target_name,
+    char const *cahute__storage
 );
 
 CAHUTE_EXTERN(int)
@@ -321,7 +321,6 @@ cahute_flash_system_using_fxremote_method(
 );
 
 CAHUTE_END_DECLS
-
 CAHUTE_END_NAMESPACE
 
 #endif /* CAHUTE_LINK_H */

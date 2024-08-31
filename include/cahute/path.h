@@ -31,6 +31,7 @@
 #include "cdefs.h"
 
 CAHUTE_BEGIN_NAMESPACE
+CAHUTE_BEGIN_DECLS
 
 #define CAHUTE_PATH_TYPE_POSIX         1
 #define CAHUTE_PATH_TYPE_DOS           2
@@ -44,8 +45,6 @@ CAHUTE_BEGIN_NAMESPACE
 #else
 # define CAHUTE_PATH_TYPE_CLI CAHUTE_PATH_TYPE_POSIX
 #endif
-
-CAHUTE_BEGIN_DECLS
 
 CAHUTE_EXTERN(int)
 cahute_find_path_extension(

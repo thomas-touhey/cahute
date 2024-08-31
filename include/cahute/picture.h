@@ -31,6 +31,8 @@
 #include "cdefs.h"
 
 CAHUTE_BEGIN_NAMESPACE
+CAHUTE_BEGIN_DECLS
+
 CAHUTE_DECLARE_TYPE(cahute_frame)
 
 #define CAHUTE_PICTURE_FORMAT_1BIT_MONO         1
@@ -47,8 +49,6 @@ struct cahute_frame {
     int cahute_frame_format;
     cahute_u8 const *cahute_frame_data;
 };
-
-CAHUTE_BEGIN_DECLS
 
 CAHUTE_EXTERN(int)
 cahute_convert_picture(
