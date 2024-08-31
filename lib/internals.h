@@ -450,7 +450,7 @@ union cahute_link_medium_state {
  *           ``CAHUTE_SERIAL_FLAG_*`` constants.
  * @property serial_speed Current serial speed.
  * @property read_buffer Buffer for reading from the medium in a
- *           stream-like interface. See ``cahute_read_from_link_medium``
+ *           stream-like interface. See ``cahute_receive_on_link_medium``
  *           definition for more information.
  *           Guaranteed to be aligned to a multiple of 32 bytes.
  * @property read_start Offset at which the unread data starts within
@@ -467,7 +467,7 @@ struct cahute_link_medium {
 
     union cahute_link_medium_state state;
 
-    /* Read buffer. See ``cahute_read_from_link_medium`` definition for more
+    /* Read buffer. See ``cahute_receive_on_link_medium`` definition for more
      * information. */
     size_t read_start, read_size;
     cahute_u8 *read_buffer;
@@ -766,101 +766,8 @@ CAHUTE_EXTERN(int) cahute_monotonic(unsigned long *msp);
  * Link medium functions, defined in linkmedium.c
  * --- */
 
-/* Compatibility macros. */
-#define cahute_read_from_link( \
-    CAHUTE__LINK, \
-    CAHUTE__BUF, \
-    CAHUTE__SIZE, \
-    CAHUTE__FT, \
-    CAHUTE__NT \
-) \
-    cahute_read_from_link_medium( \
-        &(CAHUTE__LINK)->medium, \
-        (CAHUTE__BUF), \
-        (CAHUTE__SIZE), \
-        (CAHUTE__FT), \
-        (CAHUTE__NT) \
-    )
-#define cahute_skip_from_link( \
-    CAHUTE__LINK, \
-    CAHUTE__SIZE, \
-    CAHUTE__FT, \
-    CAHUTE__NT \
-) \
-    cahute_skip_from_link_medium( \
-        &(CAHUTE__LINK)->medium, \
-        (CAHUTE__SIZE), \
-        (CAHUTE__FT), \
-        (CAHUTE__NT) \
-    )
-#define cahute_write_to_link(CAHUTE__LINK, CAHUTE__BUF, CAHUTE__SIZE) \
-    cahute_write_to_link_medium( \
-        &(CAHUTE__LINK)->medium, \
-        (CAHUTE__BUF), \
-        (CAHUTE__SIZE) \
-    )
-#define cahute_set_serial_params_to_link( \
-    CAHUTE__LINK, \
-    CAHUTE__FLAGS, \
-    CAHUTE__SPEED \
-) \
-    cahute_set_serial_params_to_link_medium( \
-        &(CAHUTE__LINK)->medium, \
-        (CAHUTE__FLAGS), \
-        (CAHUTE__SPEED) \
-    )
-#define cahute_scsi_request_to_link( \
-    CAHUTE__LINK, \
-    CAHUTE__CMD, \
-    CAHUTE__CMD_SIZE, \
-    CAHUTE__DATA, \
-    CAHUTE__DATA_SIZE, \
-    CAHUTE__STATUSP \
-) \
-    cahute_scsi_request_to_link_medium( \
-        &(CAHUTE__LINK)->medium, \
-        (CAHUTE__CMD), \
-        (CAHUTE__CMD_SIZE), \
-        (CAHUTE__DATA), \
-        (CAHUTE__DATA_SIZE), \
-        (CAHUTE__STATUSP) \
-    )
-#define cahute_scsi_request_from_link( \
-    CAHUTE__LINK, \
-    CAHUTE__CMD, \
-    CAHUTE__CMD_SIZE, \
-    CAHUTE__BUF, \
-    CAHUTE__BUF_SIZE, \
-    CAHUTE__STATUSP \
-) \
-    cahute_scsi_request_from_link_medium( \
-        &(CAHUTE__LINK)->medium, \
-        (CAHUTE_CMD), \
-        (CAHUTE__CMD_SIZE), \
-        (CAHUTE__BUF), \
-        (CAHUTE__BUF_SIZE), \
-        (CAHUTE__STATUSP) \
-    )
-
-/* Skipping used to be done through a separate function that provided a
- * dummy buffer to reading. However, since read now accepts NULL as a
- * destination buffer, it is now only a macro. */
-#define cahute_skip_from_link_medium( \
-    CAHUTE__MEDIUM, \
-    CAHUTE__SIZE, \
-    CAHUTE__FT, \
-    CAHUTE__NT \
-) \
-    cahute_read_from_link_medium( \
-        (CAHUTE__MEDIUM), \
-        NULL, \
-        (CAHUTE__SIZE), \
-        (CAHUTE__FT), \
-        (CAHUTE__NT) \
-    )
-
 CAHUTE_EXTERN(int)
-cahute_read_from_link_medium(
+cahute_receive_on_link_medium(
     cahute_link_medium *medium,
     cahute_u8 *buf,
     size_t size,
@@ -869,7 +776,7 @@ cahute_read_from_link_medium(
 );
 
 CAHUTE_EXTERN(int)
-cahute_write_to_link_medium(
+cahute_send_on_link_medium(
     cahute_link_medium *medium,
     cahute_u8 const *buf,
     size_t size

@@ -437,7 +437,7 @@ cahute_read_from_file_medium(
         return CAHUTE_OK;
 
     if (!buf) {
-        /* As opposed to cahute_read_from_link_medium(), this function does
+        /* As opposed to cahute_receive_on_link_medium(), this function does
          * not support "skipping", as it takes an "off" parameter to do
          * exactly that. This may however cause some confusion, so we want
          * to catch this explicitely. */

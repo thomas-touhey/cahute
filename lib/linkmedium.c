@@ -51,7 +51,7 @@
  * @return Error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_EXTERN(int)
-cahute_read_from_link_medium(
+cahute_receive_on_link_medium(
     cahute_link_medium *medium,
     cahute_u8 *buf,
     size_t size,
@@ -582,7 +582,7 @@ time_out:
  * @return Error, or CAHUTE_OK if no error has occurred.
  */
 CAHUTE_EXTERN(int)
-cahute_write_to_link_medium(
+cahute_send_on_link_medium(
     cahute_link_medium *medium,
     cahute_u8 const *buf,
     size_t size

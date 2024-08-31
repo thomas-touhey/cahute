@@ -376,8 +376,8 @@ cahute_seven_receive(cahute_link *link, unsigned long timeout) {
          *
          * If we have 4 bytes to complete, we are to read 4 bytes starting
          * at &buf[2], since the first 2 bytes are already present. */
-        err = cahute_read_from_link(
-            link,
+        err = cahute_receive_on_link_medium(
+            &link->medium,
             &buf[6 - to_complete],
             to_complete,
             timeout,
@@ -415,8 +415,8 @@ cahute_seven_receive(cahute_link *link, unsigned long timeout) {
         /* Packet is extended, there is at least 10 bytes: Type (1 B)
          * + Subtype (2 B) + Extended (1 B) + Data size (4 B)
          * + Checksum (2 B). */
-        err = cahute_read_from_link(
-            link,
+        err = cahute_receive_on_link_medium(
+            &link->medium,
             &buf[6],
             4,
             TIMEOUT_PACKET_CONTENTS,
@@ -450,8 +450,9 @@ cahute_seven_receive(cahute_link *link, unsigned long timeout) {
             mem(ll_info, buf, 10);
 
             if (data_size)
-                cahute_skip_from_link(
-                    link,
+                cahute_receive_on_link_medium(
+                    &link->medium,
+                    NULL,
                     data_size,
                     TIMEOUT_PACKET_CONTENTS,
                     TIMEOUT_PACKET_CONTENTS
@@ -462,8 +463,8 @@ cahute_seven_receive(cahute_link *link, unsigned long timeout) {
 
         /* We want to read the rest of the packet here, with the rest of the
          * data (since we've already read 2 bytes of data) and the checksum. */
-        err = cahute_read_from_link(
-            link,
+        err = cahute_receive_on_link_medium(
+            &link->medium,
             &buf[10],
             data_size,
             TIMEOUT_PACKET_CONTENTS,
@@ -566,7 +567,12 @@ cahute_seven_send_and_receive(
         msg(ll_info, "Sending the following packet to the device:");
         mem(ll_info, raw_packet, raw_packet_size);
 
-        if ((err = cahute_write_to_link(link, raw_packet, raw_packet_size)))
+        err = cahute_send_on_link_medium(
+            &link->medium,
+            raw_packet,
+            raw_packet_size
+        );
+        if (err)
             return err;
 
         if (flags & SEND_FLAG_DISABLE_RECEIVE) {
@@ -587,7 +593,11 @@ cahute_seven_send_and_receive(
                 "check:");
             mem(ll_info, timeout_check_packet, 6);
 
-            err = cahute_write_to_link(link, timeout_check_packet, 6);
+            err = cahute_send_on_link_medium(
+                &link->medium,
+                timeout_check_packet,
+                6
+            );
             if (err)
                 return err;
 
@@ -2221,8 +2231,8 @@ cahute_seven_receive_data(
             if (err)
                 return err;
 
-            err = cahute_set_serial_params_to_link(
-                link,
+            err = cahute_set_serial_params_to_link_medium(
+                &link->medium,
                 new_serial_flags,
                 new_serial_speed
             );

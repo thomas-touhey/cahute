@@ -33,17 +33,11 @@ Medium interface
 
 Most mediums support a stream-like interface with the following functions:
 
-.. c:function:: int cahute_read_from_link_medium(cahute_link_medium *medium, \
+.. c:function:: int cahute_receive_on_link_medium(cahute_link_medium *medium, \
     cahute_u8 *buf, size_t size, unsigned long first_timeout, \
     unsigned long next_timeout)
 
     Read exactly ``size`` bytes of data into the buffer.
-
-    .. note::
-
-        An alias for using the medium indirectly through a link is
-        available as ``cahute_read_from_link``, where the first argument
-        is the link instead of the medium.
 
     This function uses the medium read buffer to store any incoming excess
     data, for it to be processed first next time before using the underlying
@@ -91,32 +85,7 @@ Most mediums support a stream-like interface with the following functions:
         bytes will be awaited indefinitely.
     :return: Error, or :c:macro:`CAHUTE_OK`.
 
-.. c:function:: int cahute_skip_from_link_medium(cahute_link_medium *medium, \
-    size_t size, unsigned long first_timeout, unsigned long next_timeout)
-
-    Skip exactly ``size`` bytes of data.
-
-    .. note::
-
-        An alias for using the medium indirectly through a link is
-        available as ``cahute_skip_from_link``, where the first argument
-        is the link instead of the medium.
-
-    This function is a convenience function for protocol implementations.
-    It uses :c:func:`cahute_read_from_link` to read into a trashable
-    buffer, and thus, comes with the same risks and errors.
-
-    :param medium: Link medium to skip received data from.
-    :param size: Size of the data to receive and skip.
-    :param first_timeout: Maximum delay to wait before the first byte of the
-        data, in milliseconds. If this is set to 0, the first byte will be
-        awaited indefinitely.
-    :param next_timeout: Maximum delay to wait between two bytes of the data,
-        or before the last byte, in milliseconds. If this is set to 0, next
-        bytes will be awaited indefinitely.
-    :return: Error, or :c:macro:`CAHUTE_OK`.
-
-.. c:function:: int cahute_write_to_link_medium(cahute_link_medium *medium, \
+.. c:function:: int cahute_send_on_link_medium(cahute_link_medium *medium, \
     cahute_u8 const *buf, size_t size)
 
     Write exactly ``size`` bytes of data to the link.
@@ -153,12 +122,6 @@ of the serial link using the following function:
 
     Set the serial parameters to the medium.
 
-    .. note::
-
-        An alias for using the medium indirectly through a link is
-        available as ``cahute_set_serial_params_to_link``, where the first
-        argument is the link instead of the medium.
-
     Accepted flags are a subset of the flags for :c:func:`cahute_open_serial`:
 
     * ``CAHUTE_SERIAL_STOP_*`` (stop bits);
@@ -181,12 +144,6 @@ with the following functions:
 
     Emit an SCSI request to the medium, with or without data.
 
-    .. note::
-
-        An alias for using the medium indirectly through a link is
-        available as ``cahute_scsi_request_to_link``, where the first argument
-        is the link instead of the medium.
-
     :param medium: Link medium to send the command and optional payload to,
         and receive the status from.
     :param command: Command to send.
@@ -203,12 +160,6 @@ with the following functions:
     size_t command_size, cahute_u8 *buf, size_t buf_size, int *statusp)
 
     Emit an SCSI request to the medium, while requesting data.
-
-    .. note::
-
-        An alias for using the medium indirectly through a link is
-        available as ``cahute_scsi_request_from_link``, where the first
-        argument is the link instead of the medium.
 
     :param medium: Link medium to send the command to, and receive the data
         and status from.

@@ -231,7 +231,11 @@ cahute_negotiate_serial_params(
         CAHUTE_RETURN_IMPL("Operation not supported by the link protocol.");
     }
 
-    err = cahute_set_serial_params_to_link(link, new_serial_flags, speed);
+    err = cahute_set_serial_params_to_link_medium(
+        &link->medium,
+        new_serial_flags,
+        speed
+    );
     if (err) {
         /* We have successfully negociated with the device to switch
          * serial settings but have not managed to change settings

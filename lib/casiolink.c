@@ -789,20 +789,20 @@ CAHUTE_LOCAL(int) cahute_casiolink_handle_mdl1(cahute_link *link) {
         CASIOLINK_FLAG_DEVICE_INFO_OBTAINED;
 
     /* Send the MDL1 answer now. */
-    err = cahute_write_to_link(link, buf, 40);
+    err = cahute_send_on_link_medium(&link->medium, buf, 40);
     if (err)
         return err;
 
     /* We should actually be receiving an acknowledgement, since we are
      * sending the same packet the calculator sent. */
-    err = cahute_read_from_link(link, buf, 1, 0, 0);
+    err = cahute_receive_on_link_medium(&link->medium, buf, 1, 0, 0);
     if (err)
         return err;
 
     if (buf[0] != PACKET_TYPE_ACK) {
         cahute_u8 const send_buf[] = {PACKET_TYPE_CORRUPTED};
 
-        err = cahute_write_to_link(link, send_buf, 1);
+        err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
         if (err)
             return err;
 
@@ -837,7 +837,7 @@ CAHUTE_LOCAL(int) cahute_casiolink_handle_mdl1(cahute_link *link) {
     if (!mdl_correct) {
         cahute_u8 const send_buf[] = {PACKET_TYPE_CORRUPTED};
 
-        err = cahute_write_to_link(link, send_buf, 1);
+        err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
         if (err)
             return err;
 
@@ -846,14 +846,14 @@ CAHUTE_LOCAL(int) cahute_casiolink_handle_mdl1(cahute_link *link) {
 
     /* We are ok with the sent MDL1, we can now send an acknowledgement.
      * The acknowledgement is already in our buffer, we can use that. */
-    err = cahute_write_to_link(link, buf, 1);
+    err = cahute_send_on_link_medium(&link->medium, buf, 1);
     if (err)
         return err;
 
     /* Only now that the exchange has taken place, we want to set
      * the serial params. */
-    err = cahute_set_serial_params_to_link(
-        link,
+    err = cahute_set_serial_params_to_link_medium(
+        &link->medium,
         new_serial_flags,
         new_serial_speed
     );
@@ -893,8 +893,8 @@ cahute_casiolink_receive_raw_data(cahute_link *link, unsigned long timeout) {
 
 restart_reception:
     do {
-        err = cahute_read_from_link(
-            link,
+        err = cahute_receive_on_link_medium(
+            &link->medium,
             buf,
             1,
             timeout,
@@ -910,7 +910,7 @@ restart_reception:
             /* The sender is either re-initializing the connection, or
              * starting the connection and we did not check when creating
              * the link, either way we can just answer here and restart. */
-            err = cahute_write_to_link(link, send_buf, 1);
+            err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
             if (err)
                 return err;
 
@@ -936,8 +936,8 @@ restart_reception:
     else
         buf_size = 40;
 
-    err = cahute_read_from_link(
-        link,
+    err = cahute_receive_on_link_medium(
+        &link->medium,
         &buf[1],
         buf_size - 1,
         TIMEOUT_PACKET_CONTENTS,
@@ -966,8 +966,8 @@ restart_reception:
         case CAHUTE_CASIOLINK_VARIANT_CAS50:
             msg(ll_info, "Variant is determined to be CAS50.");
 
-            err = cahute_read_from_link(
-                link,
+            err = cahute_receive_on_link_medium(
+                &link->medium,
                 &buf[40],
                 10,
                 TIMEOUT_PACKET_CONTENTS,
@@ -1016,7 +1016,7 @@ restart_reception:
 
             link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
 
-            err = cahute_write_to_link(link, send_buf, 1);
+            err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
             if (err)
                 return err;
 
@@ -1030,7 +1030,7 @@ restart_reception:
 
         /* The type has not been recognized, therefore we cannot determine
          * the size of the data to read (or the number of data parts). */
-        err = cahute_write_to_link(link, send_buf, 1);
+        err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
         if (err)
             return err;
 
@@ -1070,7 +1070,7 @@ restart_reception:
 
                 /* We actually send like we don't recognize the data, in
                  * order not to make the link irrecoverable. */
-                err = cahute_write_to_link(link, send_buf, 1);
+                err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
                 if (err)
                     return err;
             }
@@ -1083,7 +1083,7 @@ restart_reception:
     {
         cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
 
-        err = cahute_write_to_link(link, send_buf, 1);
+        err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
         if (err)
             return err;
     }
@@ -1113,8 +1113,8 @@ restart_reception:
                 total,
                 part_size);
 
-            err = cahute_read_from_link(
-                link,
+            err = cahute_receive_on_link_medium(
+                &link->medium,
                 buf,
                 1,
                 TIMEOUT_PACKET_CONTENTS,
@@ -1143,8 +1143,8 @@ restart_reception:
                     size_t to_read =
                         part_size_left > 512 ? 512 : part_size_left;
 
-                    err = cahute_read_from_link(
-                        link,
+                    err = cahute_receive_on_link_medium(
+                        &link->medium,
                         p,
                         to_read,
                         TIMEOUT_PACKET_CONTENTS,
@@ -1174,8 +1174,8 @@ restart_reception:
             }
 
             /* Read and check the checksum. */
-            err = cahute_read_from_link(
-                link,
+            err = cahute_receive_on_link_medium(
+                &link->medium,
                 &buf[1 + part_size],
                 1,
                 TIMEOUT_PACKET_CONTENTS,
@@ -1200,7 +1200,7 @@ restart_reception:
                 msg(ll_error, "Transfer will abort.");
                 link->flags |= CAHUTE_LINK_FLAG_IRRECOVERABLE;
 
-                err = cahute_write_to_link(link, send_buf, 1);
+                err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
                 if (err)
                     return err;
 
@@ -1211,7 +1211,7 @@ restart_reception:
             {
                 cahute_u8 const send_buf[] = {PACKET_TYPE_ACK};
 
-                err = cahute_write_to_link(link, send_buf, 1);
+                err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
                 if (err)
                     return err;
             }
@@ -1269,7 +1269,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 
     if (link->flags & CAHUTE_LINK_FLAG_RECEIVER) {
         /* Expect an initiation flow. */
-        err = cahute_read_from_link(link, buf, 1, 0, 0);
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 0, 0);
         if (err)
             return err;
 
@@ -1283,7 +1283,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
         }
 
         buf[0] = PACKET_TYPE_ESTABLISHED;
-        err = cahute_write_to_link(link, buf, 1);
+        err = cahute_send_on_link_medium(&link->medium, buf, 1);
         if (err)
             return err;
 
@@ -1291,8 +1291,8 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
          * being the MDL1 flow. */
         if (link->protocol_state.casiolink.variant
             == CAHUTE_CASIOLINK_VARIANT_CAS100) {
-            err = cahute_read_from_link(
-                link,
+            err = cahute_receive_on_link_medium(
+                &link->medium,
                 buf,
                 40,
                 0,
@@ -1320,7 +1320,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
                     "Unknown or invalid packet when MDL1 was expected:");
                 mem(ll_error, buf, 40);
 
-                err = cahute_write_to_link(link, send_buf, 1);
+                err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
                 if (err)
                     return err;
 
@@ -1346,11 +1346,17 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
         for (attempts = initial_attempts; attempts > 0; attempts--) {
             /* Make the initiation flow. */
             buf[0] = PACKET_TYPE_START;
-            err = cahute_write_to_link(link, buf, 1);
+            err = cahute_send_on_link_medium(&link->medium, buf, 1);
             if (err)
                 return err;
 
-            err = cahute_read_from_link(link, buf, 1, TIMEOUT_INIT, 0);
+            err = cahute_receive_on_link_medium(
+                &link->medium,
+                buf,
+                1,
+                TIMEOUT_INIT,
+                0
+            );
             if (err == CAHUTE_ERROR_TIMEOUT_START)
                 continue;
 
@@ -1403,11 +1409,17 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
 
         buf[39] = cahute_casiolink_checksum(&buf[1], 38);
 
-        err = cahute_write_to_link(link, buf, 40);
+        err = cahute_send_on_link_medium(&link->medium, buf, 40);
         if (err)
             return err;
 
-        err = cahute_read_from_link(link, buf, 40, 0, TIMEOUT_PACKET_CONTENTS);
+        err = cahute_receive_on_link_medium(
+            &link->medium,
+            buf,
+            40,
+            0,
+            TIMEOUT_PACKET_CONTENTS
+        );
         if (err)
             return err;
 
@@ -1430,7 +1442,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
             msg(ll_error, "Unknown or invalid packet when MDL1 was expected:");
             mem(ll_error, buf, 40);
 
-            err = cahute_write_to_link(link, send_buf, 1);
+            err = cahute_send_on_link_medium(&link->medium, send_buf, 1);
             if (err)
                 return err;
 
@@ -1450,12 +1462,12 @@ CAHUTE_EXTERN(int) cahute_casiolink_initiate(cahute_link *link) {
         /* Send the acknowledgement. */
         buf[0] = PACKET_TYPE_ACK;
 
-        err = cahute_write_to_link(link, buf, 1);
+        err = cahute_send_on_link_medium(&link->medium, buf, 1);
         if (err)
             return err;
 
         /* Receive the initial acknowledgement. */
-        err = cahute_read_from_link(link, buf, 1, 0, 0);
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 0, 0);
         if (err)
             return err;
 
@@ -1519,7 +1531,7 @@ CAHUTE_EXTERN(int) cahute_casiolink_terminate(cahute_link *link) {
     msg(ll_info, "Sending the following end packet:");
     mem(ll_info, buf, buf_size);
 
-    return cahute_write_to_link(link, buf, buf_size);
+    return cahute_send_on_link_medium(&link->medium, buf, buf_size);
 }
 
 /**

@@ -141,7 +141,7 @@ determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
     msg(ll_info, "Waiting for input to determine the protocol.");
 
     do {
-        err = cahute_read_from_link(link, buf, 1, 0, 0);
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 0, 0);
         if (err)
             goto fail;
 
@@ -149,7 +149,8 @@ determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
             /* This is the beginning of a Protocol 7.00 check packet.
              * We want to read the rest of the packet to ensure that
              * everything is correct. */
-            err = cahute_read_from_link(link, &buf[1], 5, 0, 0);
+            err =
+                cahute_receive_on_link_medium(&link->medium, &buf[1], 5, 0, 0);
             if (err)
                 goto fail;
 
@@ -157,7 +158,11 @@ determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
             if (!memcmp(buf, seven_check_packet, 6)) {
                 /* That's a check packet! We can answer with an ACK, then
                  * set the protocol to Protocol 7.00. */
-                err = cahute_write_to_link(link, seven_ack_packet, 6);
+                err = cahute_send_on_link_medium(
+                    &link->medium,
+                    seven_ack_packet,
+                    6
+                );
                 if (err)
                     goto fail;
 
@@ -183,7 +188,7 @@ determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
              * to CASIOLINK. */
             buf[0] = 0x13;
 
-            err = cahute_write_to_link(link, buf, 1);
+            err = cahute_send_on_link_medium(&link->medium, buf, 1);
             if (err)
                 goto fail;
 
@@ -223,11 +228,11 @@ determine_protocol_as_sender(cahute_link *link, int *protocolp) {
         msg(ll_info, "Sending the Protocol 7.00 check packet:");
         mem(ll_info, seven_check_packet, 6);
 
-        err = cahute_write_to_link(link, seven_check_packet, 6);
+        err = cahute_send_on_link_medium(&link->medium, seven_check_packet, 6);
         if (err)
             return err;
 
-        err = cahute_read_from_link(link, buf, 1, 100, 0);
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 100, 0);
         if (!err)
             break;
         else if (err != CAHUTE_ERROR_TIMEOUT_START)
@@ -236,11 +241,15 @@ determine_protocol_as_sender(cahute_link *link, int *protocolp) {
         /* Try writing a CASIOLINK start packet to see if we get an answer. */
         msg(ll_info, "Sending the CASIOLINK check packet:");
         mem(ll_info, casiolink_start_packet, 1);
-        err = cahute_write_to_link(link, casiolink_start_packet, 1);
+        err = cahute_send_on_link_medium(
+            &link->medium,
+            casiolink_start_packet,
+            1
+        );
         if (err)
             return err;
 
-        err = cahute_read_from_link(link, buf, 1, 300, 0);
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 300, 0);
         if (!err)
             break;
         else if (err != CAHUTE_ERROR_TIMEOUT_START)
@@ -256,7 +265,7 @@ determine_protocol_as_sender(cahute_link *link, int *protocolp) {
         /* This is the beginning of a Protocol 7.00 ack packet.
          * We want to read the rest of the packet to ensure that
          * everything is correct. */
-        err = cahute_read_from_link(link, &buf[1], 5, 0, 0);
+        err = cahute_receive_on_link_medium(&link->medium, &buf[1], 5, 0, 0);
         if (err)
             goto fail;
 
