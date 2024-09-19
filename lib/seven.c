@@ -43,7 +43,7 @@
  * TIMEOUT_OPTIMIZE_RESPONSE is the timeout for the response to an
  * "Optimize filesystem" (51) command. */
 #define TIMEOUT_PACKET_START      10000 /* 10 seconds. */
-#define TIMEOUT_PACKET_INIT       500   /* 500 ms (.5 seconds). */
+#define TIMEOUT_PACKET_INIT       800   /* 800 ms (.8 second). */
 #define TIMEOUT_PACKET_TIMEOUT    10000 /* 10 seconds. */
 #define TIMEOUT_PACKET_CONTENTS   2000  /* 2 seconds. */
 #define TIMEOUT_COMMAND_RESPONSE  10000 /* 10 seconds. */

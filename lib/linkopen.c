@@ -236,7 +236,7 @@ determine_protocol_as_sender(cahute_link *link, int *protocolp) {
         if (err)
             return err;
 
-        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 100, 0);
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 800, 0);
         if (!err)
             break;
         else if (err != CAHUTE_ERROR_TIMEOUT_START)
@@ -253,7 +253,7 @@ determine_protocol_as_sender(cahute_link *link, int *protocolp) {
         if (err)
             return err;
 
-        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 300, 0);
+        err = cahute_receive_on_link_medium(&link->medium, buf, 1, 200, 0);
         if (!err)
             break;
         else if (err != CAHUTE_ERROR_TIMEOUT_START)
