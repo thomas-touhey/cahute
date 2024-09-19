@@ -70,6 +70,34 @@ through GiteaPC_, by running the following command:
 
     giteapc install cake/cahute@\ |version|
 
+.. warning::
+
+    If you are using GiteaPC on Linux, it is likely that your system is using
+    udev_. If this is the case, you must move the udev rule from the user
+    install directory to the system directory, by running the following
+    command:
+
+    .. code-block:: text
+
+        sudo mv ~/.local/lib/udev/rules.d/*.rules /etc/udev/rules.d/
+
+    From there, you must reload the rules to make sure they apply by running
+    the following command:
+
+    .. code-block:: text
+
+        sudo udevadm control --reload-rules
+
+    If your user isn't already in the ``uucp`` group, you must also make that
+    the case by running the following command:
+
+    .. code-block:: text
+
+        sudo usermod -a -G uucp <your_username>
+
+    Then restart the login session or host to ensure that the new group applies
+    to your new session.
+
 .. _build-cahute:
 
 Other systems
@@ -95,6 +123,7 @@ See :ref:`guide-build` for more information.
 .. _paru: https://github.com/morganamilo/paru
 .. _pikaur: https://github.com/actionless/pikaur
 .. _GiteaPC: https://git.planet-casio.com/Lephenixnoir/giteapc
+.. _udev: https://wiki.archlinux.org/title/Udev
 
 .. |apple| image:: apple.svg
 .. |homebrew| image:: homebrew.svg
