@@ -97,7 +97,9 @@ and provide useful background information and explanation.
 .. toctree::
     :maxdepth: 3
 
-    topics
+    data-formats
+    communication-protocols
+    abstractions
     internals
 
 References

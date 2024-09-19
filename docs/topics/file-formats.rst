@@ -32,6 +32,50 @@ The file formats described by topic are the following:
     file-formats/picture-cg
     file-formats/picture-cp
 
+By extension
+------------
+
+The file formats described by extension are the following:
+
+.. list-table::
+    :header-rows: 1
+    :width: 100%
+
+    * - Extension
+      - Description
+    * - ``.C2P``
+      - :ref:`file-format-c2p`
+    * - ``.CAS``
+      - :ref:`file-format-casiolink`
+    * - ``.CASRC``
+      - :ref:`file-format-casrc`
+    * - ``.CAT``
+      - :ref:`file-format-cat`
+    * - ``.CTF``
+      - :ref:`file-format-ctf`
+    * - ``.FXP``
+      - :ref:`file-format-fxp`
+    * - ``.G1A``
+      - :ref:`file-format-g1a`
+    * - ``.G1E``
+      - :ref:`file-format-g1e`
+    * - ``.G1L``
+      - :ref:`file-format-g1l`
+    * - ``.G1M``
+      - :ref:`file-format-mainmem`
+    * - ``.G2R``
+      - :ref:`file-format-mainmem`
+    * - ``.G3A``
+      - :ref:`file-format-g3a`
+    * - ``.G3L``
+      - :ref:`file-format-g3l`
+    * - ``.G3M``
+      - :ref:`file-format-mainmem`
+    * - ``.G3P``
+      - :ref:`file-format-g3p`
+    * - ``.GRC``
+      - :ref:`file-format-graphcard`
+
 .. _file-format-standardheader:
 
 By CASIO container subtype
@@ -269,47 +313,3 @@ Known types for this container format are the following:
     Document the ``\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF``
     case, in which we need to use the extension instead of the format within
     the file.
-
-By extension
-------------
-
-The file formats described by extension are the following:
-
-.. list-table::
-    :header-rows: 1
-    :width: 100%
-
-    * - Extension
-      - Description
-    * - ``.C2P``
-      - :ref:`file-format-c2p`
-    * - ``.CAS``
-      - :ref:`file-format-casiolink`
-    * - ``.CASRC``
-      - :ref:`file-format-casrc`
-    * - ``.CAT``
-      - :ref:`file-format-cat`
-    * - ``.CTF``
-      - :ref:`file-format-ctf`
-    * - ``.FXP``
-      - :ref:`file-format-fxp`
-    * - ``.G1A``
-      - :ref:`file-format-g1a`
-    * - ``.G1E``
-      - :ref:`file-format-g1e`
-    * - ``.G1L``
-      - :ref:`file-format-g1l`
-    * - ``.G1M``
-      - :ref:`file-format-mainmem`
-    * - ``.G2R``
-      - :ref:`file-format-mainmem`
-    * - ``.G3A``
-      - :ref:`file-format-g3a`
-    * - ``.G3L``
-      - :ref:`file-format-g3l`
-    * - ``.G3M``
-      - :ref:`file-format-mainmem`
-    * - ``.G3P``
-      - :ref:`file-format-g3p`
-    * - ``.GRC``
-      - :ref:`file-format-graphcard`

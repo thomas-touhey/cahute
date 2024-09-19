@@ -1,7 +1,7 @@
 .. _logging:
 
-Logging facilities with Cahute
-==============================
+Logging facilities
+==================
 
 Cahute has logging facilities for its internal needs, which functions with
 logging levels.

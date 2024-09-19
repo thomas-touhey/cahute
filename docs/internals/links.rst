@@ -1,13 +1,8 @@
-Links and mediums
-=================
+Links and medium internals
+==========================
 
-All communication implementations are centered around resources called links.
-Internally, links are mostly constituted of:
-
-* A **medium**, which is an interface with a set of resources to communicate
-  with the underlying medium opened with the system or hardware.
-* A **protocol**, which is a set of resources and functions that do **not**
-  constitute an interface, since protocols may obey different logics.
+This document describes the internals behind links and mediums; see
+:ref:`topic-links` for more information.
 
 A link only requires one memory allocation (except for system resources that
 are allocated / opened using different functions), and the medium
@@ -408,6 +403,8 @@ Available protocols are:
 .. c:macro:: CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE
 
     USB Mass Storage without extensions.
+
+.. _internals-link-open:
 
 Opening behaviours
 ------------------

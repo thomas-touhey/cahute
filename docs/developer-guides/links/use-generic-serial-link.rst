@@ -1,3 +1,5 @@
+.. _guide-developer-use-generic-serial-link:
+
 Opening a generic link to a calculator connected by serial
 ==========================================================
 
