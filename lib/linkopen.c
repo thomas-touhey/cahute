@@ -2084,11 +2084,11 @@ cahute_open_simple_usb_link(cahute_link **linkp, unsigned long flags) {
     struct simple_usb_detection_cookie cookie;
     int attempts_left, err;
 
-    for (attempts_left = 5; attempts_left; attempts_left--) {
-        if (attempts_left < 5) {
-            msg(ll_warn, "Calculator not found, retrying in 1 second.");
+    for (attempts_left = 20; attempts_left; attempts_left--) {
+        if (attempts_left < 20) {
+            msg(ll_warn, "Calculator not found, retrying in 250ms.");
 
-            err = cahute_sleep(1000);
+            err = cahute_sleep(250);
             if (err)
                 return err;
         }
