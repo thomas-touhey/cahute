@@ -270,14 +270,14 @@ Link management related function declarations
 
     .. c:macro:: CAHUTE_SERIAL_STOP_TWO
 
-        Use 2 stop bits (*by default*).
+        Use 2 stop bits.
 
     Since the parity may also be selectable on the calculator, it can also
     be selected manually, amongst the following:
 
     .. c:macro:: CAHUTE_SERIAL_PARITY_OFF
 
-        Disable parity checks (*by default*).
+        Disable parity checks.
 
     .. c:macro:: CAHUTE_SERIAL_PARITY_EVEN
 
@@ -304,11 +304,70 @@ Link management related function declarations
 
     .. c:macro:: CAHUTE_SERIAL_XONXOFF_DISABLE
 
-        Disable XON/XOFF software control (*by default*).
+        Disable XON/XOFF software control.
 
     .. c:macro:: CAHUTE_SERIAL_XONXOFF_ENABLE
 
         Enable XON/XOFF software control.
+
+    Default serial settings depend on the protocol and CASIOLINK variant you
+    select:
+
+    .. list-table::
+        :header-rows: 1
+
+        * - Protocol
+          - Speed
+          - Parity
+          - Stop bits
+          - XON/XOFF
+        * - ``AUTO``
+          - 9600
+          - ``OFF``
+          - ``ONE``
+          - ``DISABLED``
+        * - ``NONE``
+          - 9600
+          - ``OFF``
+          - ``ONE``
+          - ``DISABLED``
+        * - ``CASIOLINK`` / ``AUTO``
+          - 9600
+          - ``OFF``
+          - ``ONE``
+          - ``DISABLED``
+        * - ``CASIOLINK`` / ``CAS40``
+          - 4800
+          - ``OFF``
+          - ``ONE``
+          - ``DISABLED``
+        * - ``CASIOLINK`` / ``CAS50``
+          - 9600
+          - ``OFF``
+          - ``ONE``
+          - ``DISABLED``
+        * - ``CASIOLINK`` / ``CAS100``
+          - 38400
+          - ``OFF``
+          - ``TWO``
+          - ``DISABLED``
+        * - ``SEVEN``
+          - 9600
+          - ``OFF``
+          - ``TWO``
+          - ``DISABLED``
+        * - ``SEVEN_OHP``
+          - 9600
+          - ``OFF``
+          - ``TWO``
+          - ``DISABLED``
+
+    .. warning::
+
+        These serial settings may only apply to the first part of the
+        communication, since in some of the aforementioned protocols and
+        CASIOLINK variants, both devices can negotiate different serial
+        parameters and switch to them.
 
     If the device uses DTR and the cable supports it, it can be selected
     manually as well, amongst the following:
@@ -398,7 +457,8 @@ Link management related function declarations
     :param flags: The flags to set to the serial link.
     :param name: The name or path of the serial link to open.
     :param speed: The speed (in bauds) to open the serial link with, or ``0``
-        to select the default serial speed.
+        to select the default serial speed for the protocol and CASIOLINK
+        variant.
     :return: The error, or 0 if the operation was successful.
 
 .. c:function:: int cahute_open_usb_link(cahute_link **linkp, \
