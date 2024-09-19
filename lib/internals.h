@@ -374,12 +374,16 @@ struct cahute_link_windows_medium_state {
 /**
  * AmigaOS serial device medium state.
  *
- * @property msg_port Message port with which the device was opened.
- * @property io IO structure of the device.
+ * @property read_msg_port Message port for the read I/O request.
+ * @property write_msg_port Message port for the write I/O request.
+ * @property read_io Read I/O request.
+ * @property write_io Write I/O request.
  */
 struct cahute_link_amigaos_serial_medium_state {
-    struct MsgPort *msg_port;
-    struct IOExtSer *io;
+    struct MsgPort *read_msg_port;
+    struct MsgPort *write_msg_port;
+    struct IOExtSer *read_io;
+    struct IOExtSer *write_io;
 };
 #endif
 

@@ -304,86 +304,140 @@ cahute_receive_on_link_medium(
 #if defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
         case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL: {
             struct timerequest *timer;
-            struct IOExtSer *io = medium->state.amigaos_serial.io;
+            struct IOExtSer *io = medium->state.amigaos_serial.read_io;
             struct MsgPort *timer_msgport,
-                *serial_msgport = medium->state.amigaos_serial.msg_port;
+                *serial_msgport = medium->state.amigaos_serial.read_msg_port;
             cahute_u32 signals = 0;
-            int has_serial = 0;
+            int has_serial_signal = 0;
+            size_t unread_bytes;
 
-            err = cahute_get_amiga_timer(&timer_msgport, &timer);
-            if (err)
-                return err;
+            /* We need to query the number of bytes currently unread.
+             * If there is at least one, we read the maximum we can (either
+             * limited by the buffer size, or the number of unread bytes).
+             * Otherwise, we wait for at least one byte to be available. */
+            io->IOSer.io_Command = SDCMD_QUERY;
+            if (DoIO((struct IORequest *)io)) {
+                msg(ll_error,
+                    "Error %d occurred while checking device status.",
+                    io->IOSer.io_Error);
+                return CAHUTE_ERROR_UNKNOWN;
+            }
 
-            /* Run two operations at once:
-             * - Read into the buffer.
-             * - Start a timer to the currently requested timeout. */
+            bytes_read = 0;
+            if (!io->IOSer.io_Actual) {
+                /* We want to make a read of 1 byte with timeout, until
+                 * there the byte is provided. */
+                err = cahute_get_amiga_timer(&timer_msgport, &timer);
+                if (err)
+                    return err;
+
+                /* Run two operations at once:
+                 * - Read into the buffer.
+                 * - Start a timer to the currently requested timeout. */
+                io->IOSer.io_Command = CMD_READ;
+                io->IOSer.io_Length = 1;
+                io->IOSer.io_Data = (APTR)dest;
+
+                SendIO((struct IORequest *)io);
+                signals = (1L << serial_msgport->mp_SigBit) | SIGBREAKF_CTRL_C;
+
+                if (timeout > 0) {
+                    timer->tr_time.tv_secs = timeout / 1000;
+                    timer->tr_time.tv_micro = timeout % 1000 * 1000;
+                    timer->tr_node.io_Command = TR_ADDREQUEST;
+
+                    SendIO((struct IORequest *)timer);
+                    signals |= (1L << timer_msgport->mp_SigBit);
+                }
+
+                if (CheckIO((struct IORequest *)io)) {
+                    /* Request has terminated immediately.
+                     * Note that we may have started a timer request for
+                     * nothing here, but we want to have this CheckIO() call
+                     * as close as possible to the Wait() to avoid race
+                     * conditions as much as possible. */
+                    signals = 0;
+                    has_serial_signal = 1;
+                } else {
+                    /* We want to wait only if the request has not finished
+                     * immediately. */
+                    signals = Wait(signals);
+                    has_serial_signal =
+                        signals & (1L << serial_msgport->mp_SigBit);
+                }
+
+                if (timeout > 0) {
+                    if (!CheckIO((struct IORequest *)timer))
+                        AbortIO((struct IORequest *)timer);
+
+                    WaitIO((struct IORequest *)timer);
+                }
+
+                /* Wait for either completion and clearing of serial read, or
+                 * for cancellation of I/O request. */
+                if (!has_serial_signal)
+                    AbortIO((struct IORequest *)io);
+
+                WaitIO((struct IORequest *)io);
+
+                if (signals & SIGBREAKF_CTRL_C)
+                    return CAHUTE_ERROR_ABORT;
+
+                /* From here, the serial signal may or may not have been set.
+                 * If yes, this means a byte has been received, and more may
+                 * still be available.
+                 * Otherwise, this means a byte has not been read, but due to
+                 * a race condition, it is possible that the bytes could have
+                 * been read between the initial status check and read, so
+                 * we still want to check the status here.
+                 *
+                 * Note that in the first case, the buffer we provide to the
+                 * system for read later is unaligned (1 past 32-byte
+                 * alignment guaranteed in linkopen.c). */
+                if (has_serial_signal) {
+                    if (io->IOSer.io_Error) {
+                        msg(ll_error,
+                            "Error %d occurred while reading from device.",
+                            io->IOSer.io_Error);
+                        return CAHUTE_ERROR_UNKNOWN;
+                    }
+
+                    dest++;
+                    target_size--;
+                    bytes_read++;
+                }
+
+                io->IOSer.io_Command = SDCMD_QUERY;
+                if (DoIO((struct IORequest *)io)) {
+                    msg(ll_error,
+                        "Error %d occurred while checking device status.",
+                        io->IOSer.io_Error);
+                    return CAHUTE_ERROR_UNKNOWN;
+                }
+
+                if (!io->IOSer.io_Actual)
+                    goto time_out;
+            }
+
+            /* Make a synchronous read of all available bytes.
+             * According to the AmigaOS Wiki, this operation is guaranteed
+             * to return without waiting. */
+            unread_bytes = io->IOSer.io_Actual;
+            if (unread_bytes > target_size)
+                unread_bytes = target_size;
+
             io->IOSer.io_Command = CMD_READ;
-            io->IOSer.io_Length = target_size;
+            io->IOSer.io_Length = unread_bytes;
             io->IOSer.io_Data = (APTR)dest;
 
-            SendIO((struct IORequest *)io);
-            signals = (1L << serial_msgport->mp_SigBit) | SIGBREAKF_CTRL_C;
-
-            if (timeout > 0) {
-                timer->tr_time.tv_secs = timeout / 1000;
-                timer->tr_time.tv_micro = timeout % 1000 * 1000;
-                timer->tr_node.io_Command = TR_ADDREQUEST;
-
-                SendIO((struct IORequest *)timer);
-                signals |= (1L << timer_msgport->mp_SigBit);
-            }
-
-            if (CheckIO((struct IORequest *)io)) {
-                /* Request has terminated immediately.
-                 * Note that we may have started a timer request for nothing
-                 * here, but we want to have this CheckIO() call as close as
-                 * possible to the Wait() to avoid race conditions as much
-                 * as possible. */
-                signals = 0;
-                has_serial = 1;
-            } else {
-                /* We want to wait only if the request has not finished
-                 * immediately. */
-                signals = Wait(signals);
-                has_serial = CheckIO((struct IORequest *)io) ? 1 : 0;
-            }
-
-            if (timeout > 0) {
-                if (!CheckIO((struct IORequest *)timer))
-                    AbortIO((struct IORequest *)timer);
-
-                WaitIO((struct IORequest *)timer);
-            }
-
-            /* Wait for either completion and clearing of serial read, or
-             * for cancellation of I/O request.
-             * This is required for refreshing the buffer and 'io_Actual'. */
-            if (!has_serial)
-                AbortIO((struct IORequest *)io);
-
-            WaitIO((struct IORequest *)io);
-
-            if (signals & SIGBREAKF_CTRL_C)
-                return CAHUTE_ERROR_ABORT;
-            else if (!has_serial)
-                goto time_out;
-
-            if (io->IOSer.io_Error) {
+            if (DoIO((struct IORequest *)io)) {
                 msg(ll_error,
-                    "Error %d occurred while reading from device.",
+                    "Error %d occurred while reading available bytes.",
                     io->IOSer.io_Error);
                 return CAHUTE_ERROR_UNKNOWN;
             }
 
-            /* I/O request was completed, we want to read the contents. */
-            if (io->IOSer.io_Error) {
-                msg(ll_error,
-                    "Error %d occurred while reading from device.",
-                    io->IOSer.io_Error);
-                return CAHUTE_ERROR_UNKNOWN;
-            }
-
-            bytes_read = io->IOSer.io_Actual;
+            bytes_read += unread_bytes;
         } break;
 #endif
 
@@ -686,7 +740,7 @@ cahute_send_on_link_medium(
 
 #if defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
         case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL: {
-            struct IOExtSer *io = medium->state.amigaos_serial.io;
+            struct IOExtSer *io = medium->state.amigaos_serial.write_io;
 
             io->IOSer.io_Length = size;
             io->IOSer.io_Data = (cahute_u8 *)buf; /* Explicit non-const. */
@@ -1121,7 +1175,7 @@ cahute_set_serial_params_to_link_medium(
 
 #if defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
     case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL: {
-        struct IOExtSer *io = medium->state.amigaos_serial.io;
+        struct IOExtSer *io = medium->state.amigaos_serial.read_io;
 
         io->io_CtlChar = 0x00001311;
         io->io_RBufLen = 1024;

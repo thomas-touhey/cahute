@@ -396,11 +396,18 @@ close_medium(int type, union cahute_link_medium_state *state) {
 
 #ifdef CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL
     case CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL:
-        AbortIO((struct IORequest *)state->amigaos_serial.io);
-        WaitIO((struct IORequest *)state->amigaos_serial.io);
-        CloseDevice((struct IORequest *)state->amigaos_serial.io);
-        DeleteIORequest(state->amigaos_serial.io);
-        DeleteMsgPort(state->amigaos_serial.msg_port);
+        AbortIO((struct IORequest *)state->amigaos_serial.read_io);
+        WaitIO((struct IORequest *)state->amigaos_serial.read_io);
+
+        AbortIO((struct IORequest *)state->amigaos_serial.write_io);
+        WaitIO((struct IORequest *)state->amigaos_serial.write_io);
+
+        CloseDevice((struct IORequest *)state->amigaos_serial.read_io);
+
+        DeleteIORequest(state->amigaos_serial.write_io);
+        DeleteIORequest(state->amigaos_serial.read_io);
+        DeleteMsgPort(state->amigaos_serial.write_msg_port);
+        DeleteMsgPort(state->amigaos_serial.read_msg_port);
         break;
 #endif
 
@@ -1624,8 +1631,10 @@ cahute_open_serial_link(
     }
 #elif defined(CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL)
     {
-        struct MsgPort *msg_port;
-        struct IOExtSer *io;
+        struct MsgPort *read_msg_port;
+        struct MsgPort *write_msg_port;
+        struct IOExtSer *read_io;
+        struct IOExtSer *write_io;
         unsigned long unit;
         int ret;
 
@@ -1634,16 +1643,33 @@ cahute_open_serial_link(
         if (ret)
             return ret;
 
-        msg_port = CreateMsgPort();
-        if (!msg_port) {
-            msg(ll_error, "Could not open message port.");
+        read_msg_port = CreateMsgPort();
+        if (!read_msg_port) {
+            msg(ll_error, "Could not open read message port.");
             return CAHUTE_ERROR_UNKNOWN;
         }
 
-        io = CreateIORequest(msg_port, sizeof(struct IOExtSer));
-        if (!io) {
-            msg(ll_error, "Could not create IORequest.");
-            DeleteMsgPort(msg_port);
+        write_msg_port = CreateMsgPort();
+        if (!write_msg_port) {
+            msg(ll_error, "Could not open write message port.");
+            DeleteMsgPort(read_msg_port);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        read_io = CreateIORequest(read_msg_port, sizeof(struct IOExtSer));
+        if (!read_io) {
+            msg(ll_error, "Could not create read IORequest.");
+            DeleteMsgPort(write_msg_port);
+            DeleteMsgPort(read_msg_port);
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        write_io = CreateIORequest(write_msg_port, sizeof(struct IOExtSer));
+        if (!write_io) {
+            msg(ll_error, "Could not create write IORequest.");
+            DeleteIORequest(read_io);
+            DeleteMsgPort(write_msg_port);
+            DeleteMsgPort(read_msg_port);
             return CAHUTE_ERROR_UNKNOWN;
         }
 
@@ -1651,7 +1677,7 @@ cahute_open_serial_link(
         ret = OpenDevice(
             (CONST_STRPTR)SERIALNAME,
             unit,
-            (struct IORequest *)io,
+            (struct IORequest *)read_io,
             0L
         );
         if (ret) {
@@ -1668,14 +1694,21 @@ cahute_open_serial_link(
             else
                 ret = CAHUTE_ERROR_UNKNOWN;
 
-            DeleteIORequest(io);
-            DeleteMsgPort(msg_port);
+            DeleteIORequest(write_io);
+            DeleteIORequest(read_io);
+            DeleteMsgPort(write_msg_port);
+            DeleteMsgPort(read_msg_port);
             return ret;
         }
 
+        CopyMem(read_io, write_io, sizeof(struct IOExtSer));
+        write_io->IOSer.io_Message.mn_ReplyPort = write_msg_port;
+
         medium_type = CAHUTE_LINK_MEDIUM_AMIGAOS_SERIAL;
-        medium_state.amigaos_serial.msg_port = msg_port;
-        medium_state.amigaos_serial.io = io;
+        medium_state.amigaos_serial.read_msg_port = read_msg_port;
+        medium_state.amigaos_serial.write_msg_port = write_msg_port;
+        medium_state.amigaos_serial.read_io = read_io;
+        medium_state.amigaos_serial.write_io = write_io;
     }
 #else
     CAHUTE_RETURN_IMPL("No serial device opening method available.");
