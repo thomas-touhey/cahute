@@ -36,11 +36,19 @@ identifiers (VID/PID) can be used:
     * - ``07cf``
       - ``6102``
       - ``CASIO MassStorage Device``
-      - ``0x0110``
+      - ``0x0200``
       - ``8`` (Mass Storage)
-      - ``0``
-      - ``0``
+      - ``6`` (SCSI)
+      - ``80`` (Bulk-Only)
       - Classpad 330+, fx-CG20, fx-CP400, fx-CP400+E
+    * - ``07cf``
+      - ``6103``
+      - ``CASIO MassStorage Device``
+      - ``0x0200``
+      - ``8`` (Mass Storage)
+      - ``6`` (SCSI)
+      - ``80`` (Bulk-Only)
+      - fx-CG50, fx-9750GIII (>= OS 3.8)
 
 The interface class ``255`` is used when the device presents protocol 7.00
 directly, while the interface class ``8`` is used in "USB key" mode, i.e.

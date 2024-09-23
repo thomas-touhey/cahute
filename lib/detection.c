@@ -303,7 +303,8 @@ cahute_detect_usb(
 
         if (device_descriptor.idVendor != 0x07cf
             || (device_descriptor.idProduct != 0x6101
-                && device_descriptor.idProduct != 0x6102))
+                && device_descriptor.idProduct != 0x6102
+                && device_descriptor.idProduct != 0x6103))
             continue;
 
         if (libusb_get_active_config_descriptor(

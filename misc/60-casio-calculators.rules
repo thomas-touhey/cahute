@@ -1,2 +1,3 @@
 ACTION=="add", ATTR{idVendor}=="07cf", ATTR{idProduct}=="6101", GROUP="uucp"
 ACTION=="add", ATTR{idVendor}=="07cf", ATTR{idProduct}=="6102", GROUP="uucp"
+ACTION=="add", ATTR{idVendor}=="07cf", ATTR{idProduct}=="6103", GROUP="uucp"

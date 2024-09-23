@@ -1798,7 +1798,8 @@ cahute_open_usb_link(
         if (device_descriptor.idVendor != 0x07cf)
             goto fail;
         if (device_descriptor.idProduct != 0x6101
-            && device_descriptor.idProduct != 0x6102)
+            && device_descriptor.idProduct != 0x6102
+            && device_descriptor.idProduct != 0x6103)
             goto fail;
 
         /* We want to check the interface class of the default configuration:
