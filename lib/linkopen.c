@@ -57,6 +57,7 @@ struct simple_usb_detection_cookie {
     int found_address;
     int found_type;
     int multiple;
+    int filter;
 };
 
 /**
@@ -2211,6 +2212,24 @@ cahute_find_simple_usb_device(
     struct simple_usb_detection_cookie *cookie,
     cahute_usb_detection_entry const *entry
 ) {
+    if (cookie->filter)
+        switch (entry->cahute_usb_detection_entry_type) {
+        case CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300:
+            if (!(cookie->filter & CAHUTE_USB_FILTER_CAS300))
+                return 0;
+            break;
+
+        case CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN:
+            if (!(cookie->filter & CAHUTE_USB_FILTER_SEVEN))
+                return 0;
+            break;
+
+        case CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI:
+            if (!(cookie->filter & CAHUTE_USB_FILTER_UMS))
+                return 0;
+            break;
+        }
+
     if (cookie->found_bus >= 0) {
         /* A device was already found, which means there are at least two
          * connected devices! */
@@ -2251,6 +2270,20 @@ CAHUTE_EXTERN(int)
 cahute_open_simple_usb_link(cahute_link **linkp, unsigned long flags) {
     struct simple_usb_detection_cookie cookie;
     int attempts_left, err;
+
+    cookie.filter = flags & CAHUTE_USB_FILTER_MASK;
+    flags &= ~CAHUTE_USB_FILTER_MASK;
+    switch (cookie.filter) {
+    case CAHUTE_USB_FILTER_ANY:
+    case CAHUTE_USB_FILTER_SERIAL:
+    case CAHUTE_USB_FILTER_CAS300:
+    case CAHUTE_USB_FILTER_SEVEN:
+    case CAHUTE_USB_FILTER_UMS:
+        break;
+
+    default:
+        CAHUTE_RETURN_IMPL("Unsupported simple USB filter.");
+    }
 
     for (attempts_left = 20; attempts_left; attempts_left--) {
         if (attempts_left < 20) {

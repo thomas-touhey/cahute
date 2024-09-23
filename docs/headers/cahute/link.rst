@@ -585,7 +585,36 @@ Link management related function declarations
         If you plan on multiple being connected simultaneously, see
         :c:func:`cahute_detect_usb` and :c:func:`cahute_open_usb_link`.
 
-    The flags are the same as for :c:func:`cahute_open_usb_link`.
+    Flags from :c:func:`cahute_open_usb_link` can be used.
+    In addition, it is possible to filter in the USB devices to look for,
+    by providing one of the following constants in the flags:
+
+    .. c:macro:: CAHUTE_USB_FILTER_ANY
+
+        Open any USB device (*by default*).
+
+    .. c:macro:: CAHUTE_USB_FILTER_CAS300
+
+        Open devices identifying themselves as a Classpad 300 / 330 (+).
+
+    .. c:macro:: CAHUTE_USB_FILTER_SEVEN
+
+        Open devices identifying themselves as a Protocol 7.00 / Protocol 7.00
+        Screenstreaming speaking device.
+
+    .. c:macro:: CAHUTE_USB_FILTER_SERIAL
+
+        Open devices identifying themselves as speaking an application protocol
+        over simple USB bulk.
+
+        This includes devices that would match
+        :c:macro:`CAHUTE_USB_FILTER_CAS300` or
+        :c:macro:`CAHUTE_USB_FILTER_SEVEN`.
+
+    .. c:macro:: CAHUTE_USB_FILTER_UMS
+
+        Open devices identifying themselves as speaking an application protocol
+        over USB Mass Storage / SCSI.
 
     :param linkp: The pointer to set to the opened link.
     :param flags: The flags to set the USB link.

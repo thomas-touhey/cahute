@@ -577,8 +577,19 @@ In this section, we will describe the behaviour of link opening functions.
     to work:
 
     * It detects available USB devices using :c:func:`cahute_detect_usb`.
-      If it finds none, it sleeps and retries until it has no attempts left.
-      If it finds multiple, it fails with error
+      It only picks USB devices matching the provided filter(s) which,
+      if non-zero, act as an accepted device type mask, i.e.:
+
+      * If :c:macro:`CAHUTE_USB_FILTER_CAS300` is set, devices identifying
+        as a Classpad 300 / 330 (+) are accepted;
+      * If :c:macro:`CAHUTE_USB_FILTER_SEVEN` is set, devices identifying
+        as a Protocol 7.00 / Protocol 7.00 Screenstreaming device are
+        accepted;
+      * If :c:macro:`CAHUTE_USB_FILTER_UMS` is set, devices identifying
+        as an USB Mass Storage speaking calculator are accepted.
+
+      If this function finds no matching devices, it sleeps and retries until
+      it has no attempts left. If it finds multiple, it fails with error
       :c:macro:`CAHUTE_ERROR_TOO_MANY`.
     * It opens the found USB device using :c:func:`cahute_open_usb_link`.
 

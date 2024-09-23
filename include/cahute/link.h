@@ -165,6 +165,15 @@ typedef void(cahute_progress_func)(
 #define CAHUTE_USB_OHP      0x00000020UL /* Use screen streaming mode. */
 #define CAHUTE_USB_NOPROTO  0x00000040UL /* Open a generic device. */
 
+/* Simple USB filter */
+
+#define CAHUTE_USB_FILTER_MASK   0x000F0000UL
+#define CAHUTE_USB_FILTER_ANY    0x00000000UL
+#define CAHUTE_USB_FILTER_CAS300 0x00010000UL
+#define CAHUTE_USB_FILTER_SEVEN  0x00020000UL
+#define CAHUTE_USB_FILTER_SERIAL 0x00030000UL
+#define CAHUTE_USB_FILTER_UMS    0x00040000UL
+
 CAHUTE_WUR CAHUTE_EXTERN(int) cahute_open_serial_link(
     cahute_link **cahute__linkp,
     unsigned long cahute__flags,
