@@ -22,6 +22,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinxcontrib.mermaid",
     "add_seven_command_directive",
+    "set_custom_html",
 ]
 
 templates_path: list[str] = []
@@ -53,6 +54,7 @@ html_theme_options = {
         },
     ],
 }
+html_extra_path = [str(Path("_static") / "cover-temp.png")]
 
 if environ.get("CI_COMMIT_BRANCH") == "develop" or environ.get("IS_PREVIEW"):
     html_theme_options["announcement"] = (
