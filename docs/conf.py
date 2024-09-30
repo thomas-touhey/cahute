@@ -21,8 +21,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinxcontrib.mermaid",
-    "add_seven_command_directive",
-    "set_custom_html",
+    "cahute_extensions",
 ]
 
 templates_path: list[str] = []

@@ -3,30 +3,56 @@ Cahute |version|
 
 Cahute is a library and set of command-line utilities to handle serial
 and USB communication protocols and file formats related to CASIO calculators,
-dating from the 1990s to today. It provides the following features:
+dating from the 1990s to today. It provides the following
+features\ [#mutant]_\ :
 
-* **Transferring storage files** from and to fx-9860G compatible calculators,
-  over USB and serial links;
-* **Receiving programs from all CASIO calculators since 1991**, over USB and
-  serial links;
-* **Converting between character encodings**;
-* **Screenstreaming** from fx-9860G, fx-CG and compatible calculators, over
-  USB links;
-* **Flashing fx-9860G and compatible** using
-  :ref:`the fxRemote method <seven-fxremote-flash>`.
+.. feature-list::
 
-Officially supported OSes are Archlinux_-based and macOS_.
+    * - |feat-transfer|
+      - File transfer between storages
+      - With ``p7``, transfer files from and to storages on
+        fx-9860G compatible calculators, over USB and serial links!
+    * - |feat-program|
+      - Program backup
+      - With ``CaS``, extract programs from all CASIO calculators since 1991,
+        over USB and serial links!
+    * - |feat-text|
+      - Text conversions
+      - With :c:func:`cahute_convert_text`, convert text between standard and
+        CASIO-specific text encodings!
+    * - |feat-ohp|
+      - Screenstreaming
+      - With ``p7screen``, display screen captures and streaming from your
+        calculator on your host system!
+    * - |feat-flash|
+      - ROM flashing
+      - With ``p7os``, flash fx-9860G and compatible calculators!
+
+Officially supported systems are the following:
+
+.. system-list::
+
+    * - |system-arch|
+      - Archlinux_ and derivatives
+    * - |system-apple|
+      - macOS_
 
 .. note::
 
-    For support for other platforms, see the following issues:
+    Support and distribution of other platforms is in progress or is awaiting
+    volunteers:
 
-    * `Windows XP and above
-      <https://gitlab.com/cahuteproject/cahute/-/issues/10>`_;
-    * `Debian-based distributions
-      <https://gitlab.com/cahuteproject/cahute/-/issues/8>`_;
-    * `AmigaOS 3.2 and above
-      <https://gitlab.com/cahuteproject/cahute/-/issues/26>`_.
+    .. system-list::
+
+        * - |system-debian|
+          - Debian_ and derivatives (`#8
+            <https://gitlab.com/cahuteproject/cahute/-/issues/8>`_)
+        * - |system-win|
+          - `Microsoft Windows`_ XP and above (`#10
+            <https://gitlab.com/cahuteproject/cahute/-/issues/10>`_)
+        * - |system-amigaos|
+          - AmigaOS_ 3.2 and above (`#26
+            <https://gitlab.com/cahuteproject/cahute/-/issues/26>`_)
 
 The project is being worked on `on Gitlab <Cahute on Gitlab_>`_.
 It is maintained by `Thomas Touhey`_.
@@ -127,8 +153,26 @@ is based on.
 
     project
 
+.. [#mutant] Icons used here are from the `Mutant Standard`_,
+  licensed under `CC BY-NC-SA 4.0 International`_.
+  Copyright © 2017 - 2024 \ `Caius Nocturne`_.
+
+.. |feat-transfer| image:: feat-transfer.svg
+.. |feat-program| image:: feat-program.svg
+.. |feat-text| image:: feat-text.svg
+.. |feat-ohp| image:: feat-ohp.svg
+.. |feat-flash| image:: feat-flash.svg
+.. |system-arch| image:: guides/arch.svg
+.. |system-apple| image:: guides/apple.svg
+.. |system-win| image:: guides/win.png
+.. |system-debian| image:: guides/debian.svg
+.. |system-amigaos| image:: guides/amigaos.png
+
 .. _Archlinux: https://archlinux.org/
 .. _macOS: https://www.apple.com/macos/
+.. _Microsoft Windows: http://windows.microsoft.com/
+.. _Debian: https://www.debian.org/
+.. _AmigaOS: https://www.amigaos.net/
 
 .. _Cahute on Gitlab: https://gitlab.com/cahuteproject/cahute
 .. _Thomas Touhey: https://thomas.touhey.fr/
@@ -170,3 +214,8 @@ is based on.
 .. _Caspro:
     https://web.archive.org/web/20160504230033/
     http://www.spiderpixel.co.uk:80/caspro/
+
+.. _Mutant Standard: https://mutant.tech/
+.. _Caius Nocturne: https://nocturne.works/
+.. _CC BY-NC-SA 4.0 International:
+    http://creativecommons.org/licenses/by-nc-sa/4.0/
