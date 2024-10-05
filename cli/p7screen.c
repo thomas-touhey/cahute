@@ -242,6 +242,7 @@ int main(int ac, char **av) {
     struct args args;
     struct display_cookie cookie;
     int err, ret = 1;
+    int sdl_initialized = 0;
 
     if (!parse_args(ac, av, &args))
         return 0;
@@ -287,12 +288,12 @@ int main(int ac, char **av) {
     }
 
     /* Initialize the SDL. */
-    if (SDL_Init(SDL_INIT_VIDEO)) {
+    if (SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         fprintf(stderr, "Failed to initialize SDL: %s\n", SDL_GetError());
         cahute_close_link(link);
         return 3;
     }
-    atexit(SDL_Quit);
+    sdl_initialized = 1;
 
     cookie.window = NULL;
     cookie.renderer = NULL;
@@ -344,6 +345,8 @@ end:
         SDL_DestroyRenderer(cookie.renderer);
     if (cookie.window)
         SDL_DestroyWindow(cookie.window);
+    if (sdl_initialized)
+        SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 
     return ret;
 }
