@@ -1,3 +1,5 @@
+.. _packaging-guide:
+
 Packaging Cahute
 ================
 

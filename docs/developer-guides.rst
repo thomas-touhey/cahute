@@ -5,7 +5,7 @@ These sections describe specific problems that you may want to solve using
 the Cahute C library directly.
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     developer-guides/build
     developer-guides/detection

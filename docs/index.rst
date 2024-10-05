@@ -55,15 +55,8 @@ Officially supported systems are the following:
             <https://gitlab.com/cahuteproject/cahute/-/issues/26>`_)
 
 The project is being worked on `on Gitlab <Cahute on Gitlab_>`_.
-It is maintained by `Thomas Touhey`_.
-
-It is also talked about in the following places:
-
-* `Planète Casio <Planète Casio topic_>`_ (*in French*);
-* `TI-Planet <TI-Planet topic_>`_ (*in French*);
-* `Casiopeia <Casiopeia topic_>`_;
-* `Universal Casio Forum <UCF topic_>`_;
-* `Cemetech <Cemetech topic_>`_.
+It is maintained by `Thomas Touhey`_. See :ref:`project-forums` for the
+topics describing the projects in other communities.
 
 The project's code and documentation contents are licensed under CeCILL_
 version 2.1 as distributed by the CEA, CNRS and Inria on
@@ -178,18 +171,6 @@ is based on.
 .. _Thomas Touhey: https://thomas.touhey.fr/
 .. _CeCILL: http://www.cecill.info/licences.en.html
 .. _Diátaxis: https://diataxis.fr/
-.. _Planète Casio topic:
-    https://www.planet-casio.com/Fr/forums/topic17699-1-cahute-pour-
-    communiquer-efficacement-avec-sa-calculatrice-casio-sous-linux.html
-.. _TI-Planet topic:
-    https://tiplanet.org/forum/viewtopic.php?t=26656
-.. _Casiopeia topic:
-    https://www.casiopeia.net/forum/viewtopic.php?f=19&t=8102
-.. _UCF topic:
-    https://community.casiocalc.org/topic/
-    8214-cahute-a-toolset-for-protocols-and-file-formats/
-.. _Cemetech topic:
-    https://www.cemetech.net/forum/viewtopic.php?p=307733
 
 .. _Simon Lothar:
     https://www.casiopeia.net/forum/memberlist.php?mode=viewprofile&u=10405
