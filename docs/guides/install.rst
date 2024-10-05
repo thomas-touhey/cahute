@@ -70,6 +70,19 @@ through GiteaPC_, by running the following command:
 
     giteapc install cake/cahute@\ |version|
 
+.. note::
+
+    By default, the logging level is set to ``warning``, and the command-line
+    utilities are stripped.
+
+    If you wish to set the default logging level to ``info`` and keep the
+    debug symbols, you can set the ``contributor`` configuration by using the
+    following command instead of the previous one:
+
+    .. parsed-literal::
+
+        giteapc install cake/cahute@\ |version|\ :contributor
+
 .. warning::
 
     If you are using GiteaPC on Linux, it is likely that your system is using
