@@ -1,3 +1,5 @@
+.. _topic-file-formats:
+
 File formats
 ============
 

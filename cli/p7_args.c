@@ -645,7 +645,7 @@ int parse_args(int argc, char **argv, struct args *args) {
 
     /* Open the local source path if a path is given. */
     if (args->local_source_path && !args->local_source_file) {
-        err = cahute_open_file_for_reading(
+        err = cahute_open_file(
             &args->local_source_file,
             0,
             args->local_source_path,

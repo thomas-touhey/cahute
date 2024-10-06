@@ -15,4 +15,5 @@ happening in this project, and why it is happening.
 
     internals/compat
     internals/links
+    internals/files
     internals/text

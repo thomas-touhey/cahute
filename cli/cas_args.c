@@ -285,12 +285,7 @@ static int parse_medium_params(
         if (medium->type == MEDIUM_COM)
             type_suffix = "com";
         else if (!strcmp(prefix, "in")) {
-            err = cahute_open_file_for_reading(
-                &file,
-                0,
-                path,
-                CAHUTE_PATH_TYPE_CLI
-            );
+            err = cahute_open_file(&file, 0, path, CAHUTE_PATH_TYPE_CLI);
             if (err) {
                 fprintf(
                     stderr,

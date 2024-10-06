@@ -1,3 +1,5 @@
+.. _topic-main-memory-data:
+
 Main memory data
 ================
 

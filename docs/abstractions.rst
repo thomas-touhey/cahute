@@ -8,5 +8,6 @@ its library's public API.
     :maxdepth: 2
 
     topics/links
+    topics/files
     topics/data
     topics/logging

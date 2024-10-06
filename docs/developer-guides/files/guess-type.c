@@ -5,14 +5,15 @@
 
 int main(int ac, char **av) {
     cahute_file *file = NULL;
-    int err = 0, type, ret = 0;
+    unsigned long type;
+    int err = 0, ret = 0;
 
     if (ac != 2) {
         fprintf(stderr, "usage: %s <path/to/file.ext>\n", av[0]);
         return 1;
     }
 
-    err = cahute_open_file(&file, av[1], CAHUTE_PATH_TYPE_CLI);
+    err = cahute_open_file(&file, 0, av[1], CAHUTE_PATH_TYPE_CLI);
     if (err) {
         fprintf(
             stderr,

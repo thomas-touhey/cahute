@@ -55,7 +55,7 @@ CAHUTE_DECLARE_TYPE(cahute_file)
 #define CAHUTE_FILE_TYPE_PICTURE_CP 16384
 
 CAHUTE_EXTERN(int)
-cahute_open_file_for_reading(
+cahute_open_file(
     cahute_file **cahute__filep,
     unsigned long cahute__flags,
     void const *cahute__path,
@@ -63,7 +63,7 @@ cahute_open_file_for_reading(
 );
 
 CAHUTE_EXTERN(int)
-cahute_open_file_for_export(
+cahute_create_file(
     cahute_file **cahute__filep,
     unsigned long cahute__size,
     void const *cahute__path,

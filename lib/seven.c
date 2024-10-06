@@ -3016,7 +3016,7 @@ cahute_seven_request_file_from_storage(
         goto fail;
 
     if (path)
-        err = cahute_open_file_for_export(&file, filesize, path, path_type);
+        err = cahute_create_file(&file, filesize, path, path_type);
     else
         err = cahute_open_stdout(&file);
 

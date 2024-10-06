@@ -189,7 +189,7 @@ cahute_populate_file_from_memory(
  * @return Error, or 0 if successful.
  */
 CAHUTE_EXTERN(int)
-cahute_open_file_for_reading(
+cahute_open_file(
     cahute_file **filep,
     unsigned long flags,
     void const *path,
@@ -369,7 +369,7 @@ cahute_open_file_for_reading(
  * @return Error, or 0 if successful.
  */
 CAHUTE_EXTERN(int)
-cahute_open_file_for_export(
+cahute_create_file(
     cahute_file **filep,
     unsigned long file_size,
     void const *path,

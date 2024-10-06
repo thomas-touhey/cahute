@@ -6,6 +6,8 @@
 Macro definitions
 -----------------
 
+.. _cahute-file-type-macros:
+
 ``CAHUTE_FILE_TYPE_*`` are constants representing the type of an opened file.
 
 .. c:macro:: CAHUTE_FILE_TYPE_ADDIN_CG
@@ -67,7 +69,7 @@ Type definitions
 Function declarations
 ---------------------
 
-.. c:function:: int cahute_open_file_for_reading(cahute_file **filep, \
+.. c:function:: int cahute_open_file(cahute_file **filep, \
     void const *path, int path_type)
 
     Open a file from a path, in order to read it.
@@ -77,7 +79,7 @@ Function declarations
     :param path_type: Type of the path to the file to open.
     :return: Error, or 0 if the operation was successful.
 
-.. c:function:: int cahute_open_file_for_export(cahute_file **filep, \
+.. c:function:: int cahute_create_file(cahute_file **filep, \
     size_t size, void const *path, int path_type)
 
     Open a file from a path, in order to write its content.

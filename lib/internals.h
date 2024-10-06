@@ -760,8 +760,8 @@ struct cahute_file_medium {
 
     unsigned long flags;
     unsigned long offset;
-    unsigned long read_offset;
     unsigned long file_size;
+    unsigned long read_offset;
     size_t read_size;
 
     cahute_u8 *read_buffer;
