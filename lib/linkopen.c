@@ -166,6 +166,8 @@ CAHUTE_LOCAL(int)
 determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
     cahute_u8 buf[6];
     size_t received = 1;
+    int serial_protocol = CAHUTE_LINK_PROTOCOL_SERIAL_AUTO;
+    int usb_protocol = CAHUTE_LINK_PROTOCOL_USB_AUTO;
     int err;
 
     msg(ll_info, "Waiting for input to determine the protocol.");
@@ -196,16 +198,18 @@ determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
                 if (err)
                     goto fail;
 
-                *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
-                return CAHUTE_OK;
+                serial_protocol = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
+                usb_protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
+                goto found;
             }
         } else if (buf[0] == 0x0B) {
             /* This is the beginning of a Protocol 7.00 Screenstreaming packet.
              * We don't want to read the rest of the packet, the receiving
              * routine for Protocol 7.00 screenstreaming will realign
              * itself. */
-            *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP;
-            return CAHUTE_OK;
+            serial_protocol = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN_OHP;
+            usb_protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
+            goto found;
         } else if (buf[0] == 0x10) {
             /* This is an unknown protocol that is tried by the calculator
              * on both USB and serial when transmitting. If we just ignore
@@ -222,8 +226,9 @@ determine_protocol_as_receiver(cahute_link *link, int *protocolp) {
             if (err)
                 goto fail;
 
-            *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
-            return CAHUTE_OK;
+            serial_protocol = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
+            usb_protocol = CAHUTE_LINK_PROTOCOL_USB_CASIOLINK;
+            goto found;
         }
 
         break;
@@ -237,6 +242,12 @@ fail:
     if (err == CAHUTE_ERROR_TIMEOUT_START)
         err = CAHUTE_ERROR_TIMEOUT;
     return err;
+
+found:
+    *protocolp = *protocolp == CAHUTE_LINK_PROTOCOL_SERIAL_AUTO
+                     ? serial_protocol
+                     : usb_protocol;
+    return CAHUTE_OK;
 }
 
 /**
@@ -256,6 +267,8 @@ determine_protocol_as_sender(
     cahute_u8 buf[48];
     size_t received = 1;
     int err, attempts;
+    int serial_protocol = CAHUTE_LINK_PROTOCOL_SERIAL_AUTO;
+    int usb_protocol = CAHUTE_LINK_PROTOCOL_USB_AUTO;
 
     *casiolink_variantp = CAHUTE_CASIOLINK_VARIANT_AUTO;
 
@@ -324,9 +337,10 @@ determine_protocol_as_sender(
         /* This is a Classpad 300 / 330 (+) answering our Protocol 7.00
          * initial check packet with their own check packet. We're expecting
          * a packet identifier after this. */
-        *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
+        serial_protocol = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
+        usb_protocol = CAHUTE_LINK_PROTOCOL_USB_CASIOLINK;
         *casiolink_variantp = CAHUTE_CASIOLINK_VARIANT_CAS300;
-        return CAHUTE_OK;
+        goto found;
     } else if (buf[0] == 0x06) {
         /* This is the beginning of a Protocol 7.00 ack packet.
          * We want to read the rest of the packet to ensure that
@@ -339,14 +353,16 @@ determine_protocol_as_sender(
         if (!memcmp(buf, seven_ack_packet, 6)) {
             /* That's a check packet! We can answer with an ACK, then
              * set the protocol to Protocol 7.00. */
-            *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
-            return CAHUTE_OK;
+            serial_protocol = CAHUTE_LINK_PROTOCOL_SERIAL_SEVEN;
+            usb_protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
+            goto found;
         }
     } else if (buf[0] == 0x13) {
         /* This is a CASIOLINK start packet.
          * We can answer with an 'established' packet and set the protocol
          * to CASIOLINK. */
-        *protocolp = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
+        serial_protocol = CAHUTE_LINK_PROTOCOL_SERIAL_CASIOLINK;
+        usb_protocol = CAHUTE_LINK_PROTOCOL_USB_CASIOLINK;
         return CAHUTE_OK;
     }
 
@@ -359,6 +375,12 @@ fail:
     if (err == CAHUTE_ERROR_TIMEOUT_START)
         err = CAHUTE_ERROR_TIMEOUT;
     return err;
+
+found:
+    *protocolp = *protocolp == CAHUTE_LINK_PROTOCOL_SERIAL_AUTO
+                     ? serial_protocol
+                     : usb_protocol;
+    return CAHUTE_OK;
 }
 
 /**
@@ -527,7 +549,8 @@ open_link_from_medium(
     if (flags & PROTOCOL_FLAG_RECEIVER)
         link->flags |= CAHUTE_LINK_FLAG_RECEIVER;
 
-    if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_AUTO) {
+    if (protocol == CAHUTE_LINK_PROTOCOL_SERIAL_AUTO
+        || protocol == CAHUTE_LINK_PROTOCOL_USB_AUTO) {
         int new_casiolink_variant = CAHUTE_CASIOLINK_VARIANT_AUTO;
 
         if (flags & PROTOCOL_FLAG_RECEIVER)
@@ -1744,7 +1767,8 @@ cahute_open_usb_link(
     unsupported_flags =
         flags
         & ~(CAHUTE_USB_NOCHECK | CAHUTE_USB_NODISC | CAHUTE_USB_NOTERM
-            | CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP | CAHUTE_USB_NOPROTO);
+            | CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP | CAHUTE_USB_NOPROTO
+            | CAHUTE_USB_SEVEN | CAHUTE_USB_CAS300);
     if (unsupported_flags)
         CAHUTE_RETURN_IMPL("At least one unsupported flag was present.");
 
@@ -1752,7 +1776,8 @@ cahute_open_usb_link(
         unsupported_flags =
             flags
             & (CAHUTE_USB_NOCHECK | CAHUTE_USB_NODISC | CAHUTE_USB_NOTERM
-               | CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP);
+               | CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP | CAHUTE_USB_SEVEN
+               | CAHUTE_USB_CAS300);
         if (unsupported_flags) {
             msg(ll_error,
                 "The following flags are not supported by the generic "
@@ -1766,9 +1791,22 @@ cahute_open_usb_link(
             CAHUTE_RETURN_IMPL("Sender mode not available for screenstreaming."
             );
 
+        if (flags & CAHUTE_USB_CAS300)
+            CAHUTE_RETURN_IMPL("No screenstreaming is available with CAS300.");
+
         open_flags |= PROTOCOL_FLAG_RECEIVER;
     } else if (flags & CAHUTE_USB_RECEIVER)
         CAHUTE_RETURN_IMPL("Receiver mode not available for data protocols.");
+
+    if ((flags & CAHUTE_USB_SEVEN) && (flags & CAHUTE_USB_CAS300)) {
+        msg(ll_error,
+            "SEVEN and CAS300 USB flags cannot be used at the same time.");
+        return CAHUTE_ERROR_UNKNOWN;
+    } else if ((flags & CAHUTE_USB_NOCHECK) && !(flags & (CAHUTE_USB_SEVEN | CAHUTE_USB_CAS300 | CAHUTE_USB_OHP))) {
+        msg(ll_error,
+            "SEVEN or CAS300 USB flag must be set if check is disabled.");
+        return CAHUTE_ERROR_UNKNOWN;
+    }
 
     if (libusb_init(&context)) {
         msg(ll_fatal, "Could not create a libusb context.");
@@ -1785,7 +1823,8 @@ cahute_open_usb_link(
         struct libusb_device_descriptor device_descriptor;
         struct libusb_interface_descriptor const *interface_descriptor;
         struct libusb_endpoint_descriptor const *endpoint_descriptor;
-        int interface_class = 0, j;
+        int interface_class = 0, interface_subclass = 0, interface_proto = 0;
+        int j;
 
         if (libusb_get_bus_number(device_list[i]) != bus
             || libusb_get_device_address(device_list[i]) != address)
@@ -1819,6 +1858,8 @@ cahute_open_usb_link(
 
         interface_descriptor = config_descriptor->interface[0].altsetting;
         interface_class = interface_descriptor->bInterfaceClass;
+        interface_subclass = interface_descriptor->bInterfaceSubClass;
+        interface_proto = interface_descriptor->bInterfaceProtocol;
 
         /* By default the protocol is USB_SEVEN.
          * We need to distinguish here between SEVEN, SEVEN_OHP,
@@ -1837,29 +1878,31 @@ cahute_open_usb_link(
          * being 0x0100 on Classpads, and 0x0110 on fx-9860G and derivatives,
          * so we try to use that for now. */
 
-        if (interface_class == 8) {
+        if (interface_class == 8 && interface_subclass == 6
+            && interface_proto == 80) {
             /* Only fx-CG and compatible bear this. */
             medium_type = CAHUTE_LINK_MEDIUM_LIBUSB_UMS;
             if (flags & CAHUTE_USB_OHP)
                 protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
-        } else if (interface_class == 255) {
+        } else if (interface_class == 255 && interface_subclass == 0 && interface_proto == 255) {
             medium_type = CAHUTE_LINK_MEDIUM_LIBUSB;
 
-            if (device_descriptor.idProduct == 0x6101
-                && device_descriptor.bcdUSB == 0x100) {
-                /* The device is considered to be a Classpad. */
-                if (flags & CAHUTE_USB_OHP) {
-                    msg(ll_error,
-                        "No OHP protocol supported for the Classpad.");
-                    goto fail;
-                }
-
+            if (flags & CAHUTE_USB_OHP)
+                protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
+            else if (flags & CAHUTE_USB_CAS300) {
                 protocol = CAHUTE_LINK_PROTOCOL_USB_CASIOLINK;
                 casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS300;
-            } else if (flags & CAHUTE_USB_OHP)
-                protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP;
+            } else if (flags & CAHUTE_USB_SEVEN)
+                protocol = CAHUTE_LINK_PROTOCOL_USB_SEVEN;
+            else {
+                protocol = CAHUTE_LINK_PROTOCOL_USB_AUTO;
+                casiolink_variant = CAHUTE_CASIOLINK_VARIANT_CAS300;
+            }
         } else {
-            msg(ll_error, "Unsupported interface class %d", interface_class);
+            msg(ll_error,
+                "Unsupported interface class %d and interface subclass %d",
+                interface_class,
+                interface_subclass);
             goto fail;
         }
 
@@ -2188,14 +2231,11 @@ fail:
  */
 CAHUTE_INLINE(char const *) get_usb_detection_type_name(int type) {
     switch (type) {
-    case CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300:
-        return "Classpad 300 / 330 (+) or compatible calculator (CAS300)";
-
-    case CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN:
-        return "fx-9860G or compatible calculator (Protocol 7.00)";
+    case CAHUTE_USB_DETECTION_ENTRY_TYPE_SERIAL:
+        return "Serial over bulk transfers";
 
     case CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI:
-        return "fx-CG or compatible calculator (SCSI)";
+        return "USB Mass Storage";
 
     default:
         return "unknown";
@@ -2215,13 +2255,8 @@ cahute_find_simple_usb_device(
 ) {
     if (cookie->filter)
         switch (entry->cahute_usb_detection_entry_type) {
-        case CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300:
-            if (!(cookie->filter & CAHUTE_USB_FILTER_CAS300))
-                return 0;
-            break;
-
-        case CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN:
-            if (!(cookie->filter & CAHUTE_USB_FILTER_SEVEN))
+        case CAHUTE_USB_DETECTION_ENTRY_TYPE_SERIAL:
+            if (!(cookie->filter & CAHUTE_USB_FILTER_SERIAL))
                 return 0;
             break;
 
@@ -2277,13 +2312,28 @@ cahute_open_simple_usb_link(cahute_link **linkp, unsigned long flags) {
     switch (cookie.filter) {
     case CAHUTE_USB_FILTER_ANY:
     case CAHUTE_USB_FILTER_SERIAL:
-    case CAHUTE_USB_FILTER_CAS300:
-    case CAHUTE_USB_FILTER_SEVEN:
     case CAHUTE_USB_FILTER_UMS:
         break;
 
     default:
         CAHUTE_RETURN_IMPL("Unsupported simple USB filter.");
+    }
+
+    /* If any filter is provided that does not contain serial devices,
+     * we want to set the SEVEN flag for cahute_open_usb_link() not to
+     * raise an error if NOCHECK is set. */
+    if ((flags & CAHUTE_USB_NOCHECK)
+        && !(
+            flags & (CAHUTE_USB_SEVEN | CAHUTE_USB_CAS300 | CAHUTE_USB_OHP)
+        )) {
+        if (!cookie.filter || (cookie.filter & CAHUTE_USB_FILTER_SERIAL)) {
+            msg(ll_error,
+                "SEVEN or CAS300 USB flag must be set if check is disabled "
+                "and serial devices are candidates.");
+            return CAHUTE_ERROR_UNKNOWN;
+        }
+
+        flags |= CAHUTE_USB_SEVEN;
     }
 
     for (attempts_left = 20; attempts_left; attempts_left--) {

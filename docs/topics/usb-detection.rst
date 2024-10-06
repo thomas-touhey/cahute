@@ -12,7 +12,6 @@ identifiers (VID/PID) can be used:
     * - ``idVendor``
       - ``idProduct``
       - ``iManufacturer``
-      - ``bcdUSB``
       - ``bInterfaceClass``
       - ``bInterfaceSubclass``
       - ``bInterfaceProtocol``
@@ -20,23 +19,20 @@ identifiers (VID/PID) can be used:
     * - ``07cf``
       - ``6101``
       - ``CASIO COMPUTER CO., LTD.``
-      - ``0x0100``
       - ``255`` (Vendor-Specific)
       - ``0``
-      - ``0``
-      - Classpad 300 / 330 (+)
+      - ``255``
+      - Classpad 300 / 330 (+), fx-9860G Slim
     * - ``07cf``
       - ``6101``
       - ``CESG502``
-      - ``0x0110``
       - ``255`` (Vendor-Specific)
       - ``0``
-      - ``0``
-      - Graph 35+/75/85/95, fx-9860G Slim, Classpad 300
+      - ``255``
+      - Graph 35+/75/85/95
     * - ``07cf``
       - ``6102``
       - ``CASIO MassStorage Device``
-      - ``0x0200``
       - ``8`` (Mass Storage)
       - ``6`` (SCSI)
       - ``80`` (Bulk-Only)
@@ -44,15 +40,29 @@ identifiers (VID/PID) can be used:
     * - ``07cf``
       - ``6103``
       - ``CASIO MassStorage Device``
-      - ``0x0200``
       - ``8`` (Mass Storage)
       - ``6`` (SCSI)
       - ``80`` (Bulk-Only)
-      - fx-CG50, fx-9750GIII (>= OS 3.8)
+      - fx-CG50, Graph 90+E, fx-9750GIII (>= OS 3.8)
 
-The interface class ``255`` is used when the device presents protocol 7.00
-directly, while the interface class ``8`` is used in "USB key" mode, i.e.
-when the file system and main memory are presented using SCSI.
+The interface class ``255`` is used when the device presents CASIOLINK,
+Protocol 7.00 or Protocol 7.00 Screenstreaming directly over bulk transfers,
+while the interface class ``8`` is used in "USB key" mode, i.e.
+when the file system and main memory are presented using USB Mass Storage.
+
+.. warning::
+
+    While more modern devices speaking Protocol 7.00 / Protocol 7.00
+    Screenstreaming over bulk transfers use a specific ``iManufacturer``
+    and a greater ``bcdUSB``, ancient Protocol 7.00 / Protocol 7.00
+    Screenstreaming devices, such as the fx-9860G Slim, are indistinguishable
+    from Classpad 300 / 330 (+) devices on USB alone.
+
+    Because of this, in the :c:func:`cahute_open_usb_link` and
+    :c:func:`cahute_open_simple_usb_link` interfaces, the protocol can either
+    be forced by the caller using the :c:macro:`CAHUTE_USB_CAS300` or
+    :c:macro:`CAHUTE_USB_SEVEN` flag, or determined once the link is made
+    using automatic protocol detection.
 
 .. warning::
 

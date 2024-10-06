@@ -95,7 +95,7 @@ static int open_link(cahute_link **linkp, struct args const *args) {
     int err;
 
     (void)args;
-    flags = CAHUTE_USB_FILTER_SEVEN;
+    flags = CAHUTE_USB_FILTER_SERIAL | CAHUTE_USB_SEVEN;
     if ((err = cahute_open_simple_usb_link(&link, flags)))
         return err;
 
@@ -120,7 +120,7 @@ static int open_fxremote_link(cahute_link **linkp, struct args const *args) {
 
     (void)args;
     flags = CAHUTE_USB_NOCHECK | CAHUTE_USB_NODISC | CAHUTE_USB_NOTERM
-            | CAHUTE_USB_FILTER_SEVEN;
+            | CAHUTE_USB_FILTER_SERIAL | CAHUTE_USB_SEVEN;
     if ((err = cahute_open_simple_usb_link(&link, flags)))
         return err;
 

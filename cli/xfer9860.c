@@ -76,7 +76,12 @@ int main(int argc, char **argv) {
 
     if (!parse_args(argc, argv, &args))
         return 0;
-    if ((err = cahute_open_simple_usb_link(&link, CAHUTE_USB_FILTER_SEVEN)))
+
+    err = cahute_open_simple_usb_link(
+        &link,
+        CAHUTE_USB_FILTER_SERIAL | CAHUTE_USB_SEVEN
+    );
+    if (err)
         goto fail;
 
     switch (args.operation) {

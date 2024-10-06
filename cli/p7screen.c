@@ -262,7 +262,7 @@ int main(int ac, char **av) {
     else
         err = cahute_open_simple_usb_link(
             &link,
-            CAHUTE_USB_FILTER_SEVEN | CAHUTE_USB_RECEIVER | CAHUTE_USB_OHP
+            CAHUTE_USB_RECEIVER | CAHUTE_USB_SEVEN | CAHUTE_USB_OHP
         );
 
     if (err) {

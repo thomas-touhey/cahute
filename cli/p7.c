@@ -212,7 +212,7 @@ static int open_link(cahute_link **linkp, struct args const *args) {
         return 0;
     }
 
-    flags = CAHUTE_USB_FILTER_SEVEN;
+    flags = CAHUTE_USB_FILTER_SERIAL | CAHUTE_USB_SEVEN;
     if (args->no_init)
         flags |= CAHUTE_USB_NOCHECK;
     if (args->no_term)

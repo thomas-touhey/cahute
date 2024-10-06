@@ -268,6 +268,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_AUTO`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_CASIOLINK`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
@@ -285,6 +286,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_AUTO`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
@@ -302,6 +304,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_AUTO`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_CASIOLINK`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
@@ -326,6 +329,7 @@ Available mediums are the following:
     Available protocols on this medium are the following:
 
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_NONE`;
+    * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_AUTO`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE`;
     * :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`.
 
@@ -379,6 +383,14 @@ Available protocols are:
     Protocol 7.00 Screenstreaming over a serial medium.
 
     See :ref:`protocol-seven-ohp` for more information.
+
+.. c:macro:: CAHUTE_LINK_PROTOCOL_USB_AUTO
+
+    Automatic protocol detection on a USB serial medium.
+
+    Note that this doesn't outlive link protocol initialization, and gets
+    replaced by the actual protocol afterwards; see
+    :ref:`internals-link-protocol-initialization` for more details.
 
 .. c:macro:: CAHUTE_LINK_PROTOCOL_USB_NONE
 
@@ -487,49 +499,50 @@ In this section, we will describe the behaviour of link opening functions.
         <https://gitlab.com/cahuteproject/cahute/-/issues/3#note_1823215641>`_
         for more context.
 
-    The interface class and :c:macro:`CAHUTE_USB_OHP` flag presence to
-    protocol and medium type mapping is the following:
+    The interface class, :c:macro:`CAHUTE_USB_OHP` flag presence, and
+    :c:macro:`CAHUTE_USB_SEVEN` or :c:macro:`CAHUTE_USB_CAS300` flag presence
+    to protocol and medium type mapping is the following:
 
     .. list-table::
         :header-rows: 1
         :width: 100%
 
         * - (in) Intf. class
-          - (in) ``bcdUSB``
           - (in) ``OHP`` flag
+          - (in) ``SEVEN`` or ``CAS300``
           - (out) Medium
           - (out) Protocol
         * - 8
-          -
           - absent
+          -
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB_UMS`
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_MASS_STORAGE`
         * - 8
-          -
           - present
+          -
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB_UMS`
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`
         * - 255
-          - ``0x100``
           - present
-          - **FAIL**
-          - **FAIL**
+          -
+          - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB`
+          - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`
         * - 255
-          - ``0x100``
           - absent
+          - ``CAS300``
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB`
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_CASIOLINK` w/
             :c:macro:`CAHUTE_CASIOLINK_VARIANT_CAS300`
         * - 255
-          -
           - absent
+          - ``SEVEN``
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB`
           - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN`
         * - 255
-          -
-          - present
+          - absent
+          - none
           - :c:macro:`CAHUTE_LINK_MEDIUM_LIBUSB`
-          - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_SEVEN_OHP`
+          - :c:macro:`CAHUTE_LINK_PROTOCOL_USB_AUTO`
 
     See :ref:`usb-detection` for more information.
 
@@ -580,11 +593,9 @@ In this section, we will describe the behaviour of link opening functions.
       It only picks USB devices matching the provided filter(s) which,
       if non-zero, act as an accepted device type mask, i.e.:
 
-      * If :c:macro:`CAHUTE_USB_FILTER_CAS300` is set, devices identifying
-        as a Classpad 300 / 330 (+) are accepted;
-      * If :c:macro:`CAHUTE_USB_FILTER_SEVEN` is set, devices identifying
-        as a Protocol 7.00 / Protocol 7.00 Screenstreaming device are
-        accepted;
+      * If :c:macro:`CAHUTE_USB_FILTER_SERIAL` is set, devices identifying
+        as a CASIOLINK, Protocol 7.00 or Protocol 7.00 Screenstreaming
+        device are accepted;
       * If :c:macro:`CAHUTE_USB_FILTER_UMS` is set, devices identifying
         as an USB Mass Storage speaking calculator are accepted.
 
@@ -606,15 +617,19 @@ The common protocol initialization procedure is defined by a function named
 ``init_link`` in ``link/open.c``.
 
 First of all, if the selected protocol is
-:c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_AUTO`, the communication initialization
+:c:macro:`CAHUTE_LINK_PROTOCOL_SERIAL_AUTO`
+or :c:macro:`CAHUTE_LINK_PROTOCOL_USB_AUTO`, the communication initialization
 is used to determine the protocol in which both devices should communicate.
 
 .. note::
 
     Since the initialization step is necessary for automatic protocol
-    discovery to take place, the :c:macro:`CAHUTE_SERIAL_NOCHECK` flag
-    is forbidden with :c:macro:`CAHUTE_SERIAL_PROTOCOL_AUTO`.
-    This is described in :c:func:`cahute_open_serial_link`'s flags description.
+    discovery to take place:
+
+    * The :c:macro:`CAHUTE_SERIAL_NOCHECK` flag is forbidden with
+      :c:macro:`CAHUTE_SERIAL_PROTOCOL_AUTO`.
+    * The :c:macro:`CAHUTE_USB_NOCHECK` flag is forbidden if neither
+      :c:macro:`CAHUTE_USB_SEVEN` nor :c:macro:`CAHUTE_USB_CAS300` is provided.
 
 Then, the initialization sequence is run depending on the protocol and role
 (sender or receiver, depending on the presence of the

@@ -7,16 +7,14 @@ int my_callback(void *cookie, cahute_usb_detection_entry const *entry) {
     char const *type_name;
 
     switch (entry->cahute_usb_detection_entry_type) {
-    case CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300:
-        type_name = "Classpad 300 / 330 (+) or compatible";
-        break;
-
-    case CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN:
-        type_name = "fx-9860G or compatible";
+    case CAHUTE_USB_DETECTION_ENTRY_TYPE_SERIAL:
+        type_name =
+            "Serial calculator (fx-9860G, Classpad 300 / 330 (+) or "
+            "compatible)";
         break;
 
     case CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI:
-        type_name = "fx-CG or compatible";
+        type_name = "UMS calculator (fx-CG, fx-CP400+, fx-GIII)";
         break;
 
     default:

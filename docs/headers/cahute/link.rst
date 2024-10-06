@@ -479,7 +479,7 @@ Link management related function declarations
 
         In case of error, the value of ``*linkp`` mustn't be used nor freed.
 
-    The protocol to use is determined using the USB device metadata.
+    The protocol to use is partially determined using the USB device metadata.
     See :ref:`usb-detection` for more information.
 
     Protocol-specific behaviour can be tweaked using the following flags:
@@ -497,6 +497,10 @@ Link management related function declarations
         This flag is mostly useful when resuming a connection initiated by
         another process, or when the passive process does not require or
         implement the initial handshake.
+
+        If this flag is provided, either :c:macro:`CAHUTE_USB_SEVEN`,
+        :c:macro:`CAHUTE_USB_CAS300` or :c:macro:`CAHUTE_USB_OHP`
+        must be provided.
 
         It is only effective when using Protocol 7.00.
         See :ref:`protocol-seven` for more information.
@@ -538,6 +542,21 @@ Link management related function declarations
         This is mostly useful if the "Transmit" option is selected on the
         calculator's LINK application, instead of the "Receive" option.
 
+    .. c:macro:: CAHUTE_USB_SEVEN
+
+        In case of serial USB devices, force using Protocol 7.00 or
+        Protocol 7.00 Screenstreaming instead of automatic protocol detection.
+
+        This flag is incompatible with :c:macro:`CAHUTE_USB_CAS300`.
+
+    .. c:macro:: CAHUTE_USB_CAS300
+
+        In case of serial USB devices, force using CASIOLINK with variant
+        CAS300 instead of automatic protocol detection.
+
+        This flag is incompatible with :c:macro:`CAHUTE_USB_SEVEN`
+        and :c:macro:`CAHUTE_USB_OHP`.
+
     .. c:macro:: CAHUTE_USB_OHP
 
         If this flag is provided, the calculator is assumed to use the link
@@ -545,6 +564,8 @@ Link management related function declarations
 
         For example, with the fx-9860G and compatible, this prompts the link
         to use Protocol 7.00 Screenstreaming instead of Protocol 7.00.
+
+        This flag is incompatible with :c:macro:`CAHUTE_USB_CAS300`.
 
         See :ref:`protocol-seven-ohp` for more information.
 
@@ -593,28 +614,23 @@ Link management related function declarations
 
         Open any USB device (*by default*).
 
-    .. c:macro:: CAHUTE_USB_FILTER_CAS300
-
-        Open devices identifying themselves as a Classpad 300 / 330 (+).
-
-    .. c:macro:: CAHUTE_USB_FILTER_SEVEN
-
-        Open devices identifying themselves as a Protocol 7.00 / Protocol 7.00
-        Screenstreaming speaking device.
-
     .. c:macro:: CAHUTE_USB_FILTER_SERIAL
 
         Open devices identifying themselves as speaking an application protocol
-        over simple USB bulk.
-
-        This includes devices that would match
-        :c:macro:`CAHUTE_USB_FILTER_CAS300` or
-        :c:macro:`CAHUTE_USB_FILTER_SEVEN`.
+        over USB bulk transfers.
 
     .. c:macro:: CAHUTE_USB_FILTER_UMS
 
         Open devices identifying themselves as speaking an application protocol
         over USB Mass Storage / SCSI.
+
+    .. warning::
+
+        If the filter is provided and :c:macro:`CAHUTE_USB_FILTER_SERIAL`
+        is included and :c:macro:`CAHUTE_USB_NOCHECK` is defined, either
+        :c:macro:`CAHUTE_USB_SEVEN` or :c:macro:`CAHUTE_USB_CAS300` must be
+        provided to determine what protocol to adopt if a serial USB
+        calculator was picked.
 
     :param linkp: The pointer to set to the opened link.
     :param flags: The flags to set the USB link.

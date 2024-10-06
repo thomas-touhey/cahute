@@ -296,7 +296,8 @@ cahute_detect_usb(
     for (id = 0; id < device_count; id++) {
         struct libusb_device_descriptor device_descriptor;
         struct libusb_config_descriptor *config_descriptor;
-        int interface_class = 0;
+        struct libusb_interface_descriptor const *interface_descriptor;
+        int interface_class = 0, interface_subclass = 0, interface_proto = 0;
 
         if (libusb_get_device_descriptor(device_list[id], &device_descriptor))
             continue;
@@ -314,23 +315,23 @@ cahute_detect_usb(
             continue;
 
         if (config_descriptor->bNumInterfaces == 1
-            && config_descriptor->interface[0].num_altsetting == 1)
-            interface_class =
-                config_descriptor->interface[0].altsetting[0].bInterfaceClass;
+            && config_descriptor->interface[0].num_altsetting == 1) {
+            interface_descriptor = config_descriptor->interface[0].altsetting;
+            interface_class = interface_descriptor->bInterfaceClass;
+            interface_subclass = interface_descriptor->bInterfaceSubClass;
+            interface_proto = interface_descriptor->bInterfaceProtocol;
+        }
 
         libusb_free_config_descriptor(config_descriptor);
 
-        if (interface_class == 8)
+        if (interface_class == 8 && interface_subclass == 6
+            && interface_proto == 80)
             entry.cahute_usb_detection_entry_type =
                 CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI;
-        else if (interface_class == 255) {
-            if (device_descriptor.bcdUSB == 0x100)
-                entry.cahute_usb_detection_entry_type =
-                    CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300;
-            else
-                entry.cahute_usb_detection_entry_type =
-                    CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN;
-        } else
+        else if (interface_class == 255 && interface_subclass == 0 && interface_proto == 255)
+            entry.cahute_usb_detection_entry_type =
+                CAHUTE_USB_DETECTION_ENTRY_TYPE_SERIAL;
+        else
             continue;
 
         entry.cahute_usb_detection_entry_bus =

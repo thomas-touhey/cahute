@@ -18,10 +18,10 @@ An example output for this program is the following:
 
     New entry data:
     - Address: 003:042
-    - Type: fx-9860G or compatible
+    - Type: Serial calculator (fx-9860G, Classpad 300 / 330 (+) or compatible)
     New entry data:
     - Address: 003:043
-    - Type: fx-CG or compatible
+    - Type: UMS calculator (fx-CG, fx-CP400+, fx-GIII)
 
 .. note::
 

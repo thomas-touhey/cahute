@@ -40,9 +40,8 @@ struct cahute_serial_detection_entry {
     char const *cahute_serial_detection_entry_name;
 };
 
-#define CAHUTE_USB_DETECTION_ENTRY_TYPE_CAS300 1
-#define CAHUTE_USB_DETECTION_ENTRY_TYPE_SEVEN  2
-#define CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI   3
+#define CAHUTE_USB_DETECTION_ENTRY_TYPE_SERIAL 1
+#define CAHUTE_USB_DETECTION_ENTRY_TYPE_SCSI   2
 
 struct cahute_usb_detection_entry {
     int cahute_usb_detection_entry_bus;
