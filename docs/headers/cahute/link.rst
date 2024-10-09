@@ -247,23 +247,25 @@ Link management related function declarations
 
         Use or expect CAS40 variant.
 
-        See :ref:`casiolink-cas40-header-format` for more information.
+        See :ref:`protocol-cas40` for more information.
 
     .. c:macro:: CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS50
 
         Use or expect CAS50 variant.
 
-        See :ref:`casiolink-cas50-header-format` for more information.
+        See :ref:`protocol-cas50` for more information.
 
     .. c:macro:: CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS100
 
         Use or expect CAS100 variant.
 
-        See :ref:`casiolink-cas100-header-format` for more information.
+        See :ref:`protocol-cas100` for more information.
 
     .. c:macro:: CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS300
 
         Use or expect CAS300 variant.
+
+        See :ref:`protocol-cas300` for more information.
 
     Since the number of stop bits may be selectable on the calculator, it
     can also be selected manually, amongst the following:

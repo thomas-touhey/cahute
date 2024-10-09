@@ -1,10 +1,10 @@
-.. _casiolink-cas300-commands:
+.. _cas300-commands:
 
-Known CAS300 commands
-=====================
+CAS300 commands
+===============
 
 With CAS300, used by Classpad 300 / 330 (+) models, the
-:ref:`casiolink-command-packet` inner payload (*P* field) is expected to be
+:ref:`cas300-packet-01` inner payload (*P* field) is expected to be
 at least 4 bytes long, and starts with the following:
 
 .. list-table::
@@ -240,4 +240,4 @@ listing.
 ``0011`` "Request device information"
 -------------------------------------
 
-No payload. Answered by an
+No payload. Answered by a :ref:`cas300-command-0002`.

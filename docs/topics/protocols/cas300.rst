@@ -1,0 +1,34 @@
+.. _protocol-cas300:
+
+CAS300 -- Serial and USB protocol used by Classpad 300 / 330 (+)
+================================================================
+
+The CAS300 protocol is a variation of CAS50 and CAS100 specific
+to the Classpad 300 / 330 (+), used over USB and serial links
+between 2003 and 2013.
+
+.. note::
+
+    The term was coined by Thomas Touhey, as an evolution of CAS50
+    and CAS100 for the Classpad 300.
+
+For this protocol, the beginning of the communication always uses the same
+serial settings are always the same:
+
+* Speed: **38400** bauds.
+* Parity: **none**.
+* Stop bits: **1**.
+
+.. todo::
+
+    This configuration may vary following command :ref:`cas300-command-0003`.
+    It is unknown as to how for now.
+
+See the following sections for more details regarding the protocol.
+
+.. toctree::
+    :maxdepth: 2
+
+    cas300/packet-format
+    cas300/commands
+    cas300/flows

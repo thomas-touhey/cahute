@@ -1,0 +1,32 @@
+.. _protocol-cas100:
+
+CAS100 protocol -- Serial protocol used by AFX / Graph 100
+==========================================================
+
+The CAS100 protocol is an variation of CAS50 specific to the
+AFX / Graph 100, used between 1999 and 2003.
+
+.. note::
+
+    The term was coined by Thomas Touhey, as an evolution of CAS50 at
+    "double the speed", which was actually a mistake since the rendez-vous
+    baud speed of this protocol is 38400 bauds, and not 19200 (which
+    means it is actually quadruple the speed). The name was kept
+    however, because 100 also references Graph 100, the French
+    model variation implementing this protocol.
+
+For this protocol, serial settings are always the same, and do not vary
+during the transfer:
+
+* Speed: **38400** bauds.
+* Parity: **none**.
+* Stop bits: **2**.
+
+See the following sections for more details regarding the protocol.
+
+.. toctree::
+    :maxdepth: 2
+
+    cas100/packet-format
+    cas100/data-types
+    cas100/flows
