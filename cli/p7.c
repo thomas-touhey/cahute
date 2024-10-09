@@ -177,8 +177,7 @@ static int open_link(cahute_link **linkp, struct args const *args) {
 
     if (args->serial_name) {
         /* The user has selected a serial link! */
-        flags = args->serial_flags | CAHUTE_SERIAL_PROTOCOL_CASIOLINK
-                | CAHUTE_SERIAL_CASIOLINK_VARIANT_CAS300;
+        flags = args->serial_flags | CAHUTE_SERIAL_PROTOCOL_SEVEN;
         if (args->no_init)
             flags |= CAHUTE_SERIAL_NOCHECK;
         if (args->no_term)
